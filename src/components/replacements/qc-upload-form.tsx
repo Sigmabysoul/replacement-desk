@@ -58,7 +58,7 @@ export function QcUploadForm({
     const validNewPhotos: SelectedPhoto[] = [];
     for (const file of selectedFiles) {
       if (file.size > MAX_FILE_SIZE) {
-        setError(`"${file.name}" exceeds 5 MB limit.`);
+        setError(`"${file.name}" exceeds 25 MB limit.`);
         return;
       }
       if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
@@ -122,7 +122,7 @@ export function QcUploadForm({
             {photos.length === 0 ? "TAKE / UPLOAD QC PHOTO" : "ADD MORE QC PHOTOS"}
           </span>
           <span className="mt-1 text-xs text-indigo-700">
-            Supports camera or gallery. JPEG, PNG, or WebP up to 5 MB.
+            Supports camera or gallery. JPEG, PNG, or WebP up to 25 MB.
           </span>
           <input
             type="file"

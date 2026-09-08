@@ -45,14 +45,14 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
           <FileInputFeedback
             name="customer_photos"
             label="Customer photos"
-            hint="JPEG, PNG, or WebP. Up to 5 MB each."
+            hint="JPEG, PNG, or WebP. Up to 25 MB each."
             accept="image/jpeg,image/png,image/webp"
             iconType="camera"
           />
           <FileInputFeedback
             name="labels"
             label="Label / document"
-            hint="PDF or image. Up to 5 MB each."
+            hint="PDF or image. Up to 25 MB each."
             accept="application/pdf,image/jpeg,image/png,image/webp"
             iconType="document"
           />

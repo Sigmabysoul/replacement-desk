@@ -21,7 +21,7 @@ function formFiles(formData: FormData, key: string) {
 
 function validateFiles(files: File[], documentsAllowed = true) {
   for (const file of files) {
-    if (file.size > MAX_FILE_SIZE) throw new Error(`${file.name} is larger than 5 MB.`);
+    if (file.size > MAX_FILE_SIZE) throw new Error(`${file.name} is larger than 25 MB.`);
     if (!ALLOWED_MIME_TYPES.has(file.type)) throw new Error(`${file.name} is not a supported file type.`);
     if (!documentsAllowed && file.type === "application/pdf") throw new Error("QC uploads must be JPEG, PNG, or WebP images.");
   }
