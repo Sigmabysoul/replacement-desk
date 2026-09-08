@@ -10,3 +10,4 @@ create policy "authorized users can upload replacement files" on storage.objects
   public.current_active_role() in ('ESHA', 'PACKING', 'ADMIN') and
   coalesce((metadata ->> 'size')::bigint, 0) <= 26214400
 );
+
