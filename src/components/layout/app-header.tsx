@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LogOut, Settings, UserRound } from "lucide-react";
 import { logoutAction } from "@/app/actions";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import type { Profile } from "@/lib/types";
 
 export function AppHeader({ profile }: { profile: Profile }) {
@@ -14,11 +15,12 @@ export function AppHeader({ profile }: { profile: Profile }) {
         <div className="hidden lg:block">
           <p className="text-sm font-semibold text-slate-500">Internal operations</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <NotificationBell role={profile.role} />
           {profile.role === "ADMIN" && (
             <Link
               href="/admin/settings"
-              className="grid size-9 place-items-center rounded-xl text-slate-600 hover:bg-white lg:hidden"
+              className="grid size-10 place-items-center rounded-xl text-slate-600 hover:bg-white lg:hidden"
               aria-label="Settings"
             >
               <Settings className="size-4.5" />
