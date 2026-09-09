@@ -2,7 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, Check, Package, Volume2, VolumeX, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Bell,
+  Check,
+  CheckCircle2,
+  Package,
+  Volume2,
+  VolumeX,
+  X,
+  Play,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Role } from "@/lib/types";
 
@@ -15,27 +25,136 @@ interface NotificationItem {
   status?: string;
 }
 
-function playChime() {
+/**
+ * High-volume, punchy warehouse operational alert tone.
+ * Uses harmonic triangle oscillators to cut cleanly through ambient warehouse noise.
+ */
+export function playLoudWarehouseAlert(status?: string) {
   try {
     const AudioContextClass =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = "sine";
-    const now = ctx.currentTime;
-    osc.frequency.setValueAtTime(587.33, now); // D5
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
-    gain.gain.setValueAtTime(0.18, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-    osc.start(now);
-    osc.stop(now + 0.35);
+
+    // Distinctive acoustic patterns based on operational event
+    const isUrgent = status === "QC_REJECTED" || status === "NEEDS_TOKEN";
+    const frequencies = isUrgent
+      ? [750, 580] // Warning double tone
+      : [880, 1175, 1400]; // Loud, energetic triple alert
+
+    let timeOffset = ctx.currentTime;
+    frequencies.forEach((freq) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      // Triangle wave provides punchy odd harmonics without harsh distortion
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, timeOffset);
+
+      // 0.75 volume for clear audibility in warehouse / factory floors
+      gain.gain.setValueAtTime(0.75, timeOffset);
+      gain.gain.exponentialRampToValueAtTime(0.01, timeOffset + 0.14);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(timeOffset);
+      osc.stop(timeOffset + 0.15);
+
+      timeOffset += 0.12;
+    });
+
+    // Mobile device vibration
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate([250, 100, 250]);
+    }
   } catch {
-    // AudioContext blocked or user has not interacted
+    // AudioContext blocked before first user interaction
+  }
+}
+
+/**
+ * Fires a native OS/browser system notification (lock screen & desktop banner)
+ */
+function fireSystemNotification(
+  title: string,
+  body: string,
+  replacementId: string,
+  onOpen?: () => void,
+) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    try {
+      const notif = new Notification(title, {
+        body,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: `rd-${replacementId}-${Date.now()}`,
+      });
+      notif.onclick = () => {
+        window.focus();
+        if (onOpen) onOpen();
+        notif.close();
+      };
+    } catch {
+      // Fallback
+    }
+  }
+}
+
+function getNotificationContent(
+  status: string,
+  repNumber: string,
+  orderRef: string,
+  product: string,
+) {
+  switch (status) {
+    case "PACKED":
+      return {
+        title: `📦 Order Packed · ${repNumber}`,
+        body: `Order ${orderRef} (${product}) is packed & ready for dispatch.`,
+      };
+    case "SHIPPED":
+      return {
+        title: `🚚 Order Shipped · ${repNumber}`,
+        body: `Order ${orderRef} (${product}) has been marked as shipped.`,
+      };
+    case "QC_APPROVED":
+      return {
+        title: `✅ QC Approved · ${repNumber}`,
+        body: `QC approved for ${orderRef}. Ready to pack!`,
+      };
+    case "QC_REJECTED":
+      return {
+        title: `❌ QC Rejected · ${repNumber}`,
+        body: `QC rejected for ${orderRef}. Please check feedback and resubmit.`,
+      };
+    case "QC_PENDING":
+      return {
+        title: `🔍 QC Submitted · ${repNumber}`,
+        body: `Packing submitted photos for ${orderRef}. Pending review.`,
+      };
+    case "LABEL_PRINTED":
+      return {
+        title: `🖨️ Label Printed · ${repNumber}`,
+        body: `Shipping label printed for ${orderRef} (${product}).`,
+      };
+    case "NEW":
+      return {
+        title: `🆕 New Replacement · ${repNumber}`,
+        body: `Order ${orderRef} · ${product} created by Esha.`,
+      };
+    case "NEEDS_TOKEN":
+      return {
+        title: `⚠️ Token Required · ${repNumber}`,
+        body: `Need to raise token for order ${orderRef}.`,
+      };
+    default:
+      return {
+        title: `📋 Order Updated · ${repNumber}`,
+        body: `Order ${orderRef} · ${product} status changed to ${status}.`,
+      };
   }
 }
 
@@ -52,9 +171,16 @@ export function NotificationBell({ role }: { role?: Role }) {
     const saved = localStorage.getItem("rd_last_read_notif");
     return saved ? parseInt(saved, 10) : 0;
   });
+  const router = useRouter();
+  const [permission, setPermission] = useState<NotificationPermission>(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      return Notification.permission;
+    }
+    return "default";
+  });
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // Fetch initial recent replacement activity
+  // Fetch initial notifications
   useEffect(() => {
     let supabase: ReturnType<typeof createClient>;
     try {
@@ -72,23 +198,31 @@ export function NotificationBell({ role }: { role?: Role }) {
 
       if (!error && data) {
         setNotifications(
-          data.map((row) => ({
-            id: `${row.id}-${row.status}-${row.updated_at}`,
-            replacement_id: row.id,
-            title: `${row.replacement_number} · ${formatStatus(row.status)}`,
-            subtitle: `${row.order_reference} · ${row.product_name}`,
-            created_at: row.updated_at,
-            status: row.status,
-          })),
+          data.map((row) => {
+            const content = getNotificationContent(
+              row.status,
+              row.replacement_number,
+              row.order_reference,
+              row.product_name,
+            );
+            return {
+              id: `${row.id}-${row.status}-${row.updated_at}`,
+              replacement_id: row.id,
+              title: content.title,
+              subtitle: content.body,
+              created_at: row.updated_at,
+              status: row.status,
+            };
+          }),
         );
       }
     }
 
     loadNotifications();
 
-    // Listen to live database changes via Realtime
+    // Listen to live database changes via Supabase Realtime
     const channel = supabase
-      .channel("notification-bell-feed")
+      .channel("notification-bell-live")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "replacements" },
@@ -103,20 +237,35 @@ export function NotificationBell({ role }: { role?: Role }) {
           };
           if (!row || !row.id) return;
 
+          const content = getNotificationContent(
+            row.status || "UPDATED",
+            row.replacement_number || "Order",
+            row.order_reference || "",
+            row.product_name || "",
+          );
+
           const newItem: NotificationItem = {
             id: `${row.id}-${row.status}-${row.updated_at || Date.now()}`,
             replacement_id: row.id,
-            title: `${row.replacement_number || "Order"} · ${formatStatus(row.status || "UPDATED")}`,
-            subtitle: `${row.order_reference || ""} · ${row.product_name || ""}`,
+            title: content.title,
+            subtitle: content.body,
             created_at: row.updated_at || new Date().toISOString(),
             status: row.status,
           };
 
-          setNotifications((prev) => [newItem, ...prev.filter((p) => p.replacement_id !== row.id)].slice(0, 15));
+          setNotifications((prev) =>
+            [newItem, ...prev.filter((p) => p.replacement_id !== row.id)].slice(0, 15),
+          );
 
+          // 1. Play loud warehouse operational alert
           if (soundEnabled) {
-            playChime();
+            playLoudWarehouseAlert(row.status);
           }
+
+          // 2. Fire system/browser lock screen notification
+          fireSystemNotification(content.title, content.body, row.id, () => {
+            router.push(`/replacements/${row.id}`);
+          });
         },
       )
       .subscribe();
@@ -124,9 +273,9 @@ export function NotificationBell({ role }: { role?: Role }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [soundEnabled]);
+  }, [soundEnabled, router]);
 
-  // Click outside to close dropdown
+  // Click outside to close
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -155,7 +304,22 @@ export function NotificationBell({ role }: { role?: Role }) {
     const next = !soundEnabled;
     setSoundEnabled(next);
     localStorage.setItem("rd_chime_enabled", String(next));
-    if (next) playChime();
+    if (next) playLoudWarehouseAlert("PACKED");
+  }
+
+  async function requestPermission() {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      const result = await Notification.requestPermission();
+      setPermission(result);
+      if (result === "granted") {
+        playLoudWarehouseAlert("PACKED");
+        fireSystemNotification(
+          "🔔 Notifications Enabled!",
+          "You will receive loud alerts when orders are packed, shipped, or approved.",
+          "",
+        );
+      }
+    }
   }
 
   return (
@@ -174,7 +338,7 @@ export function NotificationBell({ role }: { role?: Role }) {
       >
         <Bell className="size-5" />
         {unreadCount > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white shadow-sm ring-2 ring-white">
+          <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white shadow-sm ring-2 ring-white animate-pulse">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -200,8 +364,17 @@ export function NotificationBell({ role }: { role?: Role }) {
             <div className="flex items-center gap-1">
               <button
                 type="button"
+                onClick={() => playLoudWarehouseAlert("PACKED")}
+                title="Test loud warehouse alert sound"
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
+              >
+                <Play className="size-3 fill-indigo-600" />
+                <span>Test</span>
+              </button>
+              <button
+                type="button"
                 onClick={toggleSound}
-                title={soundEnabled ? "Mute alert chime" : "Enable alert chime"}
+                title={soundEnabled ? "Mute loud alert sound" : "Enable loud alert sound"}
                 className={`grid size-7 place-items-center rounded-lg text-xs transition ${
                   soundEnabled ? "text-indigo-600 hover:bg-indigo-50" : "text-slate-400 hover:bg-slate-100"
                 }`}
@@ -228,6 +401,31 @@ export function NotificationBell({ role }: { role?: Role }) {
             </div>
           </div>
 
+          {/* Browser System Notification Banner */}
+          {permission !== "granted" && (
+            <div className="m-2 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-sky-50 p-3">
+              <div className="flex items-start gap-2.5">
+                <Bell className="mt-0.5 size-4 shrink-0 text-indigo-600" />
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-indigo-950">
+                    Get System & Lock-screen Alerts
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-indigo-700">
+                    Receive pop-ups when orders are packed, shipped, or approved even in background.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={requestPermission}
+                    className="mt-2 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-indigo-700"
+                  >
+                    <CheckCircle2 className="size-3.5" />
+                    Enable Device Alerts
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 py-1">
             {notifications.length === 0 ? (
               <div className="py-8 text-center">
@@ -247,7 +445,7 @@ export function NotificationBell({ role }: { role?: Role }) {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-bold text-slate-900">{item.title}</p>
-                    <p className="truncate text-[11px] text-slate-500">{item.subtitle}</p>
+                    <p className="line-clamp-2 text-[11px] text-slate-500">{item.subtitle}</p>
                     <p className="mt-0.5 text-[10px] text-slate-400">
                       {formatTimeAgo(item.created_at)}
                     </p>
@@ -260,31 +458,6 @@ export function NotificationBell({ role }: { role?: Role }) {
       )}
     </div>
   );
-}
-
-function formatStatus(status: string) {
-  switch (status) {
-    case "NEW":
-      return "New Request";
-    case "LABEL_PRINTED":
-      return "Label Printed";
-    case "QC_PENDING":
-      return "QC Submitted";
-    case "QC_APPROVED":
-      return "QC Approved";
-    case "QC_REJECTED":
-      return "QC Rejected";
-    case "PACKED":
-      return "Packed";
-    case "SHIPPED":
-      return "Shipped";
-    case "NEEDS_TOKEN":
-      return "Needs Token";
-    case "CANCELLED":
-      return "Cancelled";
-    default:
-      return status;
-  }
 }
 
 function formatTimeAgo(timestamp: string) {
