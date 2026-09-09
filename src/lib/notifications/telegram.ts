@@ -37,22 +37,36 @@ export async function notifyTelegram(
     if (!target) continue;
     let status = "SENT";
     let error: string | null = null;
-    try {
-      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          chat_id: target,
-          text: message,
-          disable_web_page_preview: true,
-          link_preview_options: { is_disabled: true },
-        }),
-      });
-      if (!response.ok) throw new Error(`Telegram returned ${response.status}`);
-    } catch (caught) {
+    let ok = false;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            chat_id: target,
+            text: message,
+            disable_web_page_preview: true,
+            link_preview_options: { is_disabled: true },
+          }),
+        });
+        if (response.ok) {
+          ok = true;
+          break;
+        }
+        if (attempt === 1) await new Promise((r) => setTimeout(r, 400));
+        else error = `Telegram returned ${response.status}`;
+      } catch (caught) {
+        if (attempt === 1) {
+          await new Promise((r) => setTimeout(r, 400));
+        } else {
+          error = caught instanceof Error ? caught.message.slice(0, 500) : "Unknown Telegram error";
+        }
+      }
+    }
+    if (!ok) {
       failed = true;
       status = "FAILED";
-      error = caught instanceof Error ? caught.message.slice(0, 500) : "Unknown Telegram error";
     }
     if (admin) {
       try {

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Camera, Send, Trash2, AlertCircle } from "lucide-react";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { MAX_FILE_SIZE } from "@/lib/replacements/validation";
+import { compressImage } from "@/lib/image-compression";
 
 interface SelectedPhoto {
   id: string;
@@ -45,7 +46,7 @@ export function QcUploadForm({
     };
   }, [photos]);
 
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     setError(null);
     const selectedFiles = Array.from(event.target.files ?? []);
     if (!selectedFiles.length) return;
@@ -56,15 +57,16 @@ export function QcUploadForm({
     }
 
     const validNewPhotos: SelectedPhoto[] = [];
-    for (const file of selectedFiles) {
-      if (file.size > MAX_FILE_SIZE) {
-        setError(`"${file.name}" exceeds 25 MB limit.`);
+    for (const rawFile of selectedFiles) {
+      if (rawFile.size > MAX_FILE_SIZE) {
+        setError(`"${rawFile.name}" exceeds 25 MB limit.`);
         return;
       }
-      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-        setError(`"${file.name}" is not a supported image (use JPEG, PNG, or WebP).`);
+      if (!["image/jpeg", "image/png", "image/webp"].includes(rawFile.type)) {
+        setError(`"${rawFile.name}" is not a supported image (use JPEG, PNG, or WebP).`);
         return;
       }
+      const file = await compressImage(rawFile);
       validNewPhotos.push({
         id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
         file,
@@ -122,7 +124,7 @@ export function QcUploadForm({
             {photos.length === 0 ? "TAKE / UPLOAD QC PHOTO" : "ADD MORE QC PHOTOS"}
           </span>
           <span className="mt-1 text-xs text-indigo-700">
-            Supports camera or gallery. JPEG, PNG, or WebP up to 25 MB.
+            Supports camera or gallery. Photos auto-optimized for high-speed upload.
           </span>
           <input
             type="file"
@@ -160,7 +162,9 @@ export function QcUploadForm({
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
                   <p className="truncate text-[11px] font-medium text-white">
-                    {(photo.file.size / (1024 * 1024)).toFixed(1)} MB
+                    {photo.file.size < 1024 * 1024
+                      ? `${(photo.file.size / 1024).toFixed(0)} KB (optimized)`
+                      : `${(photo.file.size / (1024 * 1024)).toFixed(1)} MB`}
                   </p>
                 </div>
                 <button

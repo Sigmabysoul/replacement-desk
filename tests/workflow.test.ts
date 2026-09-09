@@ -13,6 +13,8 @@ import {
 } from "@/lib/replacements/validation";
 import { formatTelegramMessage } from "@/lib/notifications/format";
 import { safeFileName } from "@/lib/utils";
+import { validateMagicBytes } from "@/lib/security/magic-bytes";
+import { checkRateLimit, resetRateLimit } from "@/lib/security/rate-limit";
 
 describe("replacement workflow permissions", () => {
   it("prevents packing from approving QC", () => {
@@ -224,3 +226,59 @@ describe("telegram notification formatting", () => {
     expect(msg).toContain("Replacement completed.");
   });
 });
+
+describe("security: binary magic byte validation", () => {
+  it("recognizes valid JPEG file signature", () => {
+    const header = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+    expect(validateMagicBytes(header, "image/jpeg")).toBe(true);
+    expect(validateMagicBytes(header, "image/png")).toBe(false);
+  });
+
+  it("recognizes valid PNG file signature", () => {
+    const header = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    expect(validateMagicBytes(header, "image/png")).toBe(true);
+    expect(validateMagicBytes(header, "image/jpeg")).toBe(false);
+  });
+
+  it("recognizes valid WebP file signature", () => {
+    const header = new Uint8Array([
+      0x52, 0x49, 0x46, 0x46, // RIFF
+      0x00, 0x00, 0x00, 0x00,
+      0x57, 0x45, 0x42, 0x50, // WEBP
+    ]);
+    expect(validateMagicBytes(header, "image/webp")).toBe(true);
+    expect(validateMagicBytes(header, "image/png")).toBe(false);
+  });
+
+  it("recognizes valid PDF file signature", () => {
+    const header = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
+    expect(validateMagicBytes(header, "application/pdf")).toBe(true);
+    expect(validateMagicBytes(header, "image/jpeg")).toBe(false);
+  });
+
+  it("rejects spoofed executable masquerading as an image", () => {
+    const exeHeader = new Uint8Array([0x4d, 0x5a, 0x90, 0x00]); // MZ executable header
+    expect(validateMagicBytes(exeHeader, "image/jpeg")).toBe(false);
+    expect(validateMagicBytes(exeHeader, "image/png")).toBe(false);
+    expect(validateMagicBytes(exeHeader, "application/pdf")).toBe(false);
+  });
+});
+
+describe("security: sliding window rate limiter", () => {
+  it("enforces max attempts and blocks brute force", () => {
+    const testKey = `test-ip-${Date.now()}`;
+    for (let i = 1; i <= 5; i++) {
+      const res = checkRateLimit(testKey, 5, 60000);
+      expect(res.allowed).toBe(true);
+    }
+    // 6th attempt must be blocked
+    const blocked = checkRateLimit(testKey, 5, 60000);
+    expect(blocked.allowed).toBe(false);
+    expect(blocked.retryAfterSeconds).toBeGreaterThan(0);
+
+    // Resetting clears the limit
+    resetRateLimit(testKey);
+    expect(checkRateLimit(testKey, 5, 60000).allowed).toBe(true);
+  });
+});
+

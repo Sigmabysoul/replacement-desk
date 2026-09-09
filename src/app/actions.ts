@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +10,8 @@ import { requireProfile } from "@/lib/auth/session";
 import { ALLOWED_MIME_TYPES, commentSchema, MAX_FILE_SIZE, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
 import { safeFileName } from "@/lib/utils";
 import { notifyTelegram } from "@/lib/notifications/telegram";
+import { verifyFileSignature } from "@/lib/security/magic-bytes";
+import { checkRateLimit, resetRateLimit } from "@/lib/security/rate-limit";
 import type { AttachmentType, Replacement, Role } from "@/lib/types";
 
 function messageFrom(error: unknown) {
@@ -19,11 +22,13 @@ function formFiles(formData: FormData, key: string) {
   return formData.getAll(key).filter((value): value is File => value instanceof File && value.size > 0);
 }
 
-function validateFiles(files: File[], documentsAllowed = true) {
+async function validateFiles(files: File[], documentsAllowed = true) {
   for (const file of files) {
     if (file.size > MAX_FILE_SIZE) throw new Error(`${file.name} is larger than 25 MB.`);
     if (!ALLOWED_MIME_TYPES.has(file.type)) throw new Error(`${file.name} is not a supported file type.`);
     if (!documentsAllowed && file.type === "application/pdf") throw new Error("QC uploads must be JPEG, PNG, or WebP images.");
+    const validSignature = await verifyFileSignature(file);
+    if (!validSignature) throw new Error(`${file.name} is corrupted or has an unrecognized file header.`);
   }
 }
 
@@ -63,11 +68,21 @@ async function uploadFiles(
 }
 
 export async function loginAction(formData: FormData) {
-  const email = String(formData.get("email") ?? "").trim();
+  const reqHeaders = await headers();
+  const ip = reqHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || reqHeaders.get("x-real-ip") || "unknown";
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const rateLimitKey = `login:${ip}:${email}`;
+  const rate = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
+  if (!rate.allowed) {
+    const waitMinutes = Math.ceil(rate.retryAfterSeconds / 60);
+    redirect(`/login?error=${encodeURIComponent(`Too many failed login attempts. Please wait ${waitMinutes} minute${waitMinutes > 1 ? "s" : ""}.`)}`);
+  }
+
   const password = String(formData.get("password") ?? "");
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) redirect(`/login?error=${encodeURIComponent(error.message || "Email or password is incorrect.")}`);
+  resetRateLimit(rateLimitKey);
   redirect("/");
 }
 
@@ -85,8 +100,8 @@ export async function createReplacementAction(formData: FormData) {
   const customerPhotos = formFiles(formData, "customer_photos");
   const labels = formFiles(formData, "labels");
   try {
-    validateFiles(customerPhotos, false);
-    validateFiles(labels);
+    await validateFiles(customerPhotos, false);
+    await validateFiles(labels);
   } catch (error) {
     redirect(`/replacements/new?error=${encodeURIComponent(messageFrom(error))}`);
   }
@@ -180,7 +195,9 @@ export async function submitQcAction(formData: FormData) {
   const files = formFiles(formData, "qc_photos");
   if (!/^[0-9a-f-]{36}$/i.test(replacementId)) redirect("/replacements?error=Invalid%20replacement.");
   if (!files.length) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add at least one QC photo.")}`);
-  try { validateFiles(files, false); } catch (error) {
+  try {
+    await validateFiles(files, false);
+  } catch (error) {
     redirect(`/replacements/${replacementId}?error=${encodeURIComponent(messageFrom(error))}`);
   }
   const submissionId = randomUUID();

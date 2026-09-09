@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Camera, FileText, CheckCircle2 } from "lucide-react";
 import { Field } from "@/components/ui/field";
+import { compressImage } from "@/lib/image-compression";
 
 export function FileInputFeedback({
   name,
@@ -20,10 +21,35 @@ export function FileInputFeedback({
   const [selectedCount, setSelectedCount] = useState<number>(0);
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
 
-  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
-    setSelectedCount(files.length);
-    setSelectedNames(files.map((f) => f.name));
+  async function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const rawFiles = Array.from(event.target.files ?? []);
+    if (!rawFiles.length) {
+      setSelectedCount(0);
+      setSelectedNames([]);
+      return;
+    }
+
+    const compressedFiles: File[] = [];
+    for (const f of rawFiles) {
+      if (f.type.startsWith("image/") && f.type !== "image/svg+xml") {
+        compressedFiles.push(await compressImage(f));
+      } else {
+        compressedFiles.push(f);
+      }
+    }
+
+    try {
+      const dt = new DataTransfer();
+      for (const f of compressedFiles) {
+        dt.items.add(f);
+      }
+      event.target.files = dt.files;
+    } catch {
+      // Fallback
+    }
+
+    setSelectedCount(compressedFiles.length);
+    setSelectedNames(compressedFiles.map((f) => f.name));
   }
 
   const Icon = iconType === "camera" ? Camera : FileText;

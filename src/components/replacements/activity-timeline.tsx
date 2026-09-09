@@ -21,7 +21,7 @@ const actionCopy: Record<string, string> = {
   QC_APPROVED: "Approved QC",
   PACKED: "Packed the replacement",
   SHIPPED: "Marked replacement as shipped",
-  NEEDS_TOKEN: "Marked replacement as needing token",
+  NEEDS_TOKEN: "Need to raise token",
   COMMENT_ADDED: "Commented",
   FILE_UPLOADED: "Uploaded a file",
   CANCELLED: "Cancelled the replacement",
