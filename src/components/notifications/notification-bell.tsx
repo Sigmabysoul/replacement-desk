@@ -94,6 +94,7 @@ function fireSystemNotification(
       });
       notif.onclick = () => {
         window.focus();
+        window.location.href = `/replacements/${replacementId}`;
         if (onOpen) onOpen();
         notif.close();
       };
@@ -171,11 +172,18 @@ export function NotificationBell({ role }: { role?: Role }) {
     const saved = localStorage.getItem("rd_last_read_notif");
     return saved ? parseInt(saved, 10) : 0;
   });
+  const [permission, setPermission] = useState<NotificationPermission>("default");
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Sync browser notification permission state
+  useEffect(() => {
   const router = useRouter();
   const [permission, setPermission] = useState<NotificationPermission>(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
+      setPermission(Notification.permission);
       return Notification.permission;
     }
+  }, []);
     return "default";
   });
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -263,6 +271,7 @@ export function NotificationBell({ role }: { role?: Role }) {
           }
 
           // 2. Fire system/browser lock screen notification
+          fireSystemNotification(content.title, content.body, row.id);
           fireSystemNotification(content.title, content.body, row.id, () => {
             router.push(`/replacements/${row.id}`);
           });
@@ -273,6 +282,7 @@ export function NotificationBell({ role }: { role?: Role }) {
     return () => {
       supabase.removeChannel(channel);
     };
+  }, [soundEnabled]);
   }, [soundEnabled, router]);
 
   // Click outside to close
