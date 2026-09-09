@@ -75,7 +75,12 @@ export function playLoudWarehouseAlert(status?: string) {
 }
 
 /**
- * Fires a native OS/browser system notification (lock screen & desktop banner)
+ * Fires a native OS/browser system notification (lock screen & desktop banner).
+ *
+ * @param title Bold notification header.
+ * @param body Descriptive text detailing the order event.
+ * @param replacementId Replacement record UUID.
+ * @param onOpen Optional callback executed when user clicks the notification banner.
  */
 function fireSystemNotification(
   title: string,
@@ -94,8 +99,9 @@ function fireSystemNotification(
       });
       notif.onclick = () => {
         window.focus();
-        window.location.href = `/replacements/${replacementId}`;
-        if (onOpen) onOpen();
+        if (onOpen) {
+          onOpen();
+        }
         notif.close();
       };
     } catch {
@@ -104,6 +110,16 @@ function fireSystemNotification(
   }
 }
 
+/**
+ * Generates user-facing notification titles and descriptive summaries
+ * corresponding to replacement lifecycle status updates.
+ *
+ * @param status Operational order status.
+ * @param repNumber Formatted replacement ID (e.g. REP-2026-0001).
+ * @param orderRef Original customer sales order reference.
+ * @param product Product SKU or item name.
+ * @returns Object with formatted `title` and `body` strings.
+ */
 function getNotificationContent(
   status: string,
   repNumber: string,
@@ -159,7 +175,20 @@ function getNotificationContent(
   }
 }
 
+/**
+ * Top navigation notification center component.
+ *
+ * Capabilities:
+ * - Realtime badge counter for unread order updates.
+ * - Loud synthesized warehouse acoustic alerts via Web Audio API.
+ * - Native desktop and mobile browser push notifications with permission prompt.
+ * - Live subscription to Supabase Realtime `replacements` table mutations.
+ * - Dropdown feed with direct links to recent replacement orders.
+ *
+ * @param props.role Current user's department role.
+ */
 export function NotificationBell({ role }: { role?: Role }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
@@ -172,23 +201,15 @@ export function NotificationBell({ role }: { role?: Role }) {
     const saved = localStorage.getItem("rd_last_read_notif");
     return saved ? parseInt(saved, 10) : 0;
   });
-  const [permission, setPermission] = useState<NotificationPermission>("default");
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
-
-  // Sync browser notification permission state
-  useEffect(() => {
-  const router = useRouter();
   const [permission, setPermission] = useState<NotificationPermission>(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
-      setPermission(Notification.permission);
       return Notification.permission;
     }
-  }, []);
     return "default";
   });
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // Fetch initial notifications
+  // Fetch initial notifications and subscribe to live changes
   useEffect(() => {
     let supabase: ReturnType<typeof createClient>;
     try {
@@ -271,7 +292,6 @@ export function NotificationBell({ role }: { role?: Role }) {
           }
 
           // 2. Fire system/browser lock screen notification
-          fireSystemNotification(content.title, content.body, row.id);
           fireSystemNotification(content.title, content.body, row.id, () => {
             router.push(`/replacements/${row.id}`);
           });
@@ -282,7 +302,6 @@ export function NotificationBell({ role }: { role?: Role }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [soundEnabled]);
   }, [soundEnabled, router]);
 
   // Click outside to close
@@ -470,6 +489,12 @@ export function NotificationBell({ role }: { role?: Role }) {
   );
 }
 
+/**
+ * Computes a relative, human-friendly duration string (e.g. "Just now", "5m ago", "2h ago").
+ *
+ * @param timestamp ISO date string or millisecond timestamp.
+ * @returns Short human-readable relative time string.
+ */
 function formatTimeAgo(timestamp: string) {
   const diff = Date.now() - new Date(timestamp).getTime();
   const minutes = Math.floor(diff / 60000);

@@ -22,6 +22,19 @@ if (typeof setInterval !== "undefined") {
   }, 5 * 60 * 1000).unref?.();
 }
 
+/**
+ * Evaluates whether an incoming action or request violates rate limiting constraints.
+ *
+ * Implements a memory-safe sliding window counter:
+ * - If no previous record exists or window expired, creates a fresh record with `count = 1`.
+ * - If count exceeds `maxAttempts`, returns `{ allowed: false }` with remaining cooldown seconds.
+ * - Otherwise increments the counter and returns `{ allowed: true }` with remaining attempts.
+ *
+ * @param key Unique rate limiting key (e.g., `login:${ip}`).
+ * @param maxAttempts Maximum permitted attempts within the window (default: 5).
+ * @param windowMs Duration of the sliding window in milliseconds (default: 15 minutes).
+ * @returns Object indicating whether the attempt is allowed, remaining quota, and retry cooldown in seconds.
+ */
 export function checkRateLimit(
   key: string,
   maxAttempts = 5,
@@ -48,6 +61,12 @@ export function checkRateLimit(
   };
 }
 
+/**
+ * Resets or clears the rate limit record for a specific key.
+ * Typically called after a successful authentication to prevent lockouts on legitimate users.
+ *
+ * @param key Rate limit key to clear (e.g. `login:${ip}`).
+ */
 export function resetRateLimit(key: string) {
   stores.delete(key);
 }

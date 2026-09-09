@@ -10,6 +10,20 @@ export interface CompressionOptions {
   quality?: number;
 }
 
+/**
+ * Compresses an image file in the browser using an off-screen HTML5 Canvas.
+ *
+ * Algorithm & rules:
+ * - Non-raster images (e.g. PDF, SVG) are returned untouched.
+ * - Images already under 350KB are returned untouched to preserve fidelity and avoid CPU overhead.
+ * - Resizes image dimensions preserving aspect ratio so neither width nor height exceeds `options.maxDimension` (default: 1920px).
+ * - Encodes canvas output as JPEG at `options.quality` (default: 0.85).
+ * - If compressed output is unexpectedly larger than original, returns original file.
+ *
+ * @param file Original File object from `<input type="file">`.
+ * @param options Optional overrides for `maxDimension` and `quality`.
+ * @returns Compressed File object (JPEG format) or original File if uncompressed.
+ */
 export async function compressImage(
   file: File,
   options: CompressionOptions = {},
@@ -86,6 +100,13 @@ export async function compressImage(
   });
 }
 
+/**
+ * Concurrently compresses an array of image files using `Promise.all`.
+ *
+ * @param files Array of File objects to compress.
+ * @param options Optional compression configuration passed to each `compressImage` call.
+ * @returns Array of compressed (or original) File objects in the same order.
+ */
 export async function compressImages(
   files: File[],
   options?: CompressionOptions,

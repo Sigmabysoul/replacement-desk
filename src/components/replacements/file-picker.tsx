@@ -5,6 +5,18 @@ import { Camera, FileText, CheckCircle2 } from "lucide-react";
 import { Field } from "@/components/ui/field";
 import { compressImage } from "@/lib/image-compression";
 
+/**
+ * Touch-friendly file upload picker with real-time compression and selection feedback.
+ *
+ * Automatically intercepts picked image files, runs client-side compression via HTML5 Canvas,
+ * updates the input element's `DataTransfer` file list, and renders selected file badges.
+ *
+ * @param props.name HTML `<input type="file">` name attribute.
+ * @param props.label Accessible form field label text.
+ * @param props.hint Optional guidance subtitle text.
+ * @param props.accept Allowed MIME types (e.g. `image/jpeg,application/pdf`).
+ * @param props.iconType Visual icon style ('camera' or 'document').
+ */
 export function FileInputFeedback({
   name,
   label,

@@ -9,10 +9,32 @@ import type { Replacement, Role } from "@/lib/types";
 
 export type { NotificationType };
 
+/**
+ * Resolves the Telegram chat ID associated with a department role from environment variables.
+ * E.g., `TELEGRAM_ESHA_CHAT_ID`, `TELEGRAM_PACKING_CHAT_ID`.
+ *
+ * @param role The target department role.
+ * @returns Configured chat ID string or `undefined`.
+ */
 function chatId(role: Role) {
   return process.env[`TELEGRAM_${role}_CHAT_ID`];
 }
 
+/**
+ * Dispatches automated operational notifications to departmental Telegram groups.
+ *
+ * Workflow:
+ * 1. Checks if `TELEGRAM_BOT_TOKEN` is configured; skips silently if omitted (local dev mode).
+ * 2. Looks up all recipient roles mapped to the `type` event.
+ * 3. Sends formatted messages with a 2-attempt retry loop on network glitches.
+ * 4. Logs the delivery attempt (`SENT` or `FAILED`) into the `notifications` audit table.
+ *
+ * @param type Event type identifier (e.g., `NEW_REPLACEMENT`, `QC_SUBMITTED`, `PACKED`).
+ * @param replacement Minimal replacement order details.
+ * @param detail Optional additional context or rejection explanation.
+ * @param actorName Optional name of the person performing the action.
+ * @returns Status object `{ ok: boolean, skipped: boolean }`.
+ */
 export async function notifyTelegram(
   type: NotificationType,
   replacement: Pick<Replacement, "id" | "replacement_number" | "product_name" | "quantity">,

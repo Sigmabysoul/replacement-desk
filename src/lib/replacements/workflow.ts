@@ -41,14 +41,53 @@ const permissions: Record<WorkflowAction, readonly Role[]> = {
   UPLOAD: ["ESHA", "PACKING", "ADMIN"],
 };
 
+/**
+ * Determines whether a replacement order can legally transition from one status to another.
+ *
+ * Enforces the core state machine:
+ * - NEW -> LABEL_PRINTED or CANCELLED
+ * - LABEL_PRINTED -> QC_PENDING or CANCELLED
+ * - QC_PENDING -> QC_APPROVED, QC_REJECTED, or CANCELLED
+ * - QC_REJECTED -> QC_PENDING or CANCELLED
+ * - QC_APPROVED -> PACKED or CANCELLED
+ * - PACKED -> SHIPPED, NEEDS_TOKEN, or CANCELLED
+ * - NEEDS_TOKEN -> SHIPPED or CANCELLED
+ * - SHIPPED / CANCELLED are terminal states (no further transitions).
+ *
+ * @param from Current status of the replacement.
+ * @param to Proposed destination status.
+ * @returns `true` if the transition is allowed; otherwise `false`.
+ */
 export function canTransition(from: ReplacementStatus, to: ReplacementStatus) {
   return transitions[from].includes(to);
 }
 
+/**
+ * Checks whether a user with the given role is authorized to perform a workflow action.
+ *
+ * Role capabilities:
+ * - ESHA: Creates, edits, reviews QC, marks shipped, marks needs token.
+ * - PRINTING: Prints shipping labels.
+ * - PACKING: Submits QC photos, packs orders.
+ * - ADMIN: Superuser across all operations and cancellations.
+ *
+ * @param role User's operational role.
+ * @param action Workflow action to check.
+ * @returns `true` if authorized; otherwise `false`.
+ */
 export function canPerform(role: Role, action: WorkflowAction) {
   return permissions[action].includes(role);
 }
 
+/**
+ * Validates role authorization and status transition constraints, throwing an error on failure.
+ *
+ * @param role User's operational role.
+ * @param action Workflow action being attempted.
+ * @param from Optional current replacement status.
+ * @param to Optional target replacement status.
+ * @throws Error if the role cannot perform the action or if the transition is illegal.
+ */
 export function assertWorkflowAction(
   role: Role,
   action: WorkflowAction,
@@ -61,6 +100,14 @@ export function assertWorkflowAction(
   }
 }
 
+/**
+ * Computes the full list of actions available to a user role given the current order status.
+ * Used by UI components to conditionally render action buttons and controls.
+ *
+ * @param role User's operational role.
+ * @param status Current status of the replacement.
+ * @returns Array of available `WorkflowAction` keys.
+ */
 export function availableActions(role: Role, status: ReplacementStatus): WorkflowAction[] {
   const actions: WorkflowAction[] = ["COMMENT"];
   if (canPerform(role, "UPLOAD")) actions.push("UPLOAD");
@@ -76,6 +123,14 @@ export function availableActions(role: Role, status: ReplacementStatus): Workflo
   return actions;
 }
 
+/**
+ * Formats standard replacement identifiers in the `REP-YYYY-NNNN` sequence pattern.
+ *
+ * @param year 4-digit Gregorian year (2000 to 9999).
+ * @param sequence Integer sequence number (1 to 9999), padded with leading zeros.
+ * @returns Formatted identifier, e.g. "REP-2026-0042".
+ * @throws Error if year or sequence are out of acceptable bounds.
+ */
 export function nextReplacementNumber(year: number, sequence: number) {
   if (!Number.isInteger(year) || year < 2000 || year > 9999) throw new Error("Invalid year");
   if (!Number.isInteger(sequence) || sequence < 1 || sequence > 9999) throw new Error("Invalid sequence");

@@ -10,6 +10,19 @@ import { availableActions } from "@/lib/replacements/workflow";
 import { QcUploadForm } from "@/components/replacements/qc-upload-form";
 import type { Attachment, Profile, Replacement } from "@/lib/types";
 
+/**
+ * Role-aware operational action panel rendered on the replacement detail screen.
+ *
+ * Dynamically presents only legal actions based on user's active role and current status:
+ * - PRINTING: Downloads shipping label and confirms label printing.
+ * - PACKING: Renders QC camera/upload form (when in LABEL_PRINTED / QC_REJECTED) and packs order (after QC_APPROVED).
+ * - ESHA: Reviews QC photos (Approve / Reject with feedback), marks dispatched (SHIPPED / NEEDS_TOKEN).
+ * - ADMIN: Performs any standard transition or uses emergency status override with reason logging.
+ *
+ * @param props.replacement Current replacement order data.
+ * @param props.profile Active user session profile.
+ * @param props.attachments Array of uploaded files (labels, QC photos, customer proofs).
+ */
 export function ActionPanel({
   replacement,
   profile,

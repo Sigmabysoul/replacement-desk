@@ -1,6 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+/**
+ * Verifies whether required Supabase public environment variables are present.
+ * Used for graceful fallback during initial repository setup or local testing.
+ *
+ * @returns `true` if URL and anon key exist; otherwise `false`.
+ */
 export function isSupabaseConfigured() {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -8,6 +14,15 @@ export function isSupabaseConfigured() {
   );
 }
 
+/**
+ * Creates a server-side Supabase client bound to the current Next.js request cookie store.
+ *
+ * Used in Server Components, Server Actions, and Route Handlers.
+ * Seamlessly extracts cookies to authenticate as the current user and enforce Postgres RLS policies.
+ *
+ * @throws Error if Supabase environment variables are missing.
+ * @returns Initialized server Supabase client.
+ */
 export async function createClient() {
   const cookieStore = await cookies();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

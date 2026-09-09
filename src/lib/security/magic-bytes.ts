@@ -4,6 +4,19 @@
  * with a false extension or Content-Type header.
  */
 
+/**
+ * Inspects a byte buffer against known magic number signatures for allowed MIME types.
+ *
+ * Supported formats:
+ * - `image/jpeg`: Starts with `FF D8 FF`
+ * - `image/png`: Starts with `89 50 4E 47 0D 0A 1A 0A`
+ * - `image/webp`: Starts with `RIFF` at [0..3] and `WEBP` at [8..11]
+ * - `application/pdf`: Starts with `%PDF` (`25 50 44 46`)
+ *
+ * @param header Raw binary header buffer (at least 4-12 bytes required depending on type).
+ * @param mimeType Expected MIME type claimed in the HTTP request or File object.
+ * @returns `true` if the binary signature matches the claimed MIME type; otherwise `false`.
+ */
 export function validateMagicBytes(header: Uint8Array, mimeType: string): boolean {
   if (header.length < 4) return false;
 
@@ -56,7 +69,13 @@ export function validateMagicBytes(header: Uint8Array, mimeType: string): boolea
 }
 
 /**
- * Reads the first 16 bytes of a File/Blob and verifies its binary signature.
+ * Reads the initial 16 bytes of a browser/Node `File` blob and verifies its binary signature.
+ *
+ * Slices only the first 16 bytes into memory to remain fast and memory-efficient
+ * without loading large file payloads into RAM.
+ *
+ * @param file The browser/Node File object to verify.
+ * @returns Resolves to `true` if magic bytes match `file.type`, or `false` on mismatch or read error.
  */
 export async function verifyFileSignature(file: File): Promise<boolean> {
   try {

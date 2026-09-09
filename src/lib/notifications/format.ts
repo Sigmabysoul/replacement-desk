@@ -21,6 +21,16 @@ export const NOTIFICATION_RECIPIENTS: Record<NotificationType, readonly Role[]> 
   NEEDS_TOKEN: ["ESHA", "ADMIN"],
 };
 
+/**
+ * Formats a clean, readable multi-line plain text message for Telegram notifications.
+ *
+ * @param type The operational event triggering the notification (e.g. `NEW_REPLACEMENT`, `PACKED`).
+ * @param replacement Subset of replacement details (`id`, `replacement_number`, `product_name`, `quantity`).
+ * @param appUrl Optional base URL of the deployed application used to generate direct links.
+ * @param detail Optional secondary message or QC rejection reason.
+ * @param actorName Optional display name of the user who initiated the action.
+ * @returns Formatted notification text ready to be dispatched to the Telegram Bot API.
+ */
 export function formatTelegramMessage(
   type: NotificationType,
   replacement: Pick<Replacement, "id" | "replacement_number" | "product_name" | "quantity">,

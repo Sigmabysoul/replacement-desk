@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+/**
+ * Zod helper that validates optional string fields, trims whitespace,
+ * enforces maximum length, and converts empty strings to `null`.
+ *
+ * @param max Maximum character length allowed.
+ */
 const optionalText = (max: number) => z.string().trim().max(max).optional().transform((value) => value || null);
 
 export const replacementSchema = z.object({

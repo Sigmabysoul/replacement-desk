@@ -13,6 +13,19 @@ interface SelectedPhoto {
   previewUrl: string;
 }
 
+/**
+ * Interactive camera and photo upload form for warehouse quality control (QC).
+ *
+ * Features:
+ * - Direct camera capture support on mobile (`capture="environment"`).
+ * - Client-side automatic image compression via Canvas to avoid server payload limits.
+ * - Thumbnail previews with individual deletion.
+ * - `DataTransfer` synchronization with the native form `<input type="file">` payload.
+ * - Enforces 1 to 12 photo boundary and 25MB per-file size guard.
+ *
+ * @param props.replacementId Target replacement order UUID.
+ * @param props.action Next.js server action to execute upon submission (`submitQcAction`).
+ */
 export function QcUploadForm({
   replacementId,
   action,

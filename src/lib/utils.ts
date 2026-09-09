@@ -2,6 +2,12 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { ReplacementStatus } from "@/lib/types";
 
+/**
+ * Merges and deduplicates Tailwind CSS class names cleanly using `clsx` and `twMerge`.
+ *
+ * @param inputs Conditional class names, arrays, or objects.
+ * @returns Resolved Tailwind className string without conflicting classes.
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -30,6 +36,14 @@ export const statusTone: Record<ReplacementStatus, string> = {
   CANCELLED: "bg-slate-100 text-slate-500 ring-slate-200",
 };
 
+/**
+ * Formats an ISO date timestamp string into Indian English locale representation.
+ * E.g. "09 Sep 2026, 11:45 PM".
+ *
+ * @param value ISO-8601 date string.
+ * @param withTime Whether to include the 12-hour hour:minute time suffix (default: true).
+ * @returns Human-readable localized date string.
+ */
 export function formatDate(value: string, withTime = true) {
   return new Intl.DateTimeFormat("en-IN", {
     day: "2-digit",
@@ -39,6 +53,15 @@ export function formatDate(value: string, withTime = true) {
   }).format(new Date(value));
 }
 
+/**
+ * Sanitizes an uploaded file name to make it safe for filesystem and S3/Supabase storage.
+ *
+ * Replaces non-alphanumeric characters with dashes, condenses double dashes,
+ * strips leading/trailing dashes, and bounds length to 100 characters.
+ *
+ * @param name The original file name from user input or multipart form data.
+ * @returns Clean, storage-safe filename.
+ */
 export function safeFileName(name: string) {
   const clean = name
     .toLowerCase()

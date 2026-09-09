@@ -14,15 +14,28 @@ import { verifyFileSignature } from "@/lib/security/magic-bytes";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rate-limit";
 import type { AttachmentType, Replacement, Role } from "@/lib/types";
 
-function messageFrom(error: unknown) {
+/**
+ * Extracts a user-friendly error message string from an unknown caught error.
+ */
+function messageFrom(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong. Your change was not saved.";
 }
 
-function formFiles(formData: FormData, key: string) {
+/**
+ * Extracts all non-empty File instances from FormData for a given field key.
+ */
+function formFiles(formData: FormData, key: string): File[] {
   return formData.getAll(key).filter((value): value is File => value instanceof File && value.size > 0);
 }
 
-async function validateFiles(files: File[], documentsAllowed = true) {
+/**
+ * Validates uploaded files against size constraints, allowed MIME types,
+ * and genuine binary magic byte signatures (preventing file spoofing).
+ *
+ * @param files - List of files to validate
+ * @param documentsAllowed - When false, restricts uploads strictly to images (e.g. for QC)
+ */
+async function validateFiles(files: File[], documentsAllowed = true): Promise<void> {
   for (const file of files) {
     if (file.size > MAX_FILE_SIZE) throw new Error(`${file.name} is larger than 25 MB.`);
     if (!ALLOWED_MIME_TYPES.has(file.type)) throw new Error(`${file.name} is not a supported file type.`);
@@ -32,6 +45,11 @@ async function validateFiles(files: File[], documentsAllowed = true) {
   }
 }
 
+/**
+ * Uploads a batch of files directly to Supabase Storage ('replacement-files')
+ * under an isolated directory path and returns metadata rows for the database.
+ * Rolls back any partially uploaded storage files if a subsequent upload fails.
+ */
 async function uploadFiles(
   replacementId: string,
   files: File[],
@@ -67,6 +85,10 @@ async function uploadFiles(
   return { rows, uploaded };
 }
 
+/**
+ * Handles user authentication via email and password.
+ * Protected by sliding-window IP rate limiting (max 5 failed attempts per 15 minutes).
+ */
 export async function loginAction(formData: FormData) {
   const reqHeaders = await headers();
   const ip = reqHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || reqHeaders.get("x-real-ip") || "unknown";
@@ -86,12 +108,27 @@ export async function loginAction(formData: FormData) {
   redirect("/");
 }
 
+/**
+ * Signs out the current user session and redirects to the login screen.
+ */
 export async function logoutAction() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
 }
 
+/**
+ * Creates a new replacement order and uploads associated customer photos and shipping labels.
+ *
+ * Authorization: ESHA or ADMIN
+ * Workflow:
+ * 1. Validates form fields (order reference, product, quantity, etc.).
+ * 2. Validates files for MIME type, size limit, and binary file signatures.
+ * 3. Inserts the row into `replacements` table with status 'NEW'.
+ * 4. Generates formatted sequence number (REP-YYYY-XXXX) via database trigger.
+ * 5. Uploads customer photos and shipping label documents to Supabase Storage.
+ * 6. Dispatches 'NEW_REPLACEMENT' Telegram notification to printing department.
+ */
 export async function createReplacementAction(formData: FormData) {
   const profile = await requireProfile(["ESHA", "ADMIN"]);
   const parsed = replacementSchema.safeParse(Object.fromEntries(formData));
@@ -135,6 +172,13 @@ export async function createReplacementAction(formData: FormData) {
   redirect(`/replacements/${replacement.id}${warning ? `?warning=${encodeURIComponent(warning)}` : ""}`);
 }
 
+/**
+ * Updates editable order details (customer name, product, quantity, reason, notes).
+ *
+ * Authorization: ESHA or ADMIN
+ * Calls database RPC function `update_replacement_details` which logs changes
+ * to `activity_logs` and enforces edit constraints.
+ */
 export async function updateReplacementAction(formData: FormData) {
   await requireProfile(["ESHA", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
@@ -165,6 +209,17 @@ const notificationForStatus = {
   NEEDS_TOKEN: "NEEDS_TOKEN",
 } as const;
 
+/**
+ * Transitions a replacement order to a target operational status.
+ *
+ * Authorization: Enforced atomically inside PostgreSQL via `transition_replacement` RPC:
+ * - PRINTING: Can mark LABEL_PRINTED (from NEW).
+ * - ESHA: Can review QC (QC_APPROVED / QC_REJECTED) and dispatch (SHIPPED, NEEDS_TOKEN).
+ * - PACKING: Can mark PACKED (only after QC_APPROVED).
+ * - ADMIN: Can execute all standard transitions or cancel.
+ *
+ * Triggers automated Telegram notifications for the target status and revalidates cache.
+ */
 export async function transitionAction(formData: FormData) {
   await requireProfile();
   const parsed = transitionSchema.safeParse(Object.fromEntries(formData));
@@ -189,6 +244,17 @@ export async function transitionAction(formData: FormData) {
   redirect(`/replacements/${parsed.data.replacement_id}${!sent.ok ? "?warning=Updated%2C%20but%20Telegram%20notification%20failed." : ""}`);
 }
 
+/**
+ * Submits quality check (QC) photos taken by the packing department.
+ *
+ * Authorization: PACKING or ADMIN
+ * Workflow:
+ * 1. Validates image count (1-12) and checks binary file signatures.
+ * 2. Uploads photos to storage under `replacements/{id}/qc/{submissionId}`.
+ * 3. Calls `submit_qc` RPC function to atomically create submission record
+ *    and transition order status to 'QC_PENDING'.
+ * 4. Notifies ESHA via Telegram for review.
+ */
 export async function submitQcAction(formData: FormData) {
   await requireProfile(["PACKING", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
@@ -223,6 +289,13 @@ export async function submitQcAction(formData: FormData) {
   redirect(`/replacements/${replacementId}${!sent.ok ? "?warning=QC%20submitted%2C%20but%20Telegram%20notification%20failed." : ""}`);
 }
 
+/**
+ * Administrator emergency override to force a replacement into any valid lifecycle status.
+ *
+ * Authorization: ADMIN only
+ * Requires a mandatory reason which is recorded in the activity audit log via
+ * the `admin_override_replacement` database RPC function.
+ */
 export async function adminOverrideAction(formData: FormData) {
   await requireProfile(["ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
@@ -239,6 +312,12 @@ export async function adminOverrideAction(formData: FormData) {
   redirect(`/replacements/${replacementId}`);
 }
 
+/**
+ * Appends an operational or support comment to a replacement order.
+ *
+ * Authorization: Authenticated users of any active role (ESHA, PRINTING, PACKING, ADMIN).
+ * Persists the comment and logs an entry to the order timeline via the `add_replacement_comment` RPC.
+ */
 export async function addCommentAction(formData: FormData) {
   await requireProfile();
   const parsed = commentSchema.safeParse(Object.fromEntries(formData));
@@ -250,6 +329,12 @@ export async function addCommentAction(formData: FormData) {
   revalidatePath(`/replacements/${replacementId}`);
 }
 
+/**
+ * Creates a new user profile and Supabase Auth credentials.
+ *
+ * Authorization: ADMIN only
+ * Generates an email-confirmed auth user with initial metadata and a minimum 12-character password.
+ */
 export async function createUserAction(formData: FormData) {
   await requireProfile(["ADMIN"]);
   const email = String(formData.get("email") ?? "").trim();
@@ -264,6 +349,12 @@ export async function createUserAction(formData: FormData) {
   redirect("/admin/users?success=User%20created.%20Share%20the%20temporary%20password%20securely.");
 }
 
+/**
+ * Updates a user's operational role and active status.
+ *
+ * Authorization: ADMIN only
+ * Enables or disables account access and updates permissions in the `profiles` table.
+ */
 export async function updateUserAction(formData: FormData) {
   await requireProfile(["ADMIN"]);
   const id = String(formData.get("id") ?? "");
@@ -276,6 +367,12 @@ export async function updateUserAction(formData: FormData) {
   revalidatePath("/admin/users");
 }
 
+/**
+ * Updates the current authenticated user's account password.
+ *
+ * Authorization: Current authenticated user.
+ * Validates password match and enforces minimum 12-character password policy.
+ */
 export async function updatePasswordAction(formData: FormData) {
   await requireProfile();
   const password = String(formData.get("password") ?? "");
@@ -287,6 +384,16 @@ export async function updatePasswordAction(formData: FormData) {
   redirect("/profile?success=Password%20updated.");
 }
 
+/**
+ * Permanently deletes a replacement order and cleans up all associated storage files.
+ *
+ * Authorization:
+ * - ADMIN: Can delete any order at any status.
+ * - ESHA: Can delete only orders they personally created, and only while status is still 'NEW'.
+ *
+ * Deletes all physical storage files in the `replacement-files` bucket before
+ * deleting the replacement database record via service role admin client.
+ */
 export async function deleteReplacementAction(formData: FormData) {
   const profile = await requireProfile(["ADMIN", "ESHA"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
