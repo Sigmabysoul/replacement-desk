@@ -91,19 +91,19 @@ export default async function DashboardPage() {
   const replacements = (data ?? []) as Replacement[];
 
   return (
-    <div className="grid gap-7">
-      <section className="flex items-end justify-between gap-4">
+    <div className="grid gap-6 sm:gap-8">
+      <section className="flex flex-col gap-4 rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
         <div>
-          <p className="text-sm font-bold text-indigo-700">TODAY’S WORK</p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--brand)]">Today&apos;s work</p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
             Good {new Date().getHours() < 12 ? "morning" : "afternoon"}, {profile.full_name.split(" ")[0]}
           </h1>
-          <p className="mt-1 text-sm text-slate-600">See what needs attention across replacement orders.</p>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">See what needs attention across replacement orders.</p>
         </div>
         {["ESHA", "ADMIN"].includes(profile.role) && (
           <Link
             href="/replacements/new"
-            className="hidden min-h-12 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 sm:flex"
+            className="hidden min-h-12 items-center gap-2 rounded-xl bg-[var(--brand)] px-4 text-sm font-bold text-white shadow-lg shadow-[var(--brand)]/20 transition hover:-translate-y-0.5 hover:brightness-95 sm:flex"
           >
             <CirclePlus className="size-5" />
             New replacement
@@ -117,7 +117,7 @@ export default async function DashboardPage() {
         </Card>
       )}
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {metrics.map(({ label, statuses, icon: Icon, tone, href }) => {
           const count = replacements.filter((item) => statuses.includes(item.status)).length;
           return (

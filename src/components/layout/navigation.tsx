@@ -46,9 +46,9 @@ export function Navigation({ role }: { role: Role }) {
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-slate-950 px-4 py-5 text-white lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-800 bg-slate-950 px-4 py-5 text-white lg:flex">
         <Link href="/" className="mb-8 flex items-center gap-3 px-2">
-          <span className="grid size-10 place-items-center rounded-xl bg-indigo-500">
+            <span className="grid size-10 place-items-center rounded-xl bg-[var(--brand)] shadow-lg shadow-[var(--brand)]/25">
             <PackageCheck className="size-6" />
           </span>
           <span>
@@ -65,7 +65,7 @@ export function Navigation({ role }: { role: Role }) {
                 href={href}
                 className={cn(
                   "flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white",
-                  active && "bg-indigo-500 text-white"
+                  active && "bg-[var(--brand)] text-white shadow-lg shadow-[var(--brand)]/20"
                 )}
               >
                 <Icon className="size-5" />
@@ -88,7 +88,7 @@ export function Navigation({ role }: { role: Role }) {
                   href={href}
                   className={cn(
                     "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white",
-                    active && "bg-indigo-500 text-white"
+                    active && "bg-[var(--brand)] text-white shadow-lg shadow-[var(--brand)]/20"
                   )}
                 >
                   <Icon className="size-5" />
@@ -101,7 +101,7 @@ export function Navigation({ role }: { role: Role }) {
       </aside>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-slate-200 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-border/80 bg-background/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl lg:hidden"
         style={{ gridTemplateColumns: `repeat(${mobileItems.length}, minmax(0, 1fr))` }}
         aria-label="Mobile navigation"
       >
