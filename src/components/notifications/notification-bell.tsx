@@ -174,19 +174,14 @@ export function NotificationBell({ role }: { role?: Role }) {
   });
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter();
 
   // Sync browser notification permission state
   useEffect(() => {
-  const router = useRouter();
-  const [permission, setPermission] = useState<NotificationPermission>(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
       setPermission(Notification.permission);
-      return Notification.permission;
     }
   }, []);
-    return "default";
-  });
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   // Fetch initial notifications
   useEffect(() => {
@@ -282,7 +277,6 @@ export function NotificationBell({ role }: { role?: Role }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [soundEnabled]);
   }, [soundEnabled, router]);
 
   // Click outside to close
