@@ -15,8 +15,8 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
   if (STATUSES.includes(params.status as ReplacementStatus)) query = query.eq("status", params.status!);
   if (params.date) query = query.gte("created_at", `${params.date}T00:00:00`).lt("created_at", `${params.date}T23:59:59.999`);
   if (params.q?.trim()) {
-    const q = params.q.trim().replace(/[%_,()]/g, "");
-    query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%`);
+    const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").replace(/\s+/g, " ").slice(0, 100);
+    if (q) query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%`);
   }
   const { data, error } = await query.limit(100);
   const replacements = (data ?? []) as Replacement[];

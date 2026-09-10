@@ -30,7 +30,7 @@ Open `http://localhost:3000`. Before Supabase is configured, the login screen sh
 1. Create a Supabase project.
 2. Copy Project URL and anon/publishable key into `.env.local`.
 3. Copy the service-role key into `SUPABASE_SERVICE_ROLE_KEY`. It is used only on the server for admin invitations and notification records.
-4. Apply both SQL files in `supabase/migrations` in filename order. With the Supabase CLI linked, run:
+4. Apply every SQL file in `supabase/migrations` in filename order. With the Supabase CLI linked, run:
 
    ```bash
    supabase db push
@@ -38,7 +38,7 @@ Open `http://localhost:3000`. Before Supabase is configured, the login screen sh
 
    Alternatively, paste each file into the Supabase SQL editor in order.
 
-The first migration creates the schema, RLS, workflow functions, triggers, indexes, and the private `replacement-files` bucket. No public bucket setup is needed. The bucket accepts JPEG, PNG, WebP, and PDF files up to 5 MB. App and database validation both restrict paths and file types.
+The migrations create the schema, RLS, workflow functions, triggers, indexes, Realtime publication, role hardening, and the private `replacement-files` bucket. No public bucket setup is needed. The bucket accepts JPEG, PNG, WebP, and PDF files up to 25 MB. App and database validation both restrict paths and file types.
 
 ### Authentication and first admin
 
@@ -105,7 +105,7 @@ Use distinct browser profiles or sign out between roles. Direct attempts to bypa
 npm run verify
 ```
 
-This runs ESLint, TypeScript, workflow unit tests, and a production Next.js build. Business-rule tests cover unauthorized roles, rejection resubmission, packing prerequisites, dispatch alternatives, invalid transitions, and replacement-number formatting.
+This runs ESLint, TypeScript, workflow unit tests, a disposable-PostgreSQL migration and lifecycle test, and a production Next.js build. The database test also proves that Auth metadata cannot grant roles, inactive users cannot read work, and rejected QC submissions retain their history.
 
 ## Deploy to Vercel
 
@@ -118,11 +118,11 @@ This runs ESLint, TypeScript, workflow unit tests, and a production Next.js buil
 ## Operational limitations
 
 - Notifications are attempted once inline; failed Telegram sends are logged but not retried automatically.
-- There is no image compression, offline mode, bulk dispatch, or courier integration.
+- There is no offline mode, bulk dispatch, or courier integration.
 - Search covers replacement number, order reference, and product; usage is intentionally optimized for a few requests per month.
 - Admin override changes the replacement status and timestamps but cannot manufacture missing QC submission history. It is an audited recovery tool, not the normal workflow.
 - Uploaded storage objects are removed after known failures where possible; an interrupted network request may leave an orphan object that an admin can clean up from Supabase Storage.
 
 ## Suggested next improvements
 
-After real-worker feedback, consider a small failed-notification retry control, client-side image compression for slow phones, password-reset UI, and a Supabase-backed integration test suite. Keep marketplace, inventory, courier, and CommerceOps integration outside this MVP until explicitly planned.
+After real-worker feedback, consider a small failed-notification retry control and password-reset UI. Keep marketplace, inventory, courier, and CommerceOps integration outside this MVP until explicitly planned.

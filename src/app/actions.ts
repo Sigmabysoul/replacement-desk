@@ -343,8 +343,18 @@ export async function createUserAction(formData: FormData) {
   const role = String(formData.get("role") ?? "") as Role;
   if (!email || !fullName || temporaryPassword.length < 12 || !["ESHA", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Use%20a%20valid%20email%20and%20a%20temporary%20password%20of%20at%20least%2012%20characters.");
   const admin = createAdminClient();
-  const { error } = await admin.auth.admin.createUser({ email, password: temporaryPassword, email_confirm: true, user_metadata: { full_name: fullName, role } });
-  if (error) redirect(`/admin/users?error=${encodeURIComponent(error.message)}`);
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password: temporaryPassword,
+    email_confirm: true,
+    user_metadata: { full_name: fullName },
+  });
+  if (error || !data.user) redirect(`/admin/users?error=${encodeURIComponent(error?.message ?? "Could not create user.")}`);
+  const { error: profileError } = await admin.from("profiles").update({ role, active: true }).eq("id", data.user.id);
+  if (profileError) {
+    await admin.auth.admin.deleteUser(data.user.id);
+    redirect(`/admin/users?error=${encodeURIComponent(profileError.message)}`);
+  }
   revalidatePath("/admin/users");
   redirect("/admin/users?success=User%20created.%20Share%20the%20temporary%20password%20securely.");
 }
@@ -356,11 +366,12 @@ export async function createUserAction(formData: FormData) {
  * Enables or disables account access and updates permissions in the `profiles` table.
  */
 export async function updateUserAction(formData: FormData) {
-  await requireProfile(["ADMIN"]);
+  const actor = await requireProfile(["ADMIN"]);
   const id = String(formData.get("id") ?? "");
   const role = String(formData.get("role") ?? "") as Role;
   const active = formData.get("active") === "true";
   if (!/^[0-9a-f-]{36}$/i.test(id) || !["ESHA", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Invalid%20user%20update.");
+  if (id === actor.id && (!active || role !== "ADMIN")) redirect("/admin/users?error=You%20cannot%20remove%20your%20own%20active%20administrator%20access.");
   const admin = createAdminClient();
   const { error } = await admin.from("profiles").update({ role, active }).eq("id", id);
   if (error) redirect(`/admin/users?error=${encodeURIComponent(error.message)}`);
@@ -391,8 +402,8 @@ export async function updatePasswordAction(formData: FormData) {
  * - ADMIN: Can delete any order at any status.
  * - ESHA: Can delete only orders they personally created, and only while status is still 'NEW'.
  *
- * Deletes all physical storage files in the `replacement-files` bucket before
- * deleting the replacement database record via service role admin client.
+ * Deletes the database record first so a database failure cannot leave an order
+ * pointing at missing evidence, then performs best-effort privileged file cleanup.
  */
 export async function deleteReplacementAction(formData: FormData) {
   const profile = await requireProfile(["ADMIN", "ESHA"]);
@@ -421,20 +432,21 @@ export async function deleteReplacementAction(formData: FormData) {
     .select("storage_path")
     .eq("replacement_id", replacementId);
 
-  const storagePaths = (attachments ?? []).map((a) => a.storage_path).filter(Boolean);
-  if (storagePaths.length > 0) {
-    await supabase.storage.from("replacement-files").remove(storagePaths);
-  }
-
   const admin = createAdminClient();
   const { error } = await admin.from("replacements").delete().eq("id", replacementId);
   if (error) {
     redirect(`/replacements/${replacementId}?error=${encodeURIComponent(error.message)}`);
   }
 
+  const storagePaths = (attachments ?? []).map((a) => a.storage_path).filter(Boolean);
+  let cleanupWarning = "";
+  if (storagePaths.length > 0) {
+    const { error: storageError } = await admin.storage.from("replacement-files").remove(storagePaths);
+    if (storageError) cleanupWarning = "?warning=Order%20deleted%2C%20but%20an%20administrator%20must%20clean%20up%20its%20stored%20files.";
+  }
+
   revalidatePath("/");
   revalidatePath("/replacements");
   revalidatePath("/dispatch");
-  redirect("/replacements");
+  redirect(`/replacements${cleanupWarning}`);
 }
-
