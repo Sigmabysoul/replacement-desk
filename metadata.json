@@ -1,0 +1,6 @@
+{
+  "name": "Replacement Desk",
+  "description": "Manage replacement printing, quality checks, packing, and dispatch.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
