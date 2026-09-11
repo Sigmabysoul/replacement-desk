@@ -12,8 +12,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { ReplacementCard } from "@/components/replacements/replacement-card";
 import { requireProfile } from "@/lib/auth/session";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { getMockReplacements } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
 import type { Replacement, ReplacementStatus } from "@/lib/types";
 
 const metrics: {
@@ -83,25 +82,13 @@ const metrics: {
 
 export default async function DashboardPage() {
   const profile = await requireProfile();
-  let replacements: Replacement[] = [];
-  let error: string | null = null;
-
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      const { data, error: queryError } = await supabase
-        .from("replacements")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(40);
-      if (queryError) throw queryError;
-      replacements = (data ?? []) as Replacement[];
-    } catch (err) {
-      error = err instanceof Error ? err.message : "Could not load the dashboard.";
-    }
-  } else {
-    replacements = getMockReplacements();
-  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("replacements")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(40);
+  const replacements = (data ?? []) as Replacement[];
 
   return (
     <div className="grid gap-6 sm:gap-8">

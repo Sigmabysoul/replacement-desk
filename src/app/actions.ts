@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -95,18 +95,6 @@ export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  // Fallback to local demo mode if Supabase is unconfigured
-  if (!isSupabaseConfigured()) {
-    let role: Role = "ADMIN";
-    if (email.includes("esha")) role = "ESHA";
-    else if (email.includes("print")) role = "PRINTING";
-    else if (email.includes("pack")) role = "PACKING";
-
-    const cookieStore = await cookies();
-    cookieStore.set("rd_demo_role", role, { path: "/", httpOnly: true, sameSite: "lax" });
-    redirect("/");
-  }
-
   const rateLimitKey = `login:${ip}:${email}`;
   const rate = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
   if (!rate.allowed) {
@@ -126,21 +114,9 @@ export async function loginAction(formData: FormData) {
 }
 
 /**
- * Quick local preview / demo login for testing each operations role.
- */
-export async function demoLoginAction(formData: FormData) {
-  const role = String(formData.get("role") ?? "ADMIN") as Role;
-  const cookieStore = await cookies();
-  cookieStore.set("rd_demo_role", role, { path: "/", httpOnly: true, sameSite: "lax" });
-  redirect("/");
-}
-
-/**
  * Signs out the current user session and redirects to the login screen.
  */
 export async function logoutAction() {
-  const cookieStore = await cookies();
-  cookieStore.delete("rd_demo_role");
   if (isSupabaseConfigured()) {
     try {
       const supabase = await createClient();

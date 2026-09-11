@@ -28,20 +28,35 @@ export function ThemeButton() {
 
   return (
     <div className="relative">
-      <Button type="button" variant="ghost" size="icon" onClick={openEditor} aria-label="Customize theme">
-        <Palette data-icon="inline-start" />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={openEditor}
+        aria-label="Customize theme"
+        className="size-9 sm:size-10"
+      >
+        <Palette className="size-4.5" />
       </Button>
       {open && (
         <>
-          <button className="fixed inset-0 z-40 cursor-default bg-transparent" onClick={() => setOpen(false)} aria-label="Close theme editor" />
-          <section className="absolute right-0 top-12 z-50 w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl" aria-label="Custom theme editor">
+          <button
+            type="button"
+            className="fixed inset-0 z-40 cursor-default bg-black/40 backdrop-blur-[2px] sm:bg-transparent sm:backdrop-blur-none"
+            onClick={() => setOpen(false)}
+            aria-label="Close theme editor"
+          />
+          <section
+            className="fixed inset-x-3 top-16 z-50 mx-auto w-auto max-w-sm rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-[21rem] sm:max-w-none"
+            aria-label="Custom theme editor"
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-bold">Custom theme</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">Choose three colors for your workspace.</p>
               </div>
-              <Button type="button" variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close theme editor">
-                <X data-icon="inline-start" />
+              <Button type="button" variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close theme editor" className="size-8">
+                <X className="size-4" />
               </Button>
             </div>
             <div className="mt-4 grid gap-3">
@@ -70,7 +85,7 @@ export function ThemeButton() {
             </div>
             <div className="mt-4 flex justify-between gap-2">
               <Button type="button" variant="ghost" onClick={() => { resetColors(); setDraft(defaultColors); }}>
-                <RotateCcw data-icon="inline-start" /> Reset
+                <RotateCcw className="size-3.5 mr-1" /> Reset
               </Button>
               <Button type="button" onClick={applyTheme}>Apply theme</Button>
             </div>

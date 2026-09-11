@@ -3,8 +3,7 @@ import { ReplacementCard } from "@/components/replacements/replacement-card";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
 import { requireProfile } from "@/lib/auth/session";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { getMockReplacements } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
 import { STATUSES, type Replacement, type ReplacementStatus } from "@/lib/types";
 import { statusLabel } from "@/lib/utils";
 
@@ -12,32 +11,16 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
   const profile = await requireProfile();
   const params = await searchParams;
 
-  let replacements: Replacement[] = [];
-  let error: string | null = null;
-
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      let query = supabase.from("replacements").select("*").order("created_at", { ascending: false });
-      if (STATUSES.includes(params.status as ReplacementStatus)) query = query.eq("status", params.status!);
-      if (params.date) query = query.gte("created_at", `${params.date}T00:00:00`).lt("created_at", `${params.date}T23:59:59.999`);
-      if (params.q?.trim()) {
-        const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").replace(/\s+/g, " ").slice(0, 100);
-        if (q) query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%`);
-      }
-      const { data, error: queryError } = await query.limit(100);
-      if (queryError) throw queryError;
-      replacements = (data ?? []) as Replacement[];
-    } catch (err) {
-      error = err instanceof Error ? err.message : "Could not load replacements.";
-    }
-  } else {
-    replacements = getMockReplacements({
-      q: params.q,
-      status: params.status,
-      date: params.date,
-    });
+  const supabase = await createClient();
+  let query = supabase.from("replacements").select("*").order("created_at", { ascending: false });
+  if (STATUSES.includes(params.status as ReplacementStatus)) query = query.eq("status", params.status!);
+  if (params.date) query = query.gte("created_at", `${params.date}T00:00:00`).lt("created_at", `${params.date}T23:59:59.999`);
+  if (params.q?.trim()) {
+    const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").replace(/\s+/g, " ").slice(0, 100);
+    if (q) query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%`);
   }
+  const { data, error } = await query.limit(100);
+  const replacements = (data ?? []) as Replacement[];
 
   return (
     <div className="grid gap-6">
@@ -69,7 +52,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
 
       {(error || params.error) && (
         <Card className="border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900">
-          {params.error ?? error}
+          {params.error ?? error?.message}
         </Card>
       )}
 

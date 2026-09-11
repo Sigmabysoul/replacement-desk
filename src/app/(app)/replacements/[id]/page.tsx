@@ -22,8 +22,7 @@ import { Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { requireProfile } from "@/lib/auth/session";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { getMockReplacement } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
 import type { ActivityLog, Attachment, Profile, QcSubmission, Replacement } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -37,85 +36,66 @@ export default async function ReplacementDetailPage({
   const profile = await requireProfile();
   const { id } = await params;
   const notice = await searchParams;
+  const supabase = await createClient();
 
-  let replacement: Replacement | null = null;
-  let attachments: Attachment[] = [];
-  let qcs: QcSubmission[] = [];
-  let activities: ActivityLog[] = [];
-  let names = new Map<string, Pick<Profile, "full_name" | "role">>();
+  const [
+    { data: replacementData },
+    { data: attachmentData },
+    { data: qcData },
+    { data: activityData },
+  ] = await Promise.all([
+    supabase.from("replacements").select("*").eq("id", id).single(),
+    supabase.from("attachments").select("*").eq("replacement_id", id).order("created_at"),
+    supabase
+      .from("qc_submissions")
+      .select("*")
+      .eq("replacement_id", id)
+      .order("submission_number", { ascending: false }),
+    supabase.from("activity_logs").select("*").eq("replacement_id", id).order("created_at", { ascending: true }),
+  ]);
 
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      const [
-        { data: replacementData },
-        { data: attachmentData },
-        { data: qcData },
-        { data: activityData },
-      ] = await Promise.all([
-        supabase.from("replacements").select("*").eq("id", id).single(),
-        supabase.from("attachments").select("*").eq("replacement_id", id).order("created_at"),
-        supabase
-          .from("qc_submissions")
-          .select("*")
-          .eq("replacement_id", id)
-          .order("submission_number", { ascending: false }),
-        supabase.from("activity_logs").select("*").eq("replacement_id", id).order("created_at", { ascending: true }),
-      ]);
+  if (!replacementData) notFound();
+  const replacement = replacementData as Replacement;
+  const attachments = (attachmentData ?? []) as Attachment[];
+  const qcs = (qcData ?? []) as QcSubmission[];
+  const activities = (activityData ?? []) as ActivityLog[];
 
-      if (replacementData) {
-        replacement = replacementData as Replacement;
-        attachments = (attachmentData ?? []) as Attachment[];
-        qcs = (qcData ?? []) as QcSubmission[];
-        activities = (activityData ?? []) as ActivityLog[];
+  const actorIds = [
+    ...new Set(
+      [
+        replacement.created_by,
+        ...activities.map((item) => item.actor_id),
+        ...qcs.flatMap((item) => [item.submitted_by, item.reviewed_by]),
+      ].filter(Boolean),
+    ),
+  ] as string[];
 
-        const actorIds = [
-          ...new Set(
-            [
-              replacement.created_by,
-              ...activities.map((item) => item.actor_id),
-              ...qcs.flatMap((item) => [item.submitted_by, item.reviewed_by]),
-            ].filter(Boolean),
-          ),
-        ] as string[];
+  const { data: profileRows } = actorIds.length
+    ? await supabase.from("profiles").select("id,full_name,role").in("id", actorIds)
+    : { data: [] };
 
-        const { data: profileRows } = actorIds.length
-          ? await supabase.from("profiles").select("id,full_name,role").in("id", actorIds)
-          : { data: [] };
+  const names = new Map(
+    (profileRows ?? []).map((item) => [item.id, item as Pick<Profile, "full_name" | "role">]),
+  );
 
-        names = new Map(
-          (profileRows ?? []).map((item) => [item.id, item as Pick<Profile, "full_name" | "role">]),
-        );
-
-        if (attachments.length > 0) {
-          const { data: signedData } = await supabase.storage
-            .from("replacement-files")
-            .createSignedUrls(
-              attachments.map((item) => item.storage_path),
-              60 * 15
-            );
-          const urlMap = new Map(
-            (signedData ?? [])
-              .filter((item) => item.path && item.signedUrl)
-              .map((item) => [item.path as string, item.signedUrl as string]),
-          );
-          attachments.forEach((attachment) => {
-            attachment.signed_url = urlMap.get(attachment.storage_path) ?? undefined;
-          });
-        }
-      }
-    } catch {
-      // Fallback
-    }
+  if (attachments.length > 0) {
+    const { data: signedData } = await supabase.storage
+      .from("replacement-files")
+      .createSignedUrls(
+        attachments.map((item) => item.storage_path),
+        60 * 15
+      );
+    const urlMap = new Map(
+      (signedData ?? [])
+        .filter((item) => item.path && item.signedUrl)
+        .map((item) => [item.path as string, item.signedUrl as string]),
+    );
+    attachments.forEach((attachment) => {
+      attachment.signed_url = urlMap.get(attachment.storage_path) ?? undefined;
+    });
   }
 
-  if (!replacement) {
-    replacement = getMockReplacement(id);
-  }
-
-  if (!replacement) notFound();
-
-  replacement.creator = names.get(replacement.created_by) ?? replacement.creator ?? null;
+  replacement.creator = names.get(replacement.created_by) ?? null;
   activities.forEach((item) => {
     item.actor = item.actor_id ? names.get(item.actor_id) ?? null : null;
   });

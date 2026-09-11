@@ -367,11 +367,11 @@ export function NotificationBell({ role }: { role?: Role }) {
           }
         }}
         aria-label="Notifications"
-        className="relative grid size-10 place-items-center rounded-xl text-slate-600 transition hover:bg-white hover:text-slate-900"
+        className="relative grid size-9 sm:size-10 place-items-center rounded-xl text-slate-600 transition hover:bg-white hover:text-slate-900"
       >
-        <Bell className="size-5" />
+        <Bell className="size-4.5 sm:size-5" />
         {unreadCount > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white shadow-sm ring-2 ring-white animate-pulse">
+          <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white shadow-sm ring-2 ring-white animate-pulse">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -379,7 +379,7 @@ export function NotificationBell({ role }: { role?: Role }) {
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 top-12 z-50 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl animate-in fade-in zoom-in-95">
+        <div className="fixed inset-x-3 top-16 z-50 mx-auto w-auto max-w-sm rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl animate-in fade-in zoom-in-95 sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-96 sm:max-w-none">
           <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
             <div className="flex items-center gap-2">
               <span className="text-sm font-black text-slate-900">Notifications</span>

@@ -4,39 +4,22 @@ import { Card } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Notice } from "@/components/ui/notice";
 import { requireProfile } from "@/lib/auth/session";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { getMockReplacements } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
 import type { Replacement } from "@/lib/types";
 
 export default async function DispatchPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   await requireProfile(["ESHA", "ADMIN"]);
   const { error: queryError } = await searchParams;
 
-  let packed: Replacement[] = [];
-  let needsToken: Replacement[] = [];
-  let error: string | null = null;
+  const supabase = await createClient();
+  const [{ data: packedData, error: packedError }, { data: tokenData, error: tokenError }] = await Promise.all([
+    supabase.from("replacements").select("*").eq("status", "PACKED").order("packed_at", { ascending: true }),
+    supabase.from("replacements").select("*").eq("status", "NEEDS_TOKEN").order("needs_token_at", { ascending: true }),
+  ]);
 
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      const [{ data: packedData, error: packedError }, { data: tokenData, error: tokenError }] = await Promise.all([
-        supabase.from("replacements").select("*").eq("status", "PACKED").order("packed_at", { ascending: true }),
-        supabase.from("replacements").select("*").eq("status", "NEEDS_TOKEN").order("needs_token_at", { ascending: true }),
-      ]);
-      if (packedError || tokenError) {
-        error = "Could not load dispatch orders.";
-      } else {
-        packed = (packedData ?? []) as Replacement[];
-        needsToken = (tokenData ?? []) as Replacement[];
-      }
-    } catch {
-      error = "Could not load dispatch orders.";
-    }
-  } else {
-    const all = getMockReplacements();
-    packed = all.filter((r) => r.status === "PACKED");
-    needsToken = all.filter((r) => r.status === "NEEDS_TOKEN");
-  }
+  const error = (packedError || tokenError) ? "Could not load dispatch orders." : null;
+  const packed = (packedData ?? []) as Replacement[];
+  const needsToken = (tokenData ?? []) as Replacement[];
 
   return (
     <div className="grid gap-7">
