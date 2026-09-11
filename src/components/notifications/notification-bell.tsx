@@ -13,7 +13,7 @@ import {
   X,
   Play,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import type { Role } from "@/lib/types";
 
 interface NotificationItem {
@@ -211,6 +211,10 @@ export function NotificationBell({ role }: { role?: Role }) {
 
   // Fetch initial notifications and subscribe to live changes
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      return;
+    }
+
     let supabase: ReturnType<typeof createClient>;
     try {
       supabase = createClient();

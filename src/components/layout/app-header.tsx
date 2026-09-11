@@ -23,7 +23,7 @@ export function AppHeader({ profile }: { profile: Profile }) {
           {profile.role === "ADMIN" && (
             <Link
               href="/admin/settings"
-              className="grid size-10 place-items-center rounded-xl text-slate-600 hover:bg-white lg:hidden"
+              className="grid size-10 place-items-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 transition lg:hidden"
               aria-label="Settings"
             >
               <Settings className="size-4.5" />
@@ -31,16 +31,16 @@ export function AppHeader({ profile }: { profile: Profile }) {
           )}
           <Link
             href="/profile"
-            className="flex min-h-11 items-center gap-2 rounded-xl px-2.5 text-sm font-semibold text-slate-700 hover:bg-white"
+            className="flex min-h-11 items-center gap-2 rounded-xl px-2 py-1 text-sm font-semibold text-foreground hover:bg-muted/60 transition"
           >
-            <span className="grid size-8 place-items-center rounded-full bg-indigo-100 text-indigo-700">
+            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
               <UserRound className="size-4" />
             </span>
-            <span className="hidden sm:block">{profile.full_name}</span>
+            <span className="hidden sm:inline truncate max-w-[120px] lg:max-w-none">{profile.full_name}</span>
           </Link>
           <form action={logoutAction}>
-            <Button type="submit" variant="ghost" size="icon" aria-label="Sign out">
-              <LogOut className="size-5" />
+            <Button type="submit" variant="ghost" size="icon" aria-label="Sign out" className="size-10 text-muted-foreground hover:text-foreground">
+              <LogOut className="size-4.5" />
             </Button>
           </form>
         </div>

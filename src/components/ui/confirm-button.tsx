@@ -27,7 +27,15 @@ export function ConfirmButton({
       className={className}
       disabled={pending}
       onClick={(event) => {
-        if (!window.confirm(message)) event.preventDefault();
+        try {
+          if (typeof window !== "undefined" && typeof window.confirm === "function") {
+            if (!window.confirm(message)) {
+              event.preventDefault();
+            }
+          }
+        } catch {
+          // Allow submission to continue if modal prompt is blocked by iframe policy
+        }
       }}
     >
       {pending && <LoaderCircle className="size-5 animate-spin" aria-hidden="true" />}

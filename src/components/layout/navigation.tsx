@@ -101,7 +101,7 @@ export function Navigation({ role }: { role: Role }) {
       </aside>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-border/80 bg-background/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-border/80 bg-background/95 px-1.5 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl lg:hidden"
         style={{ gridTemplateColumns: `repeat(${mobileItems.length}, minmax(0, 1fr))` }}
         aria-label="Mobile navigation"
       >
@@ -112,12 +112,14 @@ export function Navigation({ role }: { role: Role }) {
               key={href}
               href={href}
               className={cn(
-                "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-bold text-slate-500",
-                active && "bg-indigo-50 text-indigo-700"
+                "flex min-h-[50px] flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-bold transition",
+                active
+                  ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-extrabold"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon className="size-5" />
-              <span>{short}</span>
+              <Icon className="size-5 shrink-0" />
+              <span className="truncate max-w-[64px] text-center leading-tight">{short}</span>
             </Link>
           );
         })}

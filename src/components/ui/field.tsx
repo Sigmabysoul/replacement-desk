@@ -16,3 +16,5 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select className={cn("min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100", props.className)} {...props} />;
 }
+
+export { PasswordInput } from "@/components/ui/password-input";

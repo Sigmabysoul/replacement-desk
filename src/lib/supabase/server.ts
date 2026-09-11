@@ -2,16 +2,26 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 /**
- * Verifies whether required Supabase public environment variables are present.
+ * Verifies whether required Supabase public environment variables are present
+ * and not set to dummy or template placeholder values.
  * Used for graceful fallback during initial repository setup or local testing.
  *
- * @returns `true` if URL and anon key exist; otherwise `false`.
+ * @returns `true` if genuine URL and anon key exist; otherwise `false`.
  */
-export function isSupabaseConfigured() {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
-  );
+export function isSupabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return false;
+  if (
+    url.includes("your-project") ||
+    url.includes("example.com") ||
+    key.includes("your-anon-key") ||
+    key.includes("placeholder") ||
+    !url.startsWith("http")
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /**

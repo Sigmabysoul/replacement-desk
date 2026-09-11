@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 /**
  * Headless Realtime listener that subscribes to database changes on `replacements`
@@ -15,6 +15,10 @@ export function RealtimeListener() {
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      return;
+    }
+
     let supabase: ReturnType<typeof createClient>;
     try {
       supabase = createClient();

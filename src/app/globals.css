@@ -33,7 +33,11 @@
 }
 
 * { box-sizing: border-box; }
-html { background: var(--background); }
+html {
+  background: var(--background);
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
 body {
   min-height: 100vh;
   margin: 0;
@@ -45,7 +49,11 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-button, input, textarea, select { font: inherit; }
+button, input, textarea, select, a {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
 ::selection { background: color-mix(in srgb, var(--brand) 22%, white); color: var(--foreground); }
 
 @media (max-width: 640px) {

@@ -1,10 +1,10 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireProfile } from "@/lib/auth/session";
 import { ALLOWED_MIME_TYPES, commentSchema, MAX_FILE_SIZE, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
@@ -93,6 +93,20 @@ export async function loginAction(formData: FormData) {
   const reqHeaders = await headers();
   const ip = reqHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || reqHeaders.get("x-real-ip") || "unknown";
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+
+  // Fallback to local demo mode if Supabase is unconfigured
+  if (!isSupabaseConfigured()) {
+    let role: Role = "ADMIN";
+    if (email.includes("esha")) role = "ESHA";
+    else if (email.includes("print")) role = "PRINTING";
+    else if (email.includes("pack")) role = "PACKING";
+
+    const cookieStore = await cookies();
+    cookieStore.set("rd_demo_role", role, { path: "/", httpOnly: true, sameSite: "lax" });
+    redirect("/");
+  }
+
   const rateLimitKey = `login:${ip}:${email}`;
   const rate = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
   if (!rate.allowed) {
@@ -100,11 +114,24 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(`Too many failed login attempts. Please wait ${waitMinutes} minute${waitMinutes > 1 ? "s" : ""}.`)}`);
   }
 
-  const password = String(formData.get("password") ?? "");
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect(`/login?error=${encodeURIComponent(error.message || "Email or password is incorrect.")}`);
-  resetRateLimit(rateLimitKey);
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) redirect(`/login?error=${encodeURIComponent(error.message || "Email or password is incorrect.")}`);
+    resetRateLimit(rateLimitKey);
+  } catch (err) {
+    redirect(`/login?error=${encodeURIComponent(messageFrom(err))}`);
+  }
+  redirect("/");
+}
+
+/**
+ * Quick local preview / demo login for testing each operations role.
+ */
+export async function demoLoginAction(formData: FormData) {
+  const role = String(formData.get("role") ?? "ADMIN") as Role;
+  const cookieStore = await cookies();
+  cookieStore.set("rd_demo_role", role, { path: "/", httpOnly: true, sameSite: "lax" });
   redirect("/");
 }
 
@@ -112,8 +139,16 @@ export async function loginAction(formData: FormData) {
  * Signs out the current user session and redirects to the login screen.
  */
 export async function logoutAction() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  const cookieStore = await cookies();
+  cookieStore.delete("rd_demo_role");
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Ignore network errors on signout
+    }
+  }
   redirect("/login");
 }
 
