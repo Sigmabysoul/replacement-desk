@@ -1,12 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // output: "standalone", <-- Removed to fix the Vercel build error
   experimental: {
     serverActions: {
       bodySizeLimit: "100mb",
     },
-    proxyClientMaxBodySize: "100mb",
+    // Note: proxyClientMaxBodySize isn't a standard Next.js config. 
+    // It shouldn't break the build, but you might see a warning about it in the console.
+    proxyClientMaxBodySize: "100mb", 
   },
   async headers() {
     return [
