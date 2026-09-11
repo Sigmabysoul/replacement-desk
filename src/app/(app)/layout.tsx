@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Navigation role={profile.role} />
         <div className="lg:pl-64">
           <AppHeader profile={profile} />
-          <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:pb-10 lg:pt-8">
+          <main className="mx-auto max-w-6xl px-4 pb-32 pt-6 sm:px-6 sm:pb-36 lg:pb-10 lg:pt-8">
             {children}
           </main>
         </div>

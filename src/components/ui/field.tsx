@@ -6,7 +6,15 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn("min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100", props.className)} {...props} />;
+  return (
+    <input
+      className={cn(
+        "min-h-12 w-full appearance-none rounded-xl border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100",
+        props.className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {

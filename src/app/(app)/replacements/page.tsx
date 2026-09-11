@@ -31,11 +31,17 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
 
       <Card className="p-4 sm:p-5">
         <form className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_190px_170px_auto]">
-          <label className="relative">
-            <span className="sr-only">Search replacements</span>
-            <Search className="pointer-events-none absolute left-3.5 top-3.5 size-5 text-slate-400" />
-            <Input name="q" defaultValue={params.q} placeholder="REP number, order, product" className="pl-11" />
-          </label>
+          <div className="relative w-full">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
+            <Input
+              name="q"
+              type="search"
+              defaultValue={params.q}
+              placeholder="REP number, order, product"
+              className="pl-11 pr-4"
+              aria-label="Search replacements"
+            />
+          </div>
           <Select name="status" defaultValue={params.status ?? ""} aria-label="Filter by status">
             <option value="">All statuses</option>
             {STATUSES.map((status) => (

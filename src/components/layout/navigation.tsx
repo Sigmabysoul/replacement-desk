@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "motion/react";
 import { CirclePlus, ClipboardList, LayoutDashboard, PackageCheck, Settings, Truck, Users } from "lucide-react";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -49,7 +48,7 @@ export function Navigation({ role }: { role: Role }) {
     <>
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-800 bg-slate-950 px-4 py-5 text-white lg:flex">
         <Link href="/" className="mb-8 flex items-center gap-3 px-2">
-          <span className="grid size-10 place-items-center rounded-xl bg-[var(--brand)] shadow-lg shadow-[var(--brand)]/25">
+          <span className="grid size-10 place-items-center rounded-xl bg-indigo-600 shadow-md shadow-indigo-600/20">
             <PackageCheck className="size-6" />
           </span>
           <span>
@@ -61,18 +60,17 @@ export function Navigation({ role }: { role: Role }) {
           {operationalItems.map(({ href, label, icon: Icon }) => {
             const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
             return (
-              <motion.div key={href} whileHover={{ x: 2 }} whileTap={{ scale: 0.98 }}>
-                <Link
-                  href={href}
-                  className={cn(
-                    "flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
-                    active && "bg-[var(--brand)] text-white shadow-lg shadow-[var(--brand)]/20"
-                  )}
-                >
-                  <Icon className="size-5" />
-                  {label}
-                </Link>
-              </motion.div>
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
+                  active && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                )}
+              >
+                <Icon className="size-5" />
+                {label}
+              </Link>
             );
           })}
         </nav>
@@ -85,70 +83,54 @@ export function Navigation({ role }: { role: Role }) {
             {adminItems.map(({ href, label, icon: Icon }) => {
               const active = pathname.startsWith(href);
               return (
-                <motion.div key={href} whileHover={{ x: 2 }} whileTap={{ scale: 0.98 }}>
-                  <Link
-                    href={href}
-                    className={cn(
-                      "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
-                      active && "bg-[var(--brand)] text-white shadow-lg shadow-[var(--brand)]/20"
-                    )}
-                  >
-                    <Icon className="size-5" />
-                    {label}
-                  </Link>
-                </motion.div>
+                <Link
+                  key={href}
+                  href={href}
+                  className={cn(
+                    "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
+                    active && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                  )}
+                >
+                  <Icon className="size-5" />
+                  {label}
+                </Link>
               );
             })}
           </div>
         )}
       </aside>
 
+      {/* Solid opaque mobile bottom navigation bar */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-border/80 bg-background/95 px-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-slate-200 bg-white px-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-4px_25px_rgba(15,23,42,0.08)] lg:hidden"
         style={{ gridTemplateColumns: `repeat(${mobileItems.length}, minmax(0, 1fr))` }}
         aria-label="Mobile navigation"
       >
         {mobileItems.map(({ href, short, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
-            <motion.div
+            <Link
               key={href}
-              whileTap={{ scale: 0.92 }}
-              className="relative flex justify-center"
+              href={href}
+              className={cn(
+                "relative flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl text-[11px] transition-colors active:scale-95",
+                active
+                  ? "text-indigo-600 font-extrabold"
+                  : "text-slate-500 hover:text-slate-900 font-medium"
+              )}
             >
-              <Link
-                href={href}
+              <span
                 className={cn(
-                  "relative flex min-h-[52px] w-full flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] transition-colors",
+                  "flex items-center justify-center rounded-full px-3.5 py-1 transition-all",
                   active
-                    ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
-                    : "text-muted-foreground hover:text-foreground font-medium"
+                    ? "bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200/70"
+                    : "text-slate-500"
                 )}
               >
-                {active && (
-                  <motion.div
-                    layoutId="mobileNavActivePill"
-                    className="absolute inset-1 -z-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-100/90 dark:border-indigo-800/50 shadow-xs"
-                    transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                  />
-                )}
-                <motion.div
-                  animate={active ? { scale: [1, 1.18, 1], y: [0, -1, 0] } : { scale: 1, y: 0 }}
-                  transition={{ duration: 0.25, ease: "easeOut" }}
-                  className="grid place-items-center"
-                >
-                  <Icon className={cn("size-5 shrink-0 transition-colors", active ? "stroke-[2.5]" : "stroke-2")} />
-                </motion.div>
-                <span className="truncate max-w-[64px] text-center leading-tight">{short}</span>
-                {active && (
-                  <motion.span
-                    layoutId="mobileNavActiveDot"
-                    className="size-1 rounded-full bg-indigo-600 dark:bg-indigo-400"
-                    transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                  />
-                )}
-              </Link>
-            </motion.div>
+                <Icon className={cn("size-5 shrink-0", active ? "stroke-[2.5]" : "stroke-2")} />
+              </span>
+              <span className="truncate max-w-[64px] text-center leading-none tracking-tight">{short}</span>
+            </Link>
           );
         })}
       </nav>
