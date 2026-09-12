@@ -3,6 +3,7 @@ import Image from "next/image";
 import {
   ArrowLeft,
   Download,
+  ExternalLink,
   FileText,
   MessageCircle,
   Package,
@@ -25,6 +26,10 @@ import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { ActivityLog, Attachment, Profile, QcSubmission, Replacement } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+
+function isImageAttachment(file: Attachment) {
+  return ["image/jpeg", "image/png", "image/webp"].includes(file.mime_type);
+}
 
 export default async function ReplacementDetailPage({
   params,
@@ -184,6 +189,21 @@ export default async function ReplacementDetailPage({
                   {replacement.order_reference}
                 </dd>
               </div>
+              {replacement.tracking_url && (
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Tracking</dt>
+                  <dd className="mt-1">
+                    <a
+                      href={replacement.tracking_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 font-semibold text-indigo-700 hover:text-indigo-900 hover:underline"
+                    >
+                      Open tracking link <ExternalLink className="size-4" />
+                    </a>
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Created</dt>
                 <dd className="mt-1 font-semibold text-slate-800">{formatDate(replacement.created_at)}</dd>
@@ -315,20 +335,42 @@ export default async function ReplacementDetailPage({
 
           {/* General Order Attachments and Shipping Labels */}
           <Card className="p-4 sm:p-5">
-            <h2 className="font-black text-slate-950">Order files & labels</h2>
-            <div className="mt-3 grid gap-2">
+            <div>
+              <h2 className="font-black text-slate-950">Order files & labels</h2>
+              <p className="mt-1 text-xs text-slate-500">Preview customer photos and shipping labels here. Open an item for its full-size original.</p>
+            </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {generalFiles.map((file) => (
-                <a
-                  key={file.id}
-                  href={file.signed_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50"
-                >
-                  <FileText className="size-5 text-indigo-600" />
-                  <span className="min-w-0 flex-1 truncate">{file.file_name}</span>
-                  <Download className="size-4" />
-                </a>
+                <div key={file.id} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                  {file.signed_url && isImageAttachment(file) ? (
+                    <a href={file.signed_url} target="_blank" rel="noreferrer" className="group relative block aspect-[4/3] bg-slate-100">
+                      <Image
+                        src={file.signed_url}
+                        alt={file.file_name}
+                        fill
+                        unoptimized
+                        sizes="(max-width: 640px) 100vw, 420px"
+                        className="object-contain transition group-hover:scale-[1.02]"
+                      />
+                      <span className="absolute inset-x-3 bottom-3 rounded-lg bg-slate-950/75 px-3 py-2 text-center text-xs font-bold text-white opacity-0 transition group-hover:opacity-100">
+                        Open full-size preview
+                      </span>
+                    </a>
+                  ) : file.signed_url ? (
+                    <object data={file.signed_url} type="application/pdf" className="h-72 w-full bg-white" aria-label={`${file.file_name} preview`}>
+                      <a href={file.signed_url} target="_blank" rel="noreferrer" className="grid h-full place-items-center gap-2 p-6 text-center text-sm font-bold text-indigo-700 hover:underline">
+                        <FileText className="size-8" /> Open PDF preview
+                      </a>
+                    </object>
+                  ) : (
+                    <div className="grid aspect-[4/3] place-items-center bg-slate-100 p-4 text-center text-sm text-slate-500">Preview unavailable</div>
+                  )}
+                  <a href={file.signed_url} target="_blank" rel="noreferrer" className="flex min-h-12 items-center gap-3 border-t border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-indigo-50">
+                    <FileText className="size-5 shrink-0 text-indigo-600" />
+                    <span className="min-w-0 flex-1 truncate">{file.file_name}</span>
+                    <Download className="size-4 shrink-0" />
+                  </a>
+                </div>
               ))}
               {generalFiles.length === 0 && (
                 <p className="text-sm text-slate-500">No customer photos or labels attached.</p>

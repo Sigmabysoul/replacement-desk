@@ -149,6 +149,11 @@ describe("schema validation", () => {
     expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 1000 }).success).toBe(false);
   });
 
+  it("accepts only http(s) tracking links", () => {
+    expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 1, tracking_url: "https://track.example/ABC" }).success).toBe(true);
+    expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 1, tracking_url: "javascript:alert(1)" }).success).toBe(false);
+  });
+
   it("validates comments", () => {
     expect(commentSchema.safeParse({ replacement_id: "e58ed763-928c-4155-bee9-fdbaaadc15f3", message: "Hello" }).success).toBe(true);
     expect(commentSchema.safeParse({ replacement_id: "e58ed763-928c-4155-bee9-fdbaaadc15f3", message: "" }).success).toBe(false);
@@ -281,4 +286,3 @@ describe("security: sliding window rate limiter", () => {
     expect(checkRateLimit(testKey, 5, 60000).allowed).toBe(true);
   });
 });
-

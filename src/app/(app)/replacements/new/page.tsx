@@ -35,6 +35,9 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
           <Field label="Customer reference (optional)">
             <Input name="customer_reference" maxLength={100} />
           </Field>
+          <Field label="Tracking link (optional)" hint="Paste the courier or marketplace tracking URL. It will stay with this order.">
+            <Input name="tracking_url" type="url" inputMode="url" maxLength={2000} placeholder="https://tracking.example.com/..." />
+          </Field>
           <div className="sm:col-span-2">
             <Field label="Notes (optional)">
               <Textarea name="notes" maxLength={2000} placeholder="Anything the team should know" />

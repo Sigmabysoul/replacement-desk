@@ -7,6 +7,13 @@ import { z } from "zod";
  * @param max Maximum character length allowed.
  */
 const optionalText = (max: number) => z.string().trim().max(max).optional().transform((value) => value || null);
+const optionalTrackingUrl = z
+  .string()
+  .trim()
+  .max(2000, "Tracking link is too long")
+  .optional()
+  .transform((value) => value || null)
+  .refine((value) => value === null || /^https?:\/\/[^\s]+$/i.test(value), "Tracking link must begin with http:// or https://");
 
 export const replacementSchema = z.object({
   order_reference: z.string().trim().min(1, "Order reference is required").max(100),
@@ -16,6 +23,7 @@ export const replacementSchema = z.object({
   quantity: z.coerce.number().int().min(1).max(999),
   reason: optionalText(200),
   notes: optionalText(2000),
+  tracking_url: optionalTrackingUrl,
 });
 
 export const commentSchema = z.object({

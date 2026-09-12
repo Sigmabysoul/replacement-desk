@@ -36,6 +36,7 @@ export interface Replacement {
   quantity: number;
   reason: string | null;
   notes: string | null;
+  tracking_url: string | null;
   status: ReplacementStatus;
   created_by: string;
   created_at: string;
@@ -46,6 +47,8 @@ export interface Replacement {
   packed_at: string | null;
   shipped_at: string | null;
   needs_token_at: string | null;
+  archived_at: string | null;
+  archived_by: string | null;
   creator?: Pick<Profile, "full_name"> | null;
 }
 

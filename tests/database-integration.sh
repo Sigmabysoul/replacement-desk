@@ -86,6 +86,19 @@ select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222
 insert into public.replacements(id, replacement_number, order_reference, product_name, quantity, created_by)
 values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'assigned-by-trigger', 'ORDER-1', 'Test Product', 2, '22222222-2222-2222-2222-222222222222');
 
+select public.update_replacement_details(
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'ORDER-1', null, null, 'Test Product', 2, null, null,
+  'https://tracking.example.test/ORDER-1'
+);
+
+do $$
+begin
+  if (select tracking_url from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'https://tracking.example.test/ORDER-1' then
+    raise exception 'tracking link was not retained';
+  end if;
+end
+$$;
+
 select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', false);
 select public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'LABEL_PRINTED');
 
@@ -125,6 +138,26 @@ begin
   end if;
   if (select count(*) from public.activity_logs where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') < 9 then
     raise exception 'workflow audit trail is incomplete';
+  end if;
+end
+$$;
+
+reset role;
+update public.replacements
+set created_at = now() - interval '31 days'
+where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
+select public.archive_completed_replacements();
+
+do $$
+begin
+  if (select archived_at is null from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') then
+    raise exception 'completed replacement was not archived';
+  end if;
+  if not exists (select 1 from public.activity_logs where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and action = 'ORDER_ARCHIVED') then
+    raise exception 'archive action was not recorded';
   end if;
 end
 $$;

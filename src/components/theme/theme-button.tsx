@@ -9,6 +9,13 @@ const fields = [
   { key: "primary", label: "Primary", description: "Buttons and active navigation" },
   { key: "secondary", label: "Secondary", description: "Supporting surfaces and accents" },
   { key: "tertiary", label: "Tertiary", description: "Highlights and attention states" },
+  { key: "background", label: "Workspace background", description: "The low-glare color behind your work" },
+] as const;
+
+const presets = [
+  { label: "Cool gray", colors: { primary: "#2563eb", secondary: "#0f766e", tertiary: "#f59e0b", background: "#eef3f8" } },
+  { label: "Soft lavender", colors: { primary: "#5b3df5", secondary: "#0f766e", tertiary: "#d97706", background: "#f3f1fb" } },
+  { label: "Warm paper", colors: { primary: "#9a3412", secondary: "#0f766e", tertiary: "#b45309", background: "#f7f3ea" } },
 ] as const;
 
 export function ThemeButton() {
@@ -77,10 +84,25 @@ export function ThemeButton() {
                 </label>
               ))}
             </div>
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Calm presets</p>
+              <div className="grid grid-cols-3 gap-2">
+                {presets.map((preset) => (
+                  <button key={preset.label} type="button" onClick={() => setDraft(preset.colors)} className="rounded-xl border border-border bg-muted/40 px-2 py-2 text-xs font-bold hover:border-[var(--brand)] hover:bg-card">
+                    <span className="mx-auto mb-1.5 flex justify-center gap-0.5">
+                      <span className="size-3 rounded-full" style={{ backgroundColor: preset.colors.primary }} />
+                      <span className="size-3 rounded-full" style={{ backgroundColor: preset.colors.background }} />
+                    </span>
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="mt-4 flex items-center gap-2 rounded-xl border border-border p-2">
               <span className="size-8 rounded-lg" style={{ backgroundColor: draft.primary }} />
               <span className="size-8 rounded-lg" style={{ backgroundColor: draft.secondary }} />
               <span className="size-8 rounded-lg" style={{ backgroundColor: draft.tertiary }} />
+              <span className="size-8 rounded-lg border border-border" style={{ backgroundColor: draft.background }} />
               <span className="ml-auto text-xs font-medium text-muted-foreground">Live palette preview</span>
             </div>
             <div className="mt-4 flex justify-between gap-2">
@@ -100,4 +122,5 @@ const defaultColors = {
   primary: "#2563eb",
   secondary: "#0f766e",
   tertiary: "#f59e0b",
+  background: "#eef3f8",
 };

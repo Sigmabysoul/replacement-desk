@@ -86,6 +86,7 @@ export default async function DashboardPage() {
   const { data, error } = await supabase
     .from("replacements")
     .select("*")
+    .is("archived_at", null)
     .order("created_at", { ascending: false })
     .limit(40);
   const replacements = (data ?? []) as Replacement[];

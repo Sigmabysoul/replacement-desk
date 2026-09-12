@@ -205,10 +205,23 @@ export async function updateReplacementAction(formData: FormData) {
     p_quantity: parsed.data.quantity,
     p_reason: parsed.data.reason,
     p_notes: parsed.data.notes,
+    p_tracking_url: parsed.data.tracking_url,
   });
   if (error) redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent(error.message)}`);
   revalidatePath(`/replacements/${replacementId}`);
   redirect(`/replacements/${replacementId}`);
+}
+
+/** Moves completed orders older than 30 days out of live queues while retaining their audit history. */
+export async function archiveCompletedReplacementsAction() {
+  await requireProfile(["ADMIN"]);
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("archive_completed_replacements");
+  if (error) redirect(`/replacements?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/");
+  revalidatePath("/replacements");
+  revalidatePath("/dispatch");
+  redirect(`/replacements?scope=archived&success=${encodeURIComponent(`${data ?? 0} completed order${data === 1 ? "" : "s"} archived.`)}`);
 }
 
 const notificationForStatus = {

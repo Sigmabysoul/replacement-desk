@@ -6,6 +6,7 @@ type ThemeColors = {
   primary: string;
   secondary: string;
   tertiary: string;
+  background: string;
 };
 
 type ThemeContextValue = {
@@ -18,6 +19,7 @@ const defaultColors: ThemeColors = {
   primary: "#2563eb",
   secondary: "#0f766e",
   tertiary: "#f59e0b",
+  background: "#eef3f8",
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -29,7 +31,7 @@ function getInitialColors(): ThemeColors {
     if (!saved) return defaultColors;
     const parsed = JSON.parse(saved) as Partial<ThemeColors>;
     if (parsed.primary && parsed.secondary && parsed.tertiary) {
-      return { primary: parsed.primary, secondary: parsed.secondary, tertiary: parsed.tertiary };
+      return { primary: parsed.primary, secondary: parsed.secondary, tertiary: parsed.tertiary, background: parsed.background || defaultColors.background };
     }
   } catch {
     // The persistence effect below replaces malformed storage with defaults.
@@ -44,6 +46,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.style.setProperty("--brand", colors.primary);
     document.documentElement.style.setProperty("--brand-secondary", colors.secondary);
     document.documentElement.style.setProperty("--brand-tertiary", colors.tertiary);
+    document.documentElement.style.setProperty("--background", colors.background);
     window.localStorage.setItem("replacement-desk-theme", JSON.stringify(colors));
   }, [colors]);
 

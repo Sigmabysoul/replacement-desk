@@ -1,4 +1,6 @@
-import { Search, SlidersHorizontal } from "lucide-react";
+import Link from "next/link";
+import { Archive, Search, SlidersHorizontal } from "lucide-react";
+import { archiveCompletedReplacementsAction } from "@/app/actions";
 import { ReplacementCard } from "@/components/replacements/replacement-card";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
@@ -7,12 +9,32 @@ import { createClient } from "@/lib/supabase/server";
 import { STATUSES, type Replacement, type ReplacementStatus } from "@/lib/types";
 import { statusLabel } from "@/lib/utils";
 
-export default async function ReplacementsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; date?: string; error?: string }> }) {
+type TimeScope = "recent_15" | "recent_30" | "archived" | "all";
+
+const scopeOptions: { value: TimeScope; label: string }[] = [
+  { value: "recent_15", label: "Last 15 days" },
+  { value: "recent_30", label: "Last month" },
+  { value: "archived", label: "Archive" },
+  { value: "all", label: "All records" },
+];
+
+export default async function ReplacementsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; date?: string; scope?: string; error?: string; success?: string }> }) {
   const profile = await requireProfile();
   const params = await searchParams;
+  const scope: TimeScope = scopeOptions.some((item) => item.value === params.scope)
+    ? params.scope as TimeScope
+    : "recent_30";
 
   const supabase = await createClient();
   let query = supabase.from("replacements").select("*").order("created_at", { ascending: false });
+  const now = new Date();
+  if (scope === "recent_15") {
+    query = query.is("archived_at", null).gte("created_at", new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString());
+  } else if (scope === "recent_30") {
+    query = query.is("archived_at", null).gte("created_at", new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
+  } else if (scope === "archived") {
+    query = query.not("archived_at", "is", null);
+  }
   if (STATUSES.includes(params.status as ReplacementStatus)) query = query.eq("status", params.status!);
   if (params.date) query = query.gte("created_at", `${params.date}T00:00:00`).lt("created_at", `${params.date}T23:59:59.999`);
   if (params.q?.trim()) {
@@ -30,7 +52,35 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
       </div>
 
       <Card className="p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2" aria-label="Replacement time range">
+            {scopeOptions.map((option) => {
+              const linkParams = new URLSearchParams();
+              linkParams.set("scope", option.value);
+              if (params.status) linkParams.set("status", params.status);
+              if (params.q) linkParams.set("q", params.q);
+              return (
+                <Link
+                  key={option.value}
+                  href={`/replacements?${linkParams.toString()}`}
+                  className={`rounded-xl px-3 py-2 text-xs font-bold transition ${scope === option.value ? "bg-[var(--brand)] text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+                >
+                  {option.value === "archived" && <Archive className="mr-1 inline size-3.5" />}
+                  {option.label}
+                </Link>
+              );
+            })}
+          </div>
+          {profile.role === "ADMIN" && (
+            <form action={archiveCompletedReplacementsAction}>
+              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50">
+                <Archive className="size-4" /> Archive completed 30+ day orders
+              </button>
+            </form>
+          )}
+        </div>
         <form className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_190px_170px_auto]">
+          <input type="hidden" name="scope" value={scope} />
           <div className="relative w-full">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
             <Input
@@ -61,6 +111,11 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
           {params.error ?? error?.message}
         </Card>
       )}
+      {params.success && (
+        <Card className="border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
+          {params.success}
+        </Card>
+      )}
 
       {replacements.length ? (
         <div className="grid gap-3 md:grid-cols-2">
@@ -71,7 +126,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
       ) : (
         <Card className="p-10 text-center">
           <h2 className="font-bold text-slate-800">No replacements match these filters</h2>
-          <p className="mt-1 text-sm text-slate-500">Clear a filter or try another search.</p>
+          <p className="mt-1 text-sm text-slate-500">Clear a filter, try another search, or check the Archive.</p>
         </Card>
       )}
     </div>
