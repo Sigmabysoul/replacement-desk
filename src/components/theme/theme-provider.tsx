@@ -1,60 +1,69 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-
-type ThemeColors = {
-  primary: string;
-  secondary: string;
-  tertiary: string;
-  background: string;
-};
+import {
+  DEFAULT_THEME_ID,
+  getTheme,
+  isThemeId,
+  THEME_PRESETS,
+  type ThemeId,
+  type ThemePreset,
+} from "@/components/theme/theme-presets";
 
 type ThemeContextValue = {
-  colors: ThemeColors;
-  setColors: (colors: ThemeColors) => void;
-  resetColors: () => void;
-};
-
-const defaultColors: ThemeColors = {
-  primary: "#2563eb",
-  secondary: "#0f766e",
-  tertiary: "#f59e0b",
-  background: "#eef3f8",
+  theme: ThemePreset;
+  setTheme: (themeId: ThemeId) => void;
+  resetTheme: () => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function getInitialColors(): ThemeColors {
-  if (typeof window === "undefined") return defaultColors;
+function getInitialThemeId(): ThemeId {
+  if (typeof window === "undefined") return DEFAULT_THEME_ID;
   try {
     const saved = window.localStorage.getItem("replacement-desk-theme");
-    if (!saved) return defaultColors;
-    const parsed = JSON.parse(saved) as Partial<ThemeColors>;
-    if (parsed.primary && parsed.secondary && parsed.tertiary) {
-      return { primary: parsed.primary, secondary: parsed.secondary, tertiary: parsed.tertiary, background: parsed.background || defaultColors.background };
+    if (!saved) return DEFAULT_THEME_ID;
+    const parsed = JSON.parse(saved) as { themeId?: unknown; primary?: string; background?: string };
+    if (isThemeId(parsed.themeId)) return parsed.themeId;
+
+    // Migrate the previous free-form theme format when it matches a new preset.
+    const matchingTheme = THEME_PRESETS.find(({ colors }) => (
+      colors.primary === parsed.primary && colors.background === parsed.background
+    ));
+    if (matchingTheme) {
+      return matchingTheme.id;
     }
   } catch {
-    // The persistence effect below replaces malformed storage with defaults.
+    // The persistence effect below replaces malformed storage with the default.
   }
-  return defaultColors;
+  return DEFAULT_THEME_ID;
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [colors, setColors] = useState<ThemeColors>(getInitialColors);
+  const [themeId, setTheme] = useState<ThemeId>(getInitialThemeId);
+  const theme = useMemo(() => getTheme(themeId), [themeId]);
 
   useEffect(() => {
+    const { colors } = theme;
     document.documentElement.style.setProperty("--brand", colors.primary);
     document.documentElement.style.setProperty("--brand-secondary", colors.secondary);
     document.documentElement.style.setProperty("--brand-tertiary", colors.tertiary);
     document.documentElement.style.setProperty("--background", colors.background);
-    window.localStorage.setItem("replacement-desk-theme", JSON.stringify(colors));
-  }, [colors]);
+    document.documentElement.style.setProperty("--foreground", colors.foreground);
+    document.documentElement.style.setProperty("--surface", colors.surface);
+    document.documentElement.style.setProperty("--card", colors.surface);
+    document.documentElement.style.setProperty("--card-foreground", colors.foreground);
+    document.documentElement.style.setProperty("--border", colors.border);
+    document.documentElement.style.setProperty("--muted", colors.muted);
+    document.documentElement.style.setProperty("--muted-foreground", colors.mutedForeground);
+    window.localStorage.setItem("replacement-desk-theme", JSON.stringify({ version: 2, themeId }));
+  }, [theme, themeId]);
 
   const value = useMemo(() => ({
-    colors,
-    setColors,
-    resetColors: () => setColors(defaultColors),
-  }), [colors]);
+    theme,
+    setTheme,
+    resetTheme: () => setTheme(DEFAULT_THEME_ID),
+  }), [theme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

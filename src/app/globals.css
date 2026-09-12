@@ -29,6 +29,17 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
   --color-ring: var(--ring);
+  --color-indigo-50: color-mix(in srgb, var(--brand) 6%, white);
+  --color-indigo-100: color-mix(in srgb, var(--brand) 12%, white);
+  --color-indigo-200: color-mix(in srgb, var(--brand) 22%, white);
+  --color-indigo-300: color-mix(in srgb, var(--brand) 38%, white);
+  --color-indigo-400: color-mix(in srgb, var(--brand) 68%, white);
+  --color-indigo-500: color-mix(in srgb, var(--brand) 88%, white);
+  --color-indigo-600: var(--brand);
+  --color-indigo-700: color-mix(in srgb, var(--brand) 86%, black);
+  --color-indigo-800: color-mix(in srgb, var(--brand) 72%, black);
+  --color-indigo-900: color-mix(in srgb, var(--brand) 58%, black);
+  --color-indigo-950: color-mix(in srgb, var(--brand) 38%, black);
   --font-sans: "Aptos", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 

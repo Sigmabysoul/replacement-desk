@@ -81,14 +81,16 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
         </div>
         <form className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_190px_170px_auto]">
           <input type="hidden" name="scope" value={scope} />
-          <div className="relative w-full">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
+          <div className="relative flex min-h-12 w-full items-center">
+            <span className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-12 items-center justify-center" aria-hidden="true">
+              <Search className="size-5 text-slate-400" />
+            </span>
             <Input
               name="q"
               type="search"
               defaultValue={params.q}
               placeholder="REP number, order, product"
-              className="pl-11 pr-4"
+              className="h-12 py-0 pl-12 pr-4"
               aria-label="Search replacements"
             />
           </div>

@@ -1,37 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Palette, RotateCcw, X } from "lucide-react";
+import { Check, Palette, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/theme/theme-provider";
-
-const fields = [
-  { key: "primary", label: "Primary", description: "Buttons and active navigation" },
-  { key: "secondary", label: "Secondary", description: "Supporting surfaces and accents" },
-  { key: "tertiary", label: "Tertiary", description: "Highlights and attention states" },
-  { key: "background", label: "Workspace background", description: "The low-glare color behind your work" },
-] as const;
-
-const presets = [
-  { label: "Cool gray", colors: { primary: "#2563eb", secondary: "#0f766e", tertiary: "#f59e0b", background: "#eef3f8" } },
-  { label: "Soft lavender", colors: { primary: "#5b3df5", secondary: "#0f766e", tertiary: "#d97706", background: "#f3f1fb" } },
-  { label: "Warm paper", colors: { primary: "#9a3412", secondary: "#0f766e", tertiary: "#b45309", background: "#f7f3ea" } },
-] as const;
+import { THEME_PRESETS } from "@/components/theme/theme-presets";
 
 export function ThemeButton() {
-  const { colors, setColors, resetColors } = useTheme();
+  const { theme, setTheme, resetTheme } = useTheme();
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(colors);
-
-  function openEditor() {
-    setDraft(colors);
-    setOpen(true);
-  }
-
-  function applyTheme() {
-    setColors(draft);
-    setOpen(false);
-  }
 
   return (
     <div className="relative">
@@ -39,8 +16,8 @@ export function ThemeButton() {
         type="button"
         variant="ghost"
         size="icon"
-        onClick={openEditor}
-        aria-label="Customize theme"
+        onClick={() => setOpen(true)}
+        aria-label={`Choose workspace theme. Current theme: ${theme.name}`}
         className="size-9 sm:size-10"
       >
         <Palette className="size-4.5" />
@@ -54,62 +31,49 @@ export function ThemeButton() {
             aria-label="Close theme editor"
           />
           <section
-            className="fixed inset-x-3 top-16 z-50 mx-auto w-auto max-w-sm rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-[21rem] sm:max-w-none"
-            aria-label="Custom theme editor"
+            className="fixed inset-x-3 top-16 z-50 mx-auto w-auto max-w-md rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-[25rem] sm:max-w-none"
+            aria-label="Workspace theme picker"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-bold">Custom theme</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">Choose three colors for your workspace.</p>
+                <p className="text-sm font-bold">Workspace themes</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">Ten balanced, low-glare palettes. Your choice saves automatically.</p>
               </div>
               <Button type="button" variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close theme editor" className="size-8">
                 <X className="size-4" />
               </Button>
             </div>
-            <div className="mt-4 grid gap-3">
-              {fields.map(({ key, label, description }) => (
-                <label key={key} className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
-                  <input
-                    type="color"
-                    value={draft[key]}
-                    onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
-                    className="size-10 cursor-pointer rounded-lg border-0 bg-transparent p-0"
-                    aria-label={`${label} color`}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold">{label}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{description}</span>
-                  </span>
-                  <code className="text-[11px] uppercase text-muted-foreground">{draft[key]}</code>
-                </label>
-              ))}
-            </div>
-            <div className="mt-4">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Calm presets</p>
-              <div className="grid grid-cols-3 gap-2">
-                {presets.map((preset) => (
-                  <button key={preset.label} type="button" onClick={() => setDraft(preset.colors)} className="rounded-xl border border-border bg-muted/40 px-2 py-2 text-xs font-bold hover:border-[var(--brand)] hover:bg-card">
-                    <span className="mx-auto mb-1.5 flex justify-center gap-0.5">
-                      <span className="size-3 rounded-full" style={{ backgroundColor: preset.colors.primary }} />
-                      <span className="size-3 rounded-full" style={{ backgroundColor: preset.colors.background }} />
+            <div className="mt-4 grid max-h-[min(65vh,34rem)] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+              {THEME_PRESETS.map((preset) => {
+                const selected = preset.id === theme.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setTheme(preset.id)}
+                    aria-pressed={selected}
+                    className={`relative rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${selected ? "border-[var(--brand)] bg-muted ring-2 ring-[var(--brand)]/15" : "border-border bg-card hover:border-[var(--brand)]/50"}`}
+                  >
+                    <span className="mb-2 flex h-9 items-center gap-1 rounded-lg border border-black/5 px-2" style={{ backgroundColor: preset.colors.background }}>
+                      <span className="size-4 rounded-full shadow-sm" style={{ backgroundColor: preset.colors.primary }} />
+                      <span className="size-4 rounded-full shadow-sm" style={{ backgroundColor: preset.colors.secondary }} />
+                      <span className="size-4 rounded-full shadow-sm" style={{ backgroundColor: preset.colors.tertiary }} />
+                      <span className="ml-auto size-4 rounded-full border border-black/10 shadow-sm" style={{ backgroundColor: preset.colors.surface }} />
                     </span>
-                    {preset.label}
+                    <span className="flex items-center gap-1.5 text-xs font-bold">
+                      {preset.name}
+                      {selected ? <Check className="size-3.5 text-[var(--brand)]" aria-hidden="true" /> : null}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] leading-4 text-muted-foreground">{preset.description}</span>
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-            <div className="mt-4 flex items-center gap-2 rounded-xl border border-border p-2">
-              <span className="size-8 rounded-lg" style={{ backgroundColor: draft.primary }} />
-              <span className="size-8 rounded-lg" style={{ backgroundColor: draft.secondary }} />
-              <span className="size-8 rounded-lg" style={{ backgroundColor: draft.tertiary }} />
-              <span className="size-8 rounded-lg border border-border" style={{ backgroundColor: draft.background }} />
-              <span className="ml-auto text-xs font-medium text-muted-foreground">Live palette preview</span>
-            </div>
-            <div className="mt-4 flex justify-between gap-2">
-              <Button type="button" variant="ghost" onClick={() => { resetColors(); setDraft(defaultColors); }}>
+            <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
+              <Button type="button" variant="ghost" onClick={resetTheme}>
                 <RotateCcw className="size-3.5 mr-1" /> Reset
               </Button>
-              <Button type="button" onClick={applyTheme}>Apply theme</Button>
+              <span className="text-xs font-medium text-muted-foreground">Saved on this device</span>
             </div>
           </section>
         </>
@@ -117,10 +81,3 @@ export function ThemeButton() {
     </div>
   );
 }
-
-const defaultColors = {
-  primary: "#2563eb",
-  secondary: "#0f766e",
-  tertiary: "#f59e0b",
-  background: "#eef3f8",
-};

@@ -24,7 +24,7 @@ export function PasswordInput({
         type={showPassword ? "text" : "password"}
         disabled={disabled}
         className={cn(
-          "min-h-12 w-full rounded-xl border border-slate-300 bg-white pl-3.5 pr-12 text-base text-slate-950 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed",
+          "min-h-12 w-full rounded-xl border border-border bg-card pl-3.5 pr-12 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-4 focus:ring-ring/15 disabled:opacity-50 disabled:cursor-not-allowed",
           className,
         )}
         {...props}
@@ -36,7 +36,7 @@ export function PasswordInput({
         disabled={disabled}
         aria-label={showPassword ? "Hide password" : "Show password"}
         aria-pressed={showPassword}
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 grid size-9 place-items-center rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 grid size-9 place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring transition"
       >
         {showPassword ? (
           <EyeOff className="size-5" aria-hidden="true" />

@@ -102,7 +102,7 @@ export function Navigation({ role }: { role: Role }) {
 
       {/* Solid opaque mobile bottom navigation bar */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-slate-200 bg-white px-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-4px_25px_rgba(15,23,42,0.08)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-border bg-card px-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-4px_25px_rgba(15,23,42,0.08)] lg:hidden"
         style={{ gridTemplateColumns: `repeat(${mobileItems.length}, minmax(0, 1fr))` }}
         aria-label="Mobile navigation"
       >

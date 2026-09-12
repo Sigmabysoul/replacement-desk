@@ -9,7 +9,7 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       className={cn(
-        "min-h-12 w-full appearance-none rounded-xl border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100",
+        "min-h-12 w-full appearance-none rounded-xl border border-border bg-card px-3.5 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-4 focus:ring-ring/15",
         props.className,
       )}
       {...props}
@@ -18,11 +18,11 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 }
 
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn("min-h-28 w-full resize-y rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-base text-slate-950 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100", props.className)} {...props} />;
+  return <textarea className={cn("min-h-28 w-full resize-y rounded-xl border border-border bg-card px-3.5 py-3 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-4 focus:ring-ring/15", props.className)} {...props} />;
 }
 
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={cn("min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100", props.className)} {...props} />;
+  return <select className={cn("min-h-12 w-full rounded-xl border border-border bg-card px-3.5 text-base text-foreground outline-none focus:border-ring focus:ring-4 focus:ring-ring/15", props.className)} {...props} />;
 }
 
 export { PasswordInput } from "@/components/ui/password-input";
