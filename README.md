@@ -9,7 +9,7 @@ Replacement Desk is a standalone internal operations app for customer replacemen
 - Supabase Auth (email/password), PostgreSQL, RLS, and private Storage
 - PostgreSQL security-definer functions as the workflow authority
 - Telegram Bot API as a best-effort notification channel
-- Vercel deployment; no queue, worker, or separate backend is required
+- Managed Next.js deployment on Hostinger or Vercel; no queue, worker, or separate backend is required
 
 The application code is divided into authentication, replacements, activity, attachments, notifications, permissions, and shared UI modules. PostgreSQL—not hidden UI—is the final permission and transition authority.
 
@@ -106,6 +106,20 @@ npm run verify
 ```
 
 This runs ESLint, TypeScript, workflow unit tests, a disposable-PostgreSQL migration and lifecycle test, and a production Next.js build. The database test also proves that Auth metadata cannot grant roles, inactive users cannot read work, and rejected QC submissions retain their history.
+
+## Deploy to Hostinger
+
+Hostinger's managed Node.js web apps currently require **Business Web Hosting or a Cloud plan**. Premium Web Hosting alone cannot run this server-rendered Next.js application. Keep Supabase as the external Auth, PostgreSQL, and Storage provider; do not create a second application database in Hostinger.
+
+1. Push this directory to GitHub and select the `master` branch in Hostinger.
+2. In hPanel, go to **Websites → Add Website → Deploy Web App → Import Git Repository**.
+3. Use the detected Next.js settings, with Node.js 22.x, `npm run build` as the build command, and `npm run start` as the start command.
+4. Add every required environment variable from the table above. Copy the values from the existing production deployment; never expose server-only secrets with a `NEXT_PUBLIC_` prefix.
+5. Set `NEXT_PUBLIC_APP_URL` to the final Hostinger HTTPS origin and deploy.
+6. In Supabase **Authentication → URL Configuration**, set the Site URL to the final origin and add it to Redirect URLs.
+7. Redeploy after changing environment variables, then verify login, one replacement lifecycle, a private-file preview, and a Telegram link before moving production traffic.
+
+GitHub integration automatically builds the latest selected branch on subsequent pushes. The application requires a Node.js server and must not be deployed as a static export.
 
 ## Deploy to Vercel
 

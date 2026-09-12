@@ -2,6 +2,9 @@
   "name": "replacement-desk",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9 <25"
+  },
   "scripts": {
     "dev": "next dev -p 3000 -H 0.0.0.0",
     "build": "next build",
