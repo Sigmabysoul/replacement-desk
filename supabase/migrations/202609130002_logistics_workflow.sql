@@ -186,33 +186,40 @@ begin
 end;
 $$;
 
-create or replace function public.submit_logistics_label(
+create or replace function public.submit_logistics_package(
   p_replacement_id uuid,
   p_upload_id uuid,
-  p_attachments jsonb
+  p_label_attachments jsonb,
+  p_photo_attachments jsonb
 )
 returns public.replacements language plpgsql security definer set search_path = '' as $$
 declare
   current_row public.replacements;
   actor_role public.app_role;
-  attachment_count integer := 0;
+  label_count integer := 0;
+  photo_count integer := 0;
 begin
   select * into current_row from public.replacements where id = p_replacement_id for update;
   if not found then raise exception 'Replacement not found'; end if;
 
   select public.current_active_role() into actor_role;
   if actor_role is null or actor_role not in ('LOGISTICS', 'ADMIN') then
-    raise exception 'Only Logistics can upload the shipping label';
+    raise exception 'Only Logistics can upload labels and product photos';
   end if;
   if current_row.status <> 'NEW' then
-    raise exception 'A label can only be uploaded for a new replacement';
+    raise exception 'Logistics files can only be uploaded for a new replacement';
   end if;
-  if jsonb_typeof(p_attachments) is distinct from 'array' or jsonb_array_length(p_attachments) <> 1 then
+  if jsonb_typeof(p_label_attachments) is distinct from 'array'
+    or jsonb_array_length(p_label_attachments) <> 1 then
     raise exception 'Exactly one shipping label is required';
+  end if;
+  if jsonb_typeof(p_photo_attachments) is distinct from 'array'
+    or jsonb_array_length(p_photo_attachments) not between 1 and 12 then
+    raise exception 'Between one and twelve product photos are required';
   end if;
   if (
     select count(*)
-    from jsonb_to_recordset(p_attachments) as item(storage_path text)
+    from jsonb_to_recordset(p_label_attachments) as item(storage_path text)
     join storage.objects as stored
       on stored.bucket_id = 'replacement-files'
       and stored.name = item.storage_path
@@ -220,19 +227,44 @@ begin
   ) <> 1 then
     raise exception 'The label storage object was not uploaded by the current user';
   end if;
+  if (
+    select count(*)
+    from jsonb_to_recordset(p_photo_attachments) as item(storage_path text)
+    join storage.objects as stored
+      on stored.bucket_id = 'replacement-files'
+      and stored.name = item.storage_path
+      and stored.owner_id = auth.uid()::text
+  ) <> jsonb_array_length(p_photo_attachments) then
+    raise exception 'Product photo storage objects were not uploaded by the current user';
+  end if;
 
   insert into public.attachments(
     replacement_id, qc_submission_id, attachment_type, storage_path, file_name, mime_type, uploaded_by
   )
   select
     p_replacement_id, null, 'LABEL', item.storage_path, item.file_name, item.mime_type, auth.uid()
-  from jsonb_to_recordset(p_attachments) as item(storage_path text, file_name text, mime_type text)
+  from jsonb_to_recordset(p_label_attachments) as item(storage_path text, file_name text, mime_type text)
   where item.mime_type in ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')
     and item.storage_path like (
       'replacements/' || p_replacement_id || '/logistics/' || p_upload_id || '/labels/%'
     );
-  get diagnostics attachment_count = row_count;
-  if attachment_count <> 1 then raise exception 'Invalid label metadata'; end if;
+  get diagnostics label_count = row_count;
+  if label_count <> 1 then raise exception 'Invalid label metadata'; end if;
+
+  insert into public.attachments(
+    replacement_id, qc_submission_id, attachment_type, storage_path, file_name, mime_type, uploaded_by
+  )
+  select
+    p_replacement_id, null, 'PROOF_PHOTO', item.storage_path, item.file_name, item.mime_type, auth.uid()
+  from jsonb_to_recordset(p_photo_attachments) as item(storage_path text, file_name text, mime_type text)
+  where item.mime_type in ('image/jpeg', 'image/png', 'image/webp')
+    and item.storage_path like (
+      'replacements/' || p_replacement_id || '/logistics/' || p_upload_id || '/photos/%'
+    );
+  get diagnostics photo_count = row_count;
+  if photo_count <> jsonb_array_length(p_photo_attachments) then
+    raise exception 'Invalid product photo metadata';
+  end if;
 
   update public.replacements set status = 'LABEL_UPLOADED'
   where id = p_replacement_id
@@ -242,12 +274,13 @@ begin
   values (
     p_replacement_id,
     auth.uid(),
-    'LABEL_UPLOADED',
-    jsonb_build_object('upload_id', p_upload_id, 'attachment_count', attachment_count)
+    'LOGISTICS_SUBMITTED',
+    jsonb_build_object('upload_id', p_upload_id, 'label_count', label_count, 'photo_count', photo_count)
   );
   return current_row;
 end;
 $$;
+
 
 create or replace function public.submit_packing_qc(
   p_replacement_id uuid,
@@ -339,14 +372,14 @@ begin
 end;
 $$;
 
-revoke all on function public.submit_logistics_label(uuid, uuid, jsonb) from public;
-grant execute on function public.submit_logistics_label(uuid, uuid, jsonb) to authenticated;
+revoke all on function public.submit_logistics_package(uuid, uuid, jsonb, jsonb) from public;
+grant execute on function public.submit_logistics_package(uuid, uuid, jsonb, jsonb) to authenticated;
 revoke all on function public.submit_packing_qc(uuid, uuid, jsonb) from public;
 grant execute on function public.submit_packing_qc(uuid, uuid, jsonb) to authenticated;
 
 -- Old upload RPCs remain defined for migration history but are not callable.
 revoke execute on function public.submit_qc(uuid, uuid, jsonb) from authenticated;
-drop function if exists public.submit_logistics_package(uuid, uuid, jsonb, jsonb);
+drop function if exists public.submit_logistics_label(uuid, uuid, jsonb);
 
 -- Harden older security-definer mutations against SQL NULL role comparisons.
 create or replace function public.update_replacement_details(

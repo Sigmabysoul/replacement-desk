@@ -102,6 +102,7 @@ $$;
 revoke all on function public.submit_logistics_package(uuid, uuid, jsonb, jsonb) from public;
 grant execute on function public.submit_logistics_package(uuid, uuid, jsonb, jsonb) to authenticated;
 
--- Retire the label-only RPC after the combined operation is available. Existing
--- clients receive a clear missing-function error instead of bypassing photos.
-revoke execute on function public.submit_logistics_label(uuid, uuid, jsonb) from authenticated;
+drop function if exists public.submit_logistics_label(uuid, uuid, jsonb);
+
+-- Notify PostgREST to refresh its schema cache immediately
+notify pgrst, 'reload schema';
