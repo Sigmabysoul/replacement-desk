@@ -10,14 +10,24 @@ import type { Replacement, Role } from "@/lib/types";
 export type { NotificationType };
 
 /**
- * Resolves the Telegram chat ID associated with a department role from environment variables.
- * E.g., `TELEGRAM_ESHA_CHAT_ID`, `TELEGRAM_PACKING_CHAT_ID`.
+ * Resolves Telegram chat IDs associated with a department role.
+ * E.g., `TELEGRAM_ESHA_CHAT_ID`, `TELEGRAM_LOGISTICS_CHAT_ID`.
  *
  * @param role The target department role.
- * @returns Configured chat ID string or `undefined`.
+ * @returns Unique configured chat IDs. During cutover, both legacy operational
+ * chats receive Logistics alerts until a dedicated Logistics chat is set.
  */
-function chatId(role: Role) {
-  return process.env[`TELEGRAM_${role}_CHAT_ID`];
+function chatIds(role: Role): string[] {
+  if (role === "LOGISTICS") {
+    const dedicated = process.env.TELEGRAM_LOGISTICS_CHAT_ID;
+    if (dedicated) return [dedicated];
+    return [...new Set([
+      process.env.TELEGRAM_PACKING_CHAT_ID,
+      process.env.TELEGRAM_PRINTING_CHAT_ID,
+    ].filter((value): value is string => Boolean(value)))];
+  }
+  const target = process.env[`TELEGRAM_${role}_CHAT_ID`];
+  return target ? [target] : [];
 }
 
 /**
@@ -54,9 +64,8 @@ export async function notifyTelegram(
   }
 
   let failed = false;
-  for (const role of NOTIFICATION_RECIPIENTS[type]) {
-    const target = chatId(role);
-    if (!target) continue;
+  const targets = [...new Set(NOTIFICATION_RECIPIENTS[type].flatMap(chatIds))];
+  for (const target of targets) {
     let status = "SENT";
     let error: string | null = null;
     let ok = false;

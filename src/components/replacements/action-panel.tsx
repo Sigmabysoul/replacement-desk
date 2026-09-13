@@ -1,5 +1,5 @@
-import { Check, Download, PackageCheck, Printer, Send, TriangleAlert, X } from "lucide-react";
-import { adminOverrideAction, submitQcAction, transitionAction } from "@/app/actions";
+import { Check, PackageCheck, Send, TriangleAlert, X } from "lucide-react";
+import { adminOverrideAction, submitLogisticsAction, transitionAction } from "@/app/actions";
 import { Card } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field, Select, Textarea } from "@/components/ui/field";
@@ -7,15 +7,14 @@ import { STATUSES } from "@/lib/types";
 import { statusLabel } from "@/lib/utils";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { availableActions } from "@/lib/replacements/workflow";
-import { QcUploadForm } from "@/components/replacements/qc-upload-form";
+import { LogisticsUploadForm } from "@/components/replacements/logistics-upload-form";
 import type { Attachment, Profile, Replacement } from "@/lib/types";
 
 /**
  * Role-aware operational action panel rendered on the replacement detail screen.
  *
  * Dynamically presents only legal actions based on user's active role and current status:
- * - PRINTING: Downloads shipping label and confirms label printing.
- * - PACKING: Renders QC camera/upload form (when in LABEL_PRINTED / QC_REJECTED) and packs order (after QC_APPROVED).
+ * - LOGISTICS: Uploads the label and proof photos, then packs an approved order.
  * - ESHA: Reviews QC photos (Approve / Reject with feedback), marks dispatched (SHIPPED / NEEDS_TOKEN).
  * - ADMIN: Performs any standard transition or uses emergency status override with reason logging.
  *
@@ -33,7 +32,7 @@ export function ActionPanel({
   attachments: Attachment[];
 }) {
   const actions = availableActions(profile.role, replacement.status);
-  const labels = attachments.filter((item) => item.attachment_type === "LABEL");
+  const hasLabel = attachments.some((item) => item.attachment_type === "LABEL");
   const actionable = actions.some((action) => action !== "COMMENT" && action !== "UPLOAD");
 
   if (!actionable && !["SHIPPED", "CANCELLED"].includes(replacement.status)) {
@@ -51,41 +50,12 @@ export function ActionPanel({
         <h2 className="font-black text-slate-950">Next action</h2>
       </div>
       <div className="grid gap-4 p-4 sm:p-5">
-        {actions.includes("MARK_LABEL_PRINTED") && (
-          <>
-            <div className="grid gap-2">
-              {labels.length ? (
-                labels.map((label) => (
-                  <a
-                    key={label.id}
-                    href={label.signed_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:bg-slate-50"
-                  >
-                    <Download className="size-5" />
-                    OPEN / DOWNLOAD LABEL
-                  </a>
-                ))
-              ) : (
-                <p className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-                  No label is attached. Ask Esha to upload it.
-                </p>
-              )}
-            </div>
-            <form action={transitionAction}>
-              <input type="hidden" name="replacement_id" value={replacement.id} />
-              <input type="hidden" name="target_status" value="LABEL_PRINTED" />
-              <ConfirmButton message="Confirm that the physical label has been printed.">
-                <Printer className="size-5" />
-                MARK LABEL PRINTED
-              </ConfirmButton>
-            </form>
-          </>
-        )}
-
-        {actions.includes("SUBMIT_QC") && (
-          <QcUploadForm replacementId={replacement.id} action={submitQcAction} />
+        {actions.includes("SUBMIT_LOGISTICS") && (
+          <LogisticsUploadForm
+            replacementId={replacement.id}
+            requiresLabel={!hasLabel}
+            action={submitLogisticsAction}
+          />
         )}
 
         {actions.includes("APPROVE_QC") && (
@@ -93,7 +63,7 @@ export function ActionPanel({
             <form action={transitionAction}>
               <input type="hidden" name="replacement_id" value={replacement.id} />
               <input type="hidden" name="target_status" value="QC_APPROVED" />
-              <ConfirmButton message="Approve this QC submission? Packing will be allowed to continue.">
+              <ConfirmButton message="Approve this submission? Logistics will be allowed to pack the order.">
                 <Check className="size-5" />
                 APPROVE QC
               </ConfirmButton>

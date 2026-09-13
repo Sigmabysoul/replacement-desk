@@ -3,8 +3,7 @@ import type { ReplacementStatus, Role } from "@/lib/types";
 export type WorkflowAction =
   | "CREATE_REPLACEMENT"
   | "EDIT_REPLACEMENT"
-  | "MARK_LABEL_PRINTED"
-  | "SUBMIT_QC"
+  | "SUBMIT_LOGISTICS"
   | "APPROVE_QC"
   | "REJECT_QC"
   | "MARK_PACKED"
@@ -15,7 +14,7 @@ export type WorkflowAction =
   | "UPLOAD";
 
 const transitions: Record<ReplacementStatus, readonly ReplacementStatus[]> = {
-  NEW: ["LABEL_PRINTED", "CANCELLED"],
+  NEW: ["LABEL_PRINTED", "QC_PENDING", "CANCELLED"],
   LABEL_PRINTED: ["QC_PENDING", "CANCELLED"],
   QC_PENDING: ["QC_APPROVED", "QC_REJECTED", "CANCELLED"],
   QC_REJECTED: ["QC_PENDING", "CANCELLED"],
@@ -29,23 +28,23 @@ const transitions: Record<ReplacementStatus, readonly ReplacementStatus[]> = {
 const permissions: Record<WorkflowAction, readonly Role[]> = {
   CREATE_REPLACEMENT: ["ESHA", "ADMIN"],
   EDIT_REPLACEMENT: ["ESHA", "ADMIN"],
-  MARK_LABEL_PRINTED: ["PRINTING", "ADMIN"],
-  SUBMIT_QC: ["PACKING", "ADMIN"],
+  SUBMIT_LOGISTICS: ["LOGISTICS", "ADMIN"],
   APPROVE_QC: ["ESHA", "ADMIN"],
   REJECT_QC: ["ESHA", "ADMIN"],
-  MARK_PACKED: ["PACKING", "ADMIN"],
+  MARK_PACKED: ["LOGISTICS", "ADMIN"],
   MARK_SHIPPED: ["ESHA", "ADMIN"],
   MARK_NEEDS_TOKEN: ["ESHA", "ADMIN"],
   CANCEL_REPLACEMENT: ["ADMIN"],
-  COMMENT: ["ESHA", "PRINTING", "PACKING", "ADMIN"],
-  UPLOAD: ["ESHA", "PACKING", "ADMIN"],
+  COMMENT: ["ESHA", "LOGISTICS", "ADMIN"],
+  UPLOAD: ["LOGISTICS", "ADMIN"],
 };
 
 /**
  * Determines whether a replacement order can legally transition from one status to another.
  *
  * Enforces the core state machine:
- * - NEW -> LABEL_PRINTED or CANCELLED
+ * - NEW -> QC_PENDING after Logistics supplies the label and proof photos
+ * - NEW -> LABEL_PRINTED remains valid for legacy in-flight orders
  * - LABEL_PRINTED -> QC_PENDING or CANCELLED
  * - QC_PENDING -> QC_APPROVED, QC_REJECTED, or CANCELLED
  * - QC_REJECTED -> QC_PENDING or CANCELLED
@@ -67,8 +66,7 @@ export function canTransition(from: ReplacementStatus, to: ReplacementStatus) {
  *
  * Role capabilities:
  * - ESHA: Creates, edits, reviews QC, marks shipped, marks needs token.
- * - PRINTING: Prints shipping labels.
- * - PACKING: Submits QC photos, packs orders.
+ * - LOGISTICS: Adds the shipping label and proof photos, then packs approved orders.
  * - ADMIN: Superuser across all operations and cancellations.
  *
  * @param role User's operational role.
@@ -111,8 +109,9 @@ export function assertWorkflowAction(
 export function availableActions(role: Role, status: ReplacementStatus): WorkflowAction[] {
   const actions: WorkflowAction[] = ["COMMENT"];
   if (canPerform(role, "UPLOAD")) actions.push("UPLOAD");
-  if (status === "NEW" && canPerform(role, "MARK_LABEL_PRINTED")) actions.push("MARK_LABEL_PRINTED");
-  if ((status === "LABEL_PRINTED" || status === "QC_REJECTED") && canPerform(role, "SUBMIT_QC")) actions.push("SUBMIT_QC");
+  if (["NEW", "LABEL_PRINTED", "QC_REJECTED"].includes(status) && canPerform(role, "SUBMIT_LOGISTICS")) {
+    actions.push("SUBMIT_LOGISTICS");
+  }
   if (status === "QC_PENDING" && canPerform(role, "APPROVE_QC")) actions.push("APPROVE_QC", "REJECT_QC");
   if (status === "QC_APPROVED" && canPerform(role, "MARK_PACKED")) actions.push("MARK_PACKED");
   if (status === "PACKED") {

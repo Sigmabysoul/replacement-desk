@@ -35,7 +35,11 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
   } else if (scope === "archived") {
     query = query.not("archived_at", "is", null);
   }
-  if (STATUSES.includes(params.status as ReplacementStatus)) query = query.eq("status", params.status!);
+  if (params.status === "AWAITING_LOGISTICS") {
+    query = query.in("status", ["NEW", "LABEL_PRINTED"]);
+  } else if (STATUSES.includes(params.status as ReplacementStatus)) {
+    query = query.eq("status", params.status!);
+  }
   if (params.date) query = query.gte("created_at", `${params.date}T00:00:00`).lt("created_at", `${params.date}T23:59:59.999`);
   if (params.q?.trim()) {
     const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").replace(/\s+/g, " ").slice(0, 100);
@@ -96,6 +100,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
           </div>
           <Select name="status" defaultValue={params.status ?? ""} aria-label="Filter by status">
             <option value="">All statuses</option>
+            <option value="AWAITING_LOGISTICS">Awaiting logistics</option>
             {STATUSES.map((status) => (
               <option key={status} value={status}>{statusLabel[status]}</option>
             ))}

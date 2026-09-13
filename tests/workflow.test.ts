@@ -17,21 +17,17 @@ import { validateMagicBytes } from "@/lib/security/magic-bytes";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rate-limit";
 
 describe("replacement workflow permissions", () => {
-  it("prevents packing from approving QC", () => {
-    expect(canPerform("PACKING", "APPROVE_QC")).toBe(false);
+  it("prevents logistics from approving QC", () => {
+    expect(canPerform("LOGISTICS", "APPROVE_QC")).toBe(false);
   });
 
-  it("prevents printing from marking shipped", () => {
-    expect(canPerform("PRINTING", "MARK_SHIPPED")).toBe(false);
+  it("prevents logistics from marking shipped", () => {
+    expect(canPerform("LOGISTICS", "MARK_SHIPPED")).toBe(false);
   });
 
-  it("allows packing to submit QC and mark packed", () => {
-    expect(canPerform("PACKING", "SUBMIT_QC")).toBe(true);
-    expect(canPerform("PACKING", "MARK_PACKED")).toBe(true);
-  });
-
-  it("allows printing to mark label printed", () => {
-    expect(canPerform("PRINTING", "MARK_LABEL_PRINTED")).toBe(true);
+  it("allows logistics to submit the handoff and mark packed", () => {
+    expect(canPerform("LOGISTICS", "SUBMIT_LOGISTICS")).toBe(true);
+    expect(canPerform("LOGISTICS", "MARK_PACKED")).toBe(true);
   });
 
   it("allows esha to approve/reject QC and mark shipped", () => {
@@ -43,8 +39,7 @@ describe("replacement workflow permissions", () => {
 
   it("allows admin to perform all actions", () => {
     expect(canPerform("ADMIN", "CREATE_REPLACEMENT")).toBe(true);
-    expect(canPerform("ADMIN", "MARK_LABEL_PRINTED")).toBe(true);
-    expect(canPerform("ADMIN", "SUBMIT_QC")).toBe(true);
+    expect(canPerform("ADMIN", "SUBMIT_LOGISTICS")).toBe(true);
     expect(canPerform("ADMIN", "APPROVE_QC")).toBe(true);
     expect(canPerform("ADMIN", "REJECT_QC")).toBe(true);
     expect(canPerform("ADMIN", "MARK_PACKED")).toBe(true);
@@ -56,7 +51,7 @@ describe("replacement workflow permissions", () => {
 describe("replacement workflow status transitions", () => {
   it("cannot pack before approval", () => {
     expect(canTransition("QC_PENDING", "PACKED")).toBe(false);
-    expect(() => assertWorkflowAction("PACKING", "MARK_PACKED", "QC_PENDING", "PACKED")).toThrow();
+    expect(() => assertWorkflowAction("LOGISTICS", "MARK_PACKED", "QC_PENDING", "PACKED")).toThrow();
   });
 
   it("allows rejected QC to be resubmitted", () => {
@@ -82,17 +77,17 @@ describe("replacement workflow status transitions", () => {
   });
 
   it("enforces role authorization", () => {
-    expect(() => assertWorkflowAction("PRINTING", "APPROVE_QC")).toThrow("PRINTING cannot perform APPROVE_QC");
+    expect(() => assertWorkflowAction("LOGISTICS", "APPROVE_QC")).toThrow("LOGISTICS cannot perform APPROVE_QC");
   });
 
   it("determines available actions accurately", () => {
-    expect(availableActions("PRINTING", "NEW")).toContain("MARK_LABEL_PRINTED");
-    expect(availableActions("PACKING", "NEW")).not.toContain("MARK_LABEL_PRINTED");
-    expect(availableActions("PACKING", "LABEL_PRINTED")).toContain("SUBMIT_QC");
+    expect(availableActions("LOGISTICS", "NEW")).toContain("SUBMIT_LOGISTICS");
+    expect(availableActions("LOGISTICS", "LABEL_PRINTED")).toContain("SUBMIT_LOGISTICS");
+    expect(availableActions("LOGISTICS", "QC_REJECTED")).toContain("SUBMIT_LOGISTICS");
     expect(availableActions("ESHA", "QC_PENDING")).toEqual(
       expect.arrayContaining(["APPROVE_QC", "REJECT_QC"])
     );
-    expect(availableActions("PACKING", "QC_APPROVED")).toContain("MARK_PACKED");
+    expect(availableActions("LOGISTICS", "QC_APPROVED")).toContain("MARK_PACKED");
     expect(availableActions("ESHA", "PACKED")).toEqual(
       expect.arrayContaining(["MARK_SHIPPED", "MARK_NEEDS_TOKEN"])
     );

@@ -4,7 +4,6 @@ import { Field, Input, Textarea } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ReasonSelect } from "@/components/replacements/reason-select";
-import { FileInputFeedback } from "@/components/replacements/file-picker";
 import { requireProfile } from "@/lib/auth/session";
 
 export default async function NewReplacementPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -15,7 +14,9 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
     <div className="mx-auto max-w-2xl">
       <p className="text-sm font-bold text-indigo-700">NEW REQUEST</p>
       <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Create replacement</h1>
-      <p className="mt-1 text-sm text-slate-600">Add the order and product first. Photos and the label can be attached below.</p>
+      <p className="mt-1 text-sm text-slate-600">
+        Add only the order details. Logistics will attach the shipping label and proof photos next.
+      </p>
       <form action={createReplacementAction} className="mt-6 grid gap-5">
         <Notice>{error}</Notice>
         <Card className="grid gap-5 p-4 sm:grid-cols-2 sm:p-6">
@@ -43,22 +44,6 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
               <Textarea name="notes" maxLength={2000} placeholder="Anything the team should know" />
             </Field>
           </div>
-        </Card>
-        <Card className="grid gap-5 p-4 sm:grid-cols-2 sm:p-6">
-          <FileInputFeedback
-            name="customer_photos"
-            label="Customer photos"
-            hint="JPEG, PNG, or WebP. Up to 25 MB each."
-            accept="image/jpeg,image/png,image/webp"
-            iconType="camera"
-          />
-          <FileInputFeedback
-            name="labels"
-            label="Label / document"
-            hint="PDF or image. Up to 25 MB each."
-            accept="application/pdf,image/jpeg,image/png,image/webp"
-            iconType="document"
-          />
         </Card>
         <SubmitButton pendingText="Creating replacement…">CREATE REPLACEMENT</SubmitButton>
       </form>

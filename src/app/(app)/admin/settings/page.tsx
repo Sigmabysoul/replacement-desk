@@ -65,8 +65,14 @@ export default async function SettingsPage() {
         </div>
         <Setting label="Telegram Bot Token" configured={bot} />
         <Setting label="Esha Chat ID" configured={Boolean(process.env.TELEGRAM_ESHA_CHAT_ID)} />
-        <Setting label="Printing Chat ID" configured={Boolean(process.env.TELEGRAM_PRINTING_CHAT_ID)} />
-        <Setting label="Packing Chat ID" configured={Boolean(process.env.TELEGRAM_PACKING_CHAT_ID)} />
+        <Setting
+          label="Logistics Chat ID"
+          configured={Boolean(process.env.TELEGRAM_LOGISTICS_CHAT_ID)}
+        />
+        <Setting
+          label="Legacy Logistics fallback chats"
+          configured={Boolean(process.env.TELEGRAM_PACKING_CHAT_ID || process.env.TELEGRAM_PRINTING_CHAT_ID)}
+        />
         <Setting label="Admin Chat ID" configured={Boolean(process.env.TELEGRAM_ADMIN_CHAT_ID)} />
       </Card>
 
@@ -106,7 +112,7 @@ export default async function SettingsPage() {
       <Card className="flex items-start gap-3 p-5">
         <KeyRound className="mt-0.5 size-5 shrink-0 text-indigo-600" />
         <p className="text-sm leading-6 text-slate-600">
-          Environment variables can be updated in your Vercel Project Settings. Service role keys and bot tokens are strictly kept server-side and never sent to the browser.
+          Environment variables are managed by the deployment host. Service role keys and bot tokens stay server-side and are never sent to the browser.
         </p>
       </Card>
     </div>

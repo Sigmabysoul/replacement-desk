@@ -15,11 +15,11 @@ interface NavItem {
 }
 
 const mainItems: NavItem[] = [
-  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ["ESHA", "PRINTING", "PACKING", "ADMIN"] },
-  { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["ESHA", "PRINTING", "PACKING", "ADMIN"] },
+  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ["ESHA", "LOGISTICS", "ADMIN"] },
+  { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["ESHA", "LOGISTICS", "ADMIN"] },
   { href: "/replacements/new", label: "New replacement", short: "New", icon: CirclePlus, roles: ["ESHA", "ADMIN"] },
   { href: "/dispatch", label: "Dispatch", short: "Dispatch", icon: Truck, roles: ["ESHA", "ADMIN"] },
-  { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ["ESHA", "PRINTING", "PACKING", "ADMIN"] },
+  { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ["ESHA", "LOGISTICS", "ADMIN"] },
 ];
 
 export function Navigation({ role }: { role: Role }) {

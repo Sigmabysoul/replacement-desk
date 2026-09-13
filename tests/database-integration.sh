@@ -48,6 +48,7 @@ create table storage.objects (
   owner_id text
 );
 alter table storage.objects enable row level security;
+grant usage on schema storage to authenticated;
 grant select, insert, delete on storage.objects to authenticated;
 create publication supabase_realtime;
 
@@ -56,6 +57,9 @@ alter default privileges in schema public grant usage, select on sequences to au
 SQL
 
 for migration in supabase/migrations/*.sql; do
+  case "$(basename "$migration")" in
+    20260913*) continue ;;
+  esac
   "${psql[@]}" -f "$migration" >/dev/null
 done
 
@@ -81,10 +85,51 @@ update public.profiles set role = 'PRINTING' where id = '33333333-3333-3333-3333
 update public.profiles set role = 'PACKING' where id = '44444444-4444-4444-4444-444444444444';
 update public.profiles set active = false where id = '55555555-5555-5555-5555-555555555555';
 
+insert into public.replacements(id, replacement_number, order_reference, product_name, quantity, created_by)
+values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'assigned-by-trigger', 'LEGACY-ORDER', 'Legacy Product', 1, '22222222-2222-2222-2222-222222222222');
+update public.replacements set status = 'LABEL_PRINTED' where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+SQL
+
+for migration in supabase/migrations/20260913*.sql; do
+  "${psql[@]}" -f "$migration" >/dev/null
+done
+
+"${psql[@]}" <<'SQL'
+insert into auth.users(id, email, raw_user_meta_data)
+values ('66666666-6666-4666-8666-666666666666', 'new-logistics@example.com', '{"full_name":"New Logistics","role":"ADMIN"}');
+
+do $$
+begin
+  if exists (select 1 from public.profiles where role in ('PRINTING', 'PACKING')) then
+    raise exception 'Legacy operational roles were not converted to Logistics';
+  end if;
+  if (select status from public.replacements where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') <> 'LABEL_PRINTED' then
+    raise exception 'In-flight legacy order status was not preserved';
+  end if;
+  if (select role from public.profiles where id = '66666666-6666-4666-8666-666666666666') <> 'LOGISTICS' then
+    raise exception 'New profiles do not default safely to Logistics';
+  end if;
+end
+$$;
+
 set role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
 insert into public.replacements(id, replacement_number, order_reference, product_name, quantity, created_by)
 values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'assigned-by-trigger', 'ORDER-1', 'Test Product', 2, '22222222-2222-2222-2222-222222222222');
+
+do $$
+begin
+  perform public.submit_logistics_package(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    '[]',
+    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/dddddddd-dddd-4ddd-8ddd-dddddddddddd/photos/unauthorized.jpg","file_name":"unauthorized.jpg","mime_type":"image/jpeg"}]'
+  );
+  raise exception 'Esha logistics authorization test unexpectedly succeeded';
+exception when others then
+  if sqlerrm <> 'Only Logistics can add labels and proof photos' then raise; end if;
+end
+$$;
 
 select public.update_replacement_details(
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'ORDER-1', null, null, 'Test Product', 2, null, null,
@@ -99,24 +144,90 @@ begin
 end
 $$;
 
-select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', false);
-select public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'LABEL_PRINTED');
-
 select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', false);
-select public.submit_qc(
+do $$
+begin
+  perform public.submit_logistics_package(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    null,
+    '[]'
+  );
+  raise exception 'Null attachment metadata unexpectedly succeeded';
+exception when others then
+  if sqlerrm <> 'A maximum of four label files is allowed' then raise; end if;
+end
+$$;
+
+do $$
+begin
+  insert into public.attachments(
+    replacement_id, attachment_type, storage_path, file_name, mime_type, uploaded_by
+  ) values (
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'LABEL',
+    'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/fabricated.pdf',
+    'fabricated.pdf',
+    'application/pdf',
+    '44444444-4444-4444-4444-444444444444'
+  );
+  raise exception 'Direct attachment metadata insert unexpectedly succeeded';
+exception when insufficient_privilege then
+  null;
+end
+$$;
+
+insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
+  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/dddddddd-dddd-4ddd-8ddd-dddddddddddd/photos/no-label.jpg', '{"size":1024}', '44444444-4444-4444-4444-444444444444');
+do $$
+begin
+  perform public.submit_logistics_package(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    '[]',
+    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/dddddddd-dddd-4ddd-8ddd-dddddddddddd/photos/no-label.jpg","file_name":"no-label.jpg","mime_type":"image/jpeg"}]'
+  );
+  raise exception 'Missing label test unexpectedly succeeded';
+exception when others then
+  if sqlerrm <> 'A shipping label is required for this replacement' then raise; end if;
+end
+$$;
+
+insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
+  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/label.pdf', '{"size":1024}', '44444444-4444-4444-4444-444444444444'),
+  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/photos/one.jpg', '{"size":1024}', '44444444-4444-4444-4444-444444444444');
+select public.submit_logistics_package(
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/qc/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/one.jpg","file_name":"one.jpg","mime_type":"image/jpeg"}]'
+  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/label.pdf","file_name":"label.pdf","mime_type":"application/pdf"}]',
+  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/photos/one.jpg","file_name":"one.jpg","mime_type":"image/jpeg"}]'
 );
 
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
 select public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'QC_REJECTED', 'Retake photo');
 
 select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', false);
-select public.submit_qc(
+do $$
+begin
+  perform public.submit_logistics_package(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    '[]',
+    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/dddddddd-dddd-4ddd-8ddd-dddddddddddd/photos/fabricated.jpg","file_name":"fabricated.jpg","mime_type":"image/jpeg"}]'
+  );
+  raise exception 'Fabricated storage evidence unexpectedly succeeded';
+exception when others then
+  if sqlerrm <> 'Proof photo storage objects were not uploaded by the current user' then raise; end if;
+end
+$$;
+
+insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
+  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/cccccccc-cccc-4ccc-8ccc-cccccccccccc/photos/two.jpg', '{"size":1024}', '44444444-4444-4444-4444-444444444444');
+select public.submit_logistics_package(
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/qc/cccccccc-cccc-4ccc-8ccc-cccccccccccc/two.jpg","file_name":"two.jpg","mime_type":"image/jpeg"}]'
+  '[]',
+  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/cccccccc-cccc-4ccc-8ccc-cccccccccccc/photos/two.jpg","file_name":"two.jpg","mime_type":"image/jpeg"}]'
 );
 
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
@@ -130,11 +241,17 @@ select public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'SH
 
 do $$
 begin
+  if has_function_privilege('authenticated', 'public.submit_qc(uuid,uuid,jsonb)', 'execute') then
+    raise exception 'Legacy submit_qc RPC is still callable';
+  end if;
   if (select status from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'SHIPPED' then
     raise exception 'workflow did not reach SHIPPED';
   end if;
   if (select count(*) from public.qc_submissions where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 2 then
     raise exception 'QC resubmission history was not preserved';
+  end if;
+  if (select count(*) from public.attachments where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and attachment_type = 'LABEL') <> 1 then
+    raise exception 'Logistics label was not retained';
   end if;
   if (select count(*) from public.activity_logs where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') < 9 then
     raise exception 'workflow audit trail is incomplete';
@@ -168,6 +285,42 @@ begin
   if (select count(*) from public.replacements) <> 0 then
     raise exception 'inactive profile can read replacements';
   end if;
+  begin
+    perform public.submit_logistics_package(
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      '[]',
+      '[]'
+    );
+    raise exception 'Inactive profile submitted Logistics evidence';
+  exception when others then
+    if sqlerrm <> 'Only Logistics can add labels and proof photos' then raise; end if;
+  end;
+  begin
+    perform public.update_replacement_details(
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      'ATTACK', null, null, 'Attack', 1, null, null, null
+    );
+    raise exception 'Inactive profile edited a replacement';
+  exception when others then
+    if sqlerrm <> 'Only Esha can edit replacement details' then raise; end if;
+  end;
+  begin
+    perform public.admin_override_replacement(
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      'CANCELLED',
+      'unauthorized override'
+    );
+    raise exception 'Inactive profile used the admin override';
+  exception when others then
+    if sqlerrm <> 'Admin access required' then raise; end if;
+  end;
+  begin
+    perform public.archive_completed_replacements();
+    raise exception 'Inactive profile archived replacements';
+  exception when others then
+    if sqlerrm <> 'Administrator access required' then raise; end if;
+  end;
 end
 $$;
 SQL

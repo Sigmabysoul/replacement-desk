@@ -129,57 +129,27 @@ export async function logoutAction() {
 }
 
 /**
- * Creates a new replacement order and uploads associated customer photos and shipping labels.
+ * Creates a new replacement order from Esha's order details only.
  *
  * Authorization: ESHA or ADMIN
  * Workflow:
  * 1. Validates form fields (order reference, product, quantity, etc.).
- * 2. Validates files for MIME type, size limit, and binary file signatures.
- * 3. Inserts the row into `replacements` table with status 'NEW'.
- * 4. Generates formatted sequence number (REP-YYYY-XXXX) via database trigger.
- * 5. Uploads customer photos and shipping label documents to Supabase Storage.
- * 6. Dispatches 'NEW_REPLACEMENT' Telegram notification to printing department.
+ * 2. Inserts the row into `replacements` with status 'NEW'.
+ * 3. Generates the formatted sequence number (REP-YYYY-XXXX) via database trigger.
+ * 4. Notifies Logistics that a label and proof photos are required.
  */
 export async function createReplacementAction(formData: FormData) {
   const profile = await requireProfile(["ESHA", "ADMIN"]);
   const parsed = replacementSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(`/replacements/new?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
 
-  const customerPhotos = formFiles(formData, "customer_photos");
-  const labels = formFiles(formData, "labels");
-  try {
-    await validateFiles(customerPhotos, false);
-    await validateFiles(labels);
-  } catch (error) {
-    redirect(`/replacements/new?error=${encodeURIComponent(messageFrom(error))}`);
-  }
-
   const supabase = await createClient();
   const { data, error } = await supabase.from("replacements").insert({ ...parsed.data, created_by: profile.id }).select("*").single();
   if (error || !data) redirect(`/replacements/new?error=${encodeURIComponent(error?.message ?? "Could not create replacement.")}`);
   const replacement = data as Replacement;
 
-  let warning = "";
-  let uploadedPaths: string[] = [];
-  try {
-    const customer = await uploadFiles(replacement.id, customerPhotos, "CUSTOMER_PHOTO", "customer");
-    uploadedPaths = [...customer.uploaded];
-    const label = await uploadFiles(replacement.id, labels, "LABEL", "labels");
-    uploadedPaths.push(...label.uploaded);
-    const rows = [...customer.rows, ...label.rows];
-    if (rows.length) {
-      const { error: attachmentError } = await supabase.from("attachments").insert(rows);
-      if (attachmentError) {
-        await supabase.storage.from("replacement-files").remove([...customer.uploaded, ...label.uploaded]);
-        throw attachmentError;
-      }
-    }
-  } catch (error) {
-    if (uploadedPaths.length) await supabase.storage.from("replacement-files").remove(uploadedPaths);
-    warning = messageFrom(error);
-  }
   const sent = await notifyTelegram("NEW_REPLACEMENT", replacement, undefined, profile.full_name);
-  if (!sent.ok) warning = warning || "Replacement created, but a Telegram notification could not be sent.";
+  const warning = sent.ok ? "" : "Replacement created, but a Telegram notification could not be sent.";
   redirect(`/replacements/${replacement.id}${warning ? `?warning=${encodeURIComponent(warning)}` : ""}`);
 }
 
@@ -237,9 +207,8 @@ const notificationForStatus = {
  * Transitions a replacement order to a target operational status.
  *
  * Authorization: Enforced atomically inside PostgreSQL via `transition_replacement` RPC:
- * - PRINTING: Can mark LABEL_PRINTED (from NEW).
+ * - LOGISTICS: Can submit labels/photos and pack approved orders.
  * - ESHA: Can review QC (QC_APPROVED / QC_REJECTED) and dispatch (SHIPPED, NEEDS_TOKEN).
- * - PACKING: Can mark PACKED (only after QC_APPROVED).
  * - ADMIN: Can execute all standard transitions or cancel.
  *
  * Triggers automated Telegram notifications for the target status and revalidates cache.
@@ -269,48 +238,84 @@ export async function transitionAction(formData: FormData) {
 }
 
 /**
- * Submits quality check (QC) photos taken by the packing department.
+ * Submits the Logistics handoff: a shipping label plus packing/QC proof photos.
  *
- * Authorization: PACKING or ADMIN
+ * Authorization: LOGISTICS or ADMIN
  * Workflow:
- * 1. Validates image count (1-12) and checks binary file signatures.
- * 2. Uploads photos to storage under `replacements/{id}/qc/{submissionId}`.
- * 3. Calls `submit_qc` RPC function to atomically create submission record
- *    and transition order status to 'QC_PENDING'.
+ * 1. Requires a label on the first submission and 1-12 proof photos every time.
+ * 2. Uploads the files under a submission-specific storage directory.
+ * 3. Calls `submit_logistics_package` to atomically record file metadata, create
+ *    the QC submission, and transition the order to 'QC_PENDING'.
  * 4. Notifies ESHA via Telegram for review.
  */
-export async function submitQcAction(formData: FormData) {
-  await requireProfile(["PACKING", "ADMIN"]);
+export async function submitLogisticsAction(formData: FormData) {
+  await requireProfile(["LOGISTICS", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
-  const files = formFiles(formData, "qc_photos");
+  const labels = formFiles(formData, "labels");
+  const photos = formFiles(formData, "qc_photos");
   if (!/^[0-9a-f-]{36}$/i.test(replacementId)) redirect("/replacements?error=Invalid%20replacement.");
-  if (!files.length) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add at least one QC photo.")}`);
+  if (!photos.length) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add at least one proof photo.")}`);
+  if (photos.length > 12) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add no more than twelve proof photos.")}`);
+  if (labels.length > 4) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add no more than four label files.")}`);
+  const totalUploadBytes = [...labels, ...photos].reduce((sum, file) => sum + file.size, 0);
+  if (totalUploadBytes > 80 * 1024 * 1024) {
+    redirect(`/replacements/${replacementId}?error=${encodeURIComponent("The combined upload must be 80 MB or smaller.")}`);
+  }
   try {
-    await validateFiles(files, false);
+    await Promise.all([validateFiles(labels), validateFiles(photos, false)]);
   } catch (error) {
     redirect(`/replacements/${replacementId}?error=${encodeURIComponent(messageFrom(error))}`);
   }
+
   const submissionId = randomUUID();
   const supabase = await createClient();
-  let uploaded: string[] = [];
+  const uploaded: string[] = [];
   let replacement: Replacement | null = null;
   try {
-    const upload = await uploadFiles(replacementId, files, "QC_PHOTO", `qc/${submissionId}`, submissionId);
-    uploaded = upload.uploaded;
-    const { data, error } = await supabase.rpc("submit_qc", {
+    const [{ data: current }, { count: existingLabelCount }] = await Promise.all([
+      supabase.from("replacements").select("status").eq("id", replacementId).single(),
+      supabase
+        .from("attachments")
+        .select("id", { count: "exact", head: true })
+        .eq("replacement_id", replacementId)
+        .eq("attachment_type", "LABEL"),
+    ]);
+    if (!current) throw new Error("Replacement not found.");
+    if (!labels.length && !existingLabelCount) {
+      throw new Error("Add the shipping label before sending this order for approval.");
+    }
+
+    const labelUpload = await uploadFiles(replacementId, labels, "LABEL", `logistics/${submissionId}/labels`);
+    uploaded.push(...labelUpload.uploaded);
+    const photoUpload = await uploadFiles(replacementId, photos, "QC_PHOTO", `logistics/${submissionId}/photos`, submissionId);
+    uploaded.push(...photoUpload.uploaded);
+    const { data, error } = await supabase.rpc("submit_logistics_package", {
       p_replacement_id: replacementId,
       p_submission_id: submissionId,
-      p_attachments: upload.rows,
+      p_label_attachments: labelUpload.rows,
+      p_photo_attachments: photoUpload.rows,
     });
     if (error) throw error;
     replacement = data as Replacement;
   } catch (error) {
-    if (uploaded.length) await supabase.storage.from("replacement-files").remove(uploaded);
+    if (uploaded.length) {
+      // The RPC may have committed even if its HTTP response was lost. Delete
+      // uploads only after proving that no committed attachment references them.
+      const { count, error: reconciliationError } = await supabase
+        .from("attachments")
+        .select("id", { count: "exact", head: true })
+        .in("storage_path", uploaded);
+      if (!reconciliationError && count === 0) {
+        await supabase.storage.from("replacement-files").remove(uploaded);
+      }
+    }
     redirect(`/replacements/${replacementId}?error=${encodeURIComponent(messageFrom(error))}`);
   }
   const sent = await notifyTelegram("QC_SUBMITTED", replacement!);
   revalidatePath(`/replacements/${replacementId}`);
-  redirect(`/replacements/${replacementId}${!sent.ok ? "?warning=QC%20submitted%2C%20but%20Telegram%20notification%20failed." : ""}`);
+  revalidatePath("/");
+  revalidatePath("/replacements");
+  redirect(`/replacements/${replacementId}${!sent.ok ? "?warning=Files%20submitted%2C%20but%20Telegram%20notification%20failed." : ""}`);
 }
 
 /**
@@ -339,7 +344,7 @@ export async function adminOverrideAction(formData: FormData) {
 /**
  * Appends an operational or support comment to a replacement order.
  *
- * Authorization: Authenticated users of any active role (ESHA, PRINTING, PACKING, ADMIN).
+ * Authorization: Authenticated users of any active role (ESHA, LOGISTICS, ADMIN).
  * Persists the comment and logs an entry to the order timeline via the `add_replacement_comment` RPC.
  */
 export async function addCommentAction(formData: FormData) {
@@ -365,7 +370,7 @@ export async function createUserAction(formData: FormData) {
   const fullName = String(formData.get("full_name") ?? "").trim();
   const temporaryPassword = String(formData.get("temporary_password") ?? "");
   const role = String(formData.get("role") ?? "") as Role;
-  if (!email || !fullName || temporaryPassword.length < 12 || !["ESHA", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Use%20a%20valid%20email%20and%20a%20temporary%20password%20of%20at%20least%2012%20characters.");
+  if (!email || !fullName || temporaryPassword.length < 12 || !["ESHA", "LOGISTICS", "ADMIN"].includes(role)) redirect("/admin/users?error=Use%20a%20valid%20email%20and%20a%20temporary%20password%20of%20at%20least%2012%20characters.");
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -394,7 +399,7 @@ export async function updateUserAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const role = String(formData.get("role") ?? "") as Role;
   const active = formData.get("active") === "true";
-  if (!/^[0-9a-f-]{36}$/i.test(id) || !["ESHA", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Invalid%20user%20update.");
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !["ESHA", "LOGISTICS", "ADMIN"].includes(role)) redirect("/admin/users?error=Invalid%20user%20update.");
   if (id === actor.id && (!active || role !== "ADMIN")) redirect("/admin/users?error=You%20cannot%20remove%20your%20own%20active%20administrator%20access.");
   const admin = createAdminClient();
   const { error } = await admin.from("profiles").update({ role, active }).eq("id", id);

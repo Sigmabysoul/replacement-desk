@@ -1,6 +1,6 @@
 # Replacement Desk
 
-Replacement Desk is a standalone internal operations app for customer replacement orders. Esha creates a request, Printing prints its label, Packing submits photo-based QC, Esha reviews it, and an authorized dispatcher records pickup or a missing token. Every important action is retained in an append-only activity history.
+Replacement Desk is a standalone internal operations app for customer replacement orders. Esha creates the order, Logistics attaches the shipping label and proof photos, Esha reviews the submission, Logistics packs it, and Esha records pickup or a missing token. Every important action is retained in an append-only activity history.
 
 ## Architecture
 
@@ -47,7 +47,7 @@ Public self-registration is not implemented. In Supabase Authentication, keep ne
 To create the first admin:
 
 1. In Supabase Dashboard → Authentication → Users, create a user with email/password.
-2. The database trigger creates a PACKING profile automatically.
+2. The database trigger creates a LOGISTICS profile automatically.
 3. In SQL Editor, promote that exact user ID:
 
    ```sql
@@ -69,17 +69,20 @@ Admins assign a temporary password of at least 12 characters and share it throug
 
 Missing chat IDs are skipped. Telegram delivery or logging failure never rolls back a replacement action. Attempts are recorded in `notifications` when the service-role key is configured.
 
+During the role cutover, if `TELEGRAM_LOGISTICS_CHAT_ID` is not yet set, Logistics alerts are sent to both distinct legacy `TELEGRAM_PRINTING_CHAT_ID` and `TELEGRAM_PACKING_CHAT_ID` values. Set the dedicated Logistics chat variable when the team has one combined chat.
+
 ## Environment variables
 
 | Variable | Scope | Required |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Browser/server | Yes |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser/server | Yes |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser/server | Yes, unless using the publishable key |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser/server | Yes, unless using the anon key |
+| `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | Server only | Yes for stable self-hosted deployments |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server only | Yes for admin invitations and notification logs |
 | `TELEGRAM_BOT_TOKEN` | Server only | No; required for Telegram |
 | `TELEGRAM_ESHA_CHAT_ID` | Server only | Optional recipient |
-| `TELEGRAM_PRINTING_CHAT_ID` | Server only | Optional recipient |
-| `TELEGRAM_PACKING_CHAT_ID` | Server only | Optional recipient |
+| `TELEGRAM_LOGISTICS_CHAT_ID` | Server only | Optional recipient |
 | `TELEGRAM_ADMIN_CHAT_ID` | Server only | Optional recipient |
 | `NEXT_PUBLIC_APP_URL` | Browser/server | Yes in production |
 
@@ -89,13 +92,12 @@ Never expose or prefix the service-role key or bot token with `NEXT_PUBLIC_`.
 
 Create one account for each role on Admin → Users, then test in order:
 
-1. **ESHA:** create a replacement with a label and customer photo.
-2. **PRINTING:** open the label and mark it printed. Confirm QC/dispatch controls are absent.
-3. **PACKING:** upload one or more QC images and submit. Confirm approve controls are absent.
-4. **ESHA:** reject with a required reason; sign back in as Packing and resubmit; then approve as Esha.
-5. **PACKING:** mark the approved replacement packed.
-6. **ESHA or ADMIN:** use Dispatch to mark it shipped or needs token.
-7. **ADMIN:** verify users, Telegram configuration state, and the audited override control.
+1. **ESHA:** create a replacement using order details only. Confirm no file upload is offered.
+2. **LOGISTICS:** attach a shipping label and one or more proof photos. Confirm review and dispatch controls are absent.
+3. **ESHA:** reject with a required reason; sign back in as Logistics and resubmit photos without losing the original label; then approve as Esha.
+4. **LOGISTICS:** mark the approved replacement packed.
+5. **ESHA or ADMIN:** use Dispatch to mark it shipped or needs token.
+6. **ADMIN:** verify users, Telegram configuration state, and the audited override control.
 
 Use distinct browser profiles or sign out between roles. Direct attempts to bypass the UI should fail in PostgreSQL.
 
@@ -121,6 +123,24 @@ Hostinger's managed Node.js web apps currently require **Business Web Hosting or
 
 GitHub integration automatically builds the latest selected branch on subsequent pushes. The application requires a Node.js server and must not be deployed as a static export.
 
+### Hostinger VPS deployment
+
+The repository also includes a production `Dockerfile` and `compose.hostinger.yaml` for a Hostinger VPS that already runs Coolify. This deployment joins the existing external `coolify` Docker network but does not publish a host port. An existing reverse proxy can reach the stable `replacement-desk` network alias on port 3000 without exposing the Next.js server directly.
+
+The Logistics migration changes existing Printing/Packing roles and must be coordinated with the new app. Use a short maintenance window and complete these steps in order:
+
+1. Confirm the exact Supabase project URL/reference, take a Supabase backup, and export `select id, full_name, role from public.profiles;` so legacy role assignments can be restored during rollback.
+2. Apply every pending SQL migration in filename order with `supabase db push`, or apply `202609130001_add_logistics_role.sql` and then `202609130002_logistics_workflow.sql` in that exact project's SQL editor. Confirm `LOGISTICS` profiles and the `submit_logistics_package` function exist before proceeding.
+3. Build and start the new container, verify `/login` and one controlled lifecycle, then switch HTTPS traffic. Do not roll the old application back after the role migration without restoring the exported role mapping.
+
+Keep production values in an uncommitted `.env.production` file beside the Compose file. Generate `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` once with `openssl rand -base64 32` and retain the same value across builds. Compose passes that server-only value to the BuildKit builder as a secret and also supplies runtime secrets through the env file; only `NEXT_PUBLIC_*` values are normal build arguments. Deploy with:
+
+```bash
+docker compose --env-file .env.production -f compose.hostinger.yaml up -d --build
+```
+
+The container runs as an unprivileged user, restarts automatically, and reports health against `/login`. Route the chosen HTTPS hostname to `http://replacement-desk:3000` from the reverse proxy on the `coolify` network. Always test the proxy configuration before reloading it.
+
 ## Deploy to Vercel
 
 1. Push this directory to a private Git repository.
@@ -131,7 +151,7 @@ GitHub integration automatically builds the latest selected branch on subsequent
 
 ## Operational limitations
 
-- Notifications are attempted once inline; failed Telegram sends are logged but not retried automatically.
+- Notifications are retried once inline; failed Telegram sends are logged but never block the order workflow.
 - There is no offline mode, bulk dispatch, or courier integration.
 - Search covers replacement number, order reference, and product; usage is intentionally optimized for a few requests per month.
 - Admin override changes the replacement status and timestamps but cannot manufacture missing QC submission history. It is an audited recovery tool, not the normal workflow.

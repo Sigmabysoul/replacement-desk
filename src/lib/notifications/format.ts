@@ -11,11 +11,11 @@ export type NotificationType =
   | "NEEDS_TOKEN";
 
 export const NOTIFICATION_RECIPIENTS: Record<NotificationType, readonly Role[]> = {
-  NEW_REPLACEMENT: ["PRINTING", "PACKING"],
-  LABEL_PRINTED: ["PACKING", "ESHA"],
+  NEW_REPLACEMENT: ["LOGISTICS"],
+  LABEL_PRINTED: ["LOGISTICS", "ESHA"],
   QC_SUBMITTED: ["ESHA"],
-  QC_REJECTED: ["PACKING"],
-  QC_APPROVED: ["PACKING"],
+  QC_REJECTED: ["LOGISTICS"],
+  QC_APPROVED: ["LOGISTICS"],
   PACKED: ["ESHA", "ADMIN"],
   SHIPPED: ["ESHA", "ADMIN"],
   NEEDS_TOKEN: ["ESHA", "ADMIN"],
@@ -69,7 +69,7 @@ export function formatTelegramMessage(
         "",
         replacement.replacement_number,
         "",
-        "Packing submitted QC photos.",
+        "Logistics added the shipping label and proof photos.",
       );
       break;
 
@@ -133,4 +133,3 @@ export function formatTelegramMessage(
 
   return lines.join("\n");
 }
-

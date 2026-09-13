@@ -150,7 +150,7 @@ function getNotificationContent(
     case "QC_PENDING":
       return {
         title: `🔍 QC Submitted · ${repNumber}`,
-        body: `Packing submitted photos for ${orderRef}. Pending review.`,
+        body: `Logistics submitted the label and photos for ${orderRef}. Pending Esha review.`,
       };
     case "LABEL_PRINTED":
       return {

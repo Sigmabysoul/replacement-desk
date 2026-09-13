@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // output: "standalone", <-- Removed to fix the Vercel build error
+  // Hostinger's Docker image uses the minimal standalone server. Other hosts
+  // retain their native Next.js output and deployment adapter behavior.
+  output: process.env.DOCKER_BUILD === "true" ? "standalone" : undefined,
   experimental: {
     serverActions: {
       bodySizeLimit: "100mb",

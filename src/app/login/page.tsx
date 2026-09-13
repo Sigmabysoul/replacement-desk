@@ -29,7 +29,7 @@ export default async function LoginPage({
           </span>
           <div>
             <h1 className="text-2xl font-black tracking-tight text-slate-950">Replacement Desk</h1>
-            <p className="text-xs sm:text-sm font-medium text-slate-600">Printing, QC, packing, and dispatch</p>
+            <p className="text-xs sm:text-sm font-medium text-slate-600">Orders, logistics proof, approval, and dispatch</p>
           </div>
         </div>
 

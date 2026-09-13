@@ -13,9 +13,9 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const statusLabel: Record<ReplacementStatus, string> = {
-  NEW: "New",
+  NEW: "Awaiting logistics",
   LABEL_PRINTED: "Label printed",
-  QC_PENDING: "QC pending",
+  QC_PENDING: "Waiting for Esha",
   QC_REJECTED: "QC rejected",
   QC_APPROVED: "QC approved",
   PACKED: "Packed",

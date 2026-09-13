@@ -7,17 +7,18 @@ import { formatDate } from "@/lib/utils";
 
 /**
  * Generates an intuitive next-step guidance label customized for the viewer's active role.
- * E.g., for a 'NEW' order, a Printing worker sees "Print the label" while others see "Waiting for printing".
+ * E.g., for a 'NEW' order, Logistics sees "Add label & photos" while Esha sees "Waiting for logistics".
  *
  * @param status Current operational status of the replacement.
  * @param role Active user's department role.
  * @returns Short human-readable status cue.
  */
 function actionHint(status: Replacement["status"], role: Role) {
-  if (status === "NEW") return role === "PRINTING" || role === "ADMIN" ? "Print the label" : "Waiting for printing";
-  if (status === "LABEL_PRINTED" || status === "QC_REJECTED") return role === "PACKING" || role === "ADMIN" ? "Submit QC photos" : "Waiting for QC";
+  if (["NEW", "LABEL_PRINTED", "QC_REJECTED"].includes(status)) {
+    return role === "LOGISTICS" || role === "ADMIN" ? "Add label & proof photos" : "Waiting for logistics";
+  }
   if (status === "QC_PENDING") return role === "ESHA" || role === "ADMIN" ? "Review QC" : "Waiting for review";
-  if (status === "QC_APPROVED") return role === "PACKING" || role === "ADMIN" ? "Pack replacement" : "Ready to pack";
+  if (status === "QC_APPROVED") return role === "LOGISTICS" || role === "ADMIN" ? "Pack replacement" : "Ready to pack";
   if (status === "PACKED") return role === "ESHA" || role === "ADMIN" ? "Complete dispatch" : "Ready for dispatch";
   if (status === "NEEDS_TOKEN") return "Follow up on token";
   return "View history";

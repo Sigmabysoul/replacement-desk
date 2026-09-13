@@ -275,7 +275,7 @@ export default async function ReplacementDetailPage({
                           </span>
                         </div>
                         <span className="text-xs font-medium text-slate-500">
-                          By {qc.submitter?.full_name ?? "Packing"} • {formatDate(qc.submitted_at)}
+                          By {qc.submitter?.full_name ?? "Logistics"} • {formatDate(qc.submitted_at)}
                         </span>
                       </div>
 

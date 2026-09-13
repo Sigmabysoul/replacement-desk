@@ -17,6 +17,7 @@ const actionCopy: Record<string, string> = {
   REPLACEMENT_CREATED: "Created replacement request",
   LABEL_PRINTED: "Printed the replacement label",
   QC_SUBMITTED: "Submitted QC photos",
+  LOGISTICS_SUBMITTED: "Added the shipping label and proof photos",
   QC_REJECTED: "Rejected QC",
   QC_APPROVED: "Approved QC",
   PACKED: "Packed the replacement",
@@ -34,6 +35,7 @@ function ActivityIcon({ action }: { action: string }) {
     case "LABEL_PRINTED":
       return <Printer className="size-4 text-violet-600" />;
     case "QC_SUBMITTED":
+    case "LOGISTICS_SUBMITTED":
       return <Camera className="size-4 text-amber-600" />;
     case "QC_APPROVED":
       return <CheckCircle2 className="size-4 text-emerald-600" />;
