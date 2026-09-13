@@ -2,7 +2,7 @@
 
 ```text
 NEW
- │ Logistics uploads the shipping label
+ │ Logistics uploads the shipping label and product photos
  ▼
 LABEL_UPLOADED
  │ Printing marks the label printed
@@ -31,6 +31,6 @@ Admin may cancel an open replacement or perform a reason-required, audited statu
 
 ## Audit events
 
-Creation, edits, Logistics label upload, Printing confirmation, every Packing QC submission, each QC decision, packing, dispatch, comments, cancellation, and admin overrides create immutable activity entries. Each entry records the actor and server timestamp. QC attempts use separate numbered rows, so rejection and resubmission never overwrite earlier evidence.
+Creation, edits, Logistics label/product-photo upload, Printing confirmation, every Packing QC-picture submission, each QC decision, packing, dispatch, comments, cancellation, and admin overrides create immutable activity entries. Each entry records the actor and server timestamp. Logistics evidence remains attached to the order, while Packing QC attempts use separate numbered rows so rejection and resubmission never overwrite earlier evidence.
 
 Telegram is downstream of the database commit. It can alert the relevant role, but it never becomes the source of truth and cannot prevent work from completing.

@@ -15,7 +15,7 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
       <p className="text-sm font-bold text-indigo-700">NEW REQUEST</p>
       <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Create replacement</h1>
       <p className="mt-1 text-sm text-slate-600">
-        Add only the order details. Logistics will attach the shipping label next.
+        Add only the order details. Logistics will attach the shipping label and product photos next.
       </p>
       <form action={createReplacementAction} className="mt-6 grid gap-5">
         <Notice>{error}</Notice>

@@ -17,8 +17,8 @@ import { validateMagicBytes } from "@/lib/security/magic-bytes";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rate-limit";
 
 describe("replacement workflow permissions", () => {
-  it("keeps Logistics limited to label upload", () => {
-    expect(canPerform("LOGISTICS", "UPLOAD_LABEL")).toBe(true);
+  it("allows Logistics to submit the label and product-photo handoff", () => {
+    expect(canPerform("LOGISTICS", "SUBMIT_LOGISTICS")).toBe(true);
     expect(canPerform("LOGISTICS", "APPROVE_QC")).toBe(false);
     expect(canPerform("LOGISTICS", "SUBMIT_QC")).toBe(false);
     expect(canPerform("LOGISTICS", "MARK_SHIPPED")).toBe(false);
@@ -46,7 +46,7 @@ describe("replacement workflow permissions", () => {
 
   it("allows admin to perform all actions", () => {
     expect(canPerform("ADMIN", "CREATE_REPLACEMENT")).toBe(true);
-    expect(canPerform("ADMIN", "UPLOAD_LABEL")).toBe(true);
+    expect(canPerform("ADMIN", "SUBMIT_LOGISTICS")).toBe(true);
     expect(canPerform("ADMIN", "MARK_LABEL_PRINTED")).toBe(true);
     expect(canPerform("ADMIN", "SUBMIT_QC")).toBe(true);
     expect(canPerform("ADMIN", "APPROVE_QC")).toBe(true);
@@ -96,7 +96,8 @@ describe("replacement workflow status transitions", () => {
   });
 
   it("determines available actions accurately", () => {
-    expect(availableActions("LOGISTICS", "NEW")).toContain("UPLOAD_LABEL");
+    expect(availableActions("LOGISTICS", "NEW")).toContain("SUBMIT_LOGISTICS");
+    expect(availableActions("LOGISTICS", "QC_REJECTED")).not.toContain("SUBMIT_LOGISTICS");
     expect(availableActions("PRINTING", "LABEL_UPLOADED")).toContain("MARK_LABEL_PRINTED");
     expect(availableActions("PACKING", "LABEL_PRINTED")).toContain("SUBMIT_QC");
     expect(availableActions("PACKING", "QC_REJECTED")).toContain("SUBMIT_QC");

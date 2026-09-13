@@ -151,7 +151,7 @@ export async function logoutAction() {
  * 1. Validates form fields (order reference, product, quantity, etc.).
  * 2. Inserts the row into `replacements` with status 'NEW'.
  * 3. Generates the formatted sequence number (REP-YYYY-XXXX) via database trigger.
- * 4. Notifies Logistics that a shipping label is required.
+ * 4. Notifies Logistics that the shipping label and product photos are required.
  */
 export async function createReplacementAction(formData: FormData) {
   const profile = await requireProfile(["ESHA", "ADMIN"]);
@@ -254,21 +254,26 @@ export async function transitionAction(formData: FormData) {
 }
 
 /**
- * Uploads the shipping label and hands the order from Logistics to Printing.
+ * Uploads Logistics' shipping label and product photos, then hands the order to Printing.
  *
  * Authorization: LOGISTICS or ADMIN
  * Workflow:
- * The database verifies the storage object and atomically records the label
- * before changing the order from NEW to LABEL_UPLOADED.
+ * The database verifies every storage object and atomically records both file
+ * groups before changing the order from NEW to LABEL_UPLOADED.
  */
-export async function submitLogisticsLabelAction(formData: FormData) {
+export async function submitLogisticsAction(formData: FormData) {
   await requireProfile(["LOGISTICS", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
-  const labels = formFiles(formData, "label");
+  const labels = formFiles(formData, "labels");
+  const photos = formFiles(formData, "proof_photos");
   if (!/^[0-9a-f-]{36}$/i.test(replacementId)) redirect("/replacements?error=Invalid%20replacement.");
   if (labels.length !== 1) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add exactly one shipping label.")}`);
+  if (!photos.length || photos.length > 12) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add between one and twelve product photos.")}`);
+  if ([...labels, ...photos].reduce((sum, file) => sum + file.size, 0) > 80 * 1024 * 1024) {
+    redirect(`/replacements/${replacementId}?error=${encodeURIComponent("The combined upload must be 80 MB or smaller.")}`);
+  }
   try {
-    await validateFiles(labels);
+    await Promise.all([validateFiles(labels), validateFiles(photos, false)]);
   } catch (error) {
     redirect(`/replacements/${replacementId}?error=${encodeURIComponent(messageFrom(error))}`);
   }
@@ -280,10 +285,13 @@ export async function submitLogisticsLabelAction(formData: FormData) {
   try {
     const labelUpload = await uploadFiles(replacementId, labels, "LABEL", `logistics/${uploadId}/labels`);
     uploaded.push(...labelUpload.uploaded);
-    const { data, error } = await supabase.rpc("submit_logistics_label", {
+    const photoUpload = await uploadFiles(replacementId, photos, "PROOF_PHOTO", `logistics/${uploadId}/photos`);
+    uploaded.push(...photoUpload.uploaded);
+    const { data, error } = await supabase.rpc("submit_logistics_package", {
       p_replacement_id: replacementId,
       p_upload_id: uploadId,
-      p_attachments: labelUpload.rows,
+      p_label_attachments: labelUpload.rows,
+      p_photo_attachments: photoUpload.rows,
     });
     if (error) throw error;
     replacement = data as Replacement;
@@ -295,7 +303,7 @@ export async function submitLogisticsLabelAction(formData: FormData) {
   revalidatePath(`/replacements/${replacementId}`);
   revalidatePath("/");
   revalidatePath("/replacements");
-  redirect(`/replacements/${replacementId}${!sent.ok ? "?warning=Label%20saved%2C%20but%20Telegram%20notification%20failed." : ""}`);
+  redirect(`/replacements/${replacementId}${!sent.ok ? "?warning=Files%20saved%2C%20but%20Telegram%20notification%20failed." : ""}`);
 }
 
 /** Uploads Packing's QC photos and asks Esha to approve or reject the order. */

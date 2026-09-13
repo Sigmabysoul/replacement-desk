@@ -1,5 +1,5 @@
 import { Check, PackageCheck, Printer, Send, TriangleAlert, X } from "lucide-react";
-import { adminOverrideAction, submitLogisticsLabelAction, submitPackingQcAction, transitionAction } from "@/app/actions";
+import { adminOverrideAction, submitLogisticsAction, submitPackingQcAction, transitionAction } from "@/app/actions";
 import { Card } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field, Select, Textarea } from "@/components/ui/field";
@@ -7,7 +7,7 @@ import { STATUSES } from "@/lib/types";
 import { statusLabel } from "@/lib/utils";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { availableActions } from "@/lib/replacements/workflow";
-import { LogisticsLabelUploadForm } from "@/components/replacements/logistics-label-upload-form";
+import { LogisticsUploadForm } from "@/components/replacements/logistics-upload-form";
 import { PackingQcUploadForm } from "@/components/replacements/packing-qc-upload-form";
 import type { Profile, Replacement } from "@/lib/types";
 
@@ -15,9 +15,9 @@ import type { Profile, Replacement } from "@/lib/types";
  * Role-aware operational action panel rendered on the replacement detail screen.
  *
  * Dynamically presents only legal actions based on user's active role and current status:
- * - LOGISTICS: Uploads the shipping label.
+ * - LOGISTICS: Uploads the shipping label and product proof photos.
  * - PRINTING: Confirms that the uploaded label was printed.
- * - PACKING: Submits QC photos, packs approved orders, and completes dispatch.
+ * - PACKING: Uploads QC pictures, requests Esha's review, packs, and dispatches.
  * - ESHA: Reviews QC photos (Approve / Reject with feedback).
  * - ADMIN: Performs any standard transition or uses emergency status override with reason logging.
  *
@@ -49,8 +49,12 @@ export function ActionPanel({
         <h2 className="font-black text-slate-950">Next action</h2>
       </div>
       <div className="grid gap-4 p-4 sm:p-5">
-        {actions.includes("UPLOAD_LABEL") && (
-          <LogisticsLabelUploadForm replacementId={replacement.id} action={submitLogisticsLabelAction} />
+        {actions.includes("SUBMIT_LOGISTICS") && (
+          <LogisticsUploadForm
+            replacementId={replacement.id}
+            requiresLabel={replacement.status === "NEW"}
+            action={submitLogisticsAction}
+          />
         )}
 
         {actions.includes("MARK_LABEL_PRINTED") && (

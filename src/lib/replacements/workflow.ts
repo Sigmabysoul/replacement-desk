@@ -3,7 +3,7 @@ import type { ReplacementStatus, Role } from "@/lib/types";
 export type WorkflowAction =
   | "CREATE_REPLACEMENT"
   | "EDIT_REPLACEMENT"
-  | "UPLOAD_LABEL"
+  | "SUBMIT_LOGISTICS"
   | "MARK_LABEL_PRINTED"
   | "SUBMIT_QC"
   | "APPROVE_QC"
@@ -30,7 +30,7 @@ const transitions: Record<ReplacementStatus, readonly ReplacementStatus[]> = {
 const permissions: Record<WorkflowAction, readonly Role[]> = {
   CREATE_REPLACEMENT: ["ESHA", "ADMIN"],
   EDIT_REPLACEMENT: ["ESHA", "ADMIN"],
-  UPLOAD_LABEL: ["LOGISTICS", "ADMIN"],
+  SUBMIT_LOGISTICS: ["LOGISTICS", "ADMIN"],
   MARK_LABEL_PRINTED: ["PRINTING", "ADMIN"],
   SUBMIT_QC: ["PACKING", "ADMIN"],
   APPROVE_QC: ["ESHA", "ADMIN"],
@@ -46,9 +46,9 @@ const permissions: Record<WorkflowAction, readonly Role[]> = {
  * Determines whether a replacement order can legally transition from one status to another.
  *
  * Enforces the core state machine:
- * - NEW -> LABEL_UPLOADED after Logistics supplies the shipping label
+ * - NEW -> LABEL_UPLOADED after Logistics supplies the label and product photos
  * - LABEL_UPLOADED -> LABEL_PRINTED after Printing confirms the label is printed
- * - LABEL_PRINTED -> QC_PENDING after Packing submits proof photos
+ * - LABEL_PRINTED -> QC_PENDING after Packing uploads a QC picture and requests review
  * - QC_PENDING -> QC_APPROVED, QC_REJECTED, or CANCELLED
  * - QC_REJECTED -> QC_PENDING or CANCELLED
  * - QC_APPROVED -> PACKED or CANCELLED
@@ -69,9 +69,9 @@ export function canTransition(from: ReplacementStatus, to: ReplacementStatus) {
  *
  * Role capabilities:
  * - ESHA: Creates and edits replacements, then reviews Packing's QC evidence.
- * - LOGISTICS: Uploads the shipping label.
+ * - LOGISTICS: Uploads the shipping label and product proof photos.
  * - PRINTING: Confirms the uploaded label was printed.
- * - PACKING: Submits QC photos, packs approved orders, and finishes dispatch.
+ * - PACKING: Uploads QC pictures, requests review, packs, and finishes dispatch.
  * - ADMIN: Superuser across all operations and cancellations.
  *
  * @param role User's operational role.
@@ -113,7 +113,7 @@ export function assertWorkflowAction(
  */
 export function availableActions(role: Role, status: ReplacementStatus): WorkflowAction[] {
   const actions: WorkflowAction[] = ["COMMENT"];
-  if (status === "NEW" && canPerform(role, "UPLOAD_LABEL")) actions.push("UPLOAD_LABEL");
+  if (status === "NEW" && canPerform(role, "SUBMIT_LOGISTICS")) actions.push("SUBMIT_LOGISTICS");
   if (status === "LABEL_UPLOADED" && canPerform(role, "MARK_LABEL_PRINTED")) actions.push("MARK_LABEL_PRINTED");
   if (["LABEL_PRINTED", "QC_REJECTED"].includes(status) && canPerform(role, "SUBMIT_QC")) actions.push("SUBMIT_QC");
   if (status === "QC_PENDING" && canPerform(role, "APPROVE_QC")) actions.push("APPROVE_QC", "REJECT_QC");

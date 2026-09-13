@@ -15,7 +15,7 @@ export const STATUSES = [
 ] as const;
 export type ReplacementStatus = (typeof STATUSES)[number];
 
-export type AttachmentType = "CUSTOMER_PHOTO" | "LABEL" | "QC_PHOTO" | "OTHER";
+export type AttachmentType = "CUSTOMER_PHOTO" | "LABEL" | "PROOF_PHOTO" | "QC_PHOTO" | "OTHER";
 export type QcDecision = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface Profile {

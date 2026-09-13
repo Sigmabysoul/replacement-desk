@@ -1,6 +1,6 @@
 # Replacement Desk
 
-Replacement Desk is a standalone internal operations app for customer replacement orders. Esha creates the order, Logistics uploads the shipping label, Printing marks it printed, Packing submits QC photos for Esha's review, and Packing packs and completes dispatch. Every important action is retained in an append-only activity history.
+Replacement Desk is a standalone internal operations app for customer replacement orders. Esha creates the order, Logistics uploads the shipping label and product photos, Printing marks the label printed, Packing submits separate QC pictures for Esha's review, and Packing packs and completes dispatch. Every important action is retained in an append-only activity history.
 
 ## Architecture
 
@@ -95,9 +95,9 @@ Never expose or prefix the service-role key or bot token with `NEXT_PUBLIC_`.
 Create one account for each role on Admin → Users, then test in order:
 
 1. **ESHA:** create a replacement using order details only. Confirm no file upload is offered.
-2. **LOGISTICS:** upload one shipping label. Confirm QC, printing, packing, and dispatch controls are absent.
+2. **LOGISTICS:** upload one shipping label and one or more product photos. Confirm QC, printing, packing, and dispatch controls are absent.
 3. **PRINTING:** mark the uploaded label printed. Confirm file upload and QC controls are absent.
-4. **PACKING:** upload QC photos and request Esha approval.
+4. **PACKING:** upload separate QC pictures and request Esha approval.
 5. **ESHA:** reject with a required reason; sign back in as Packing and resubmit photos without losing the original label; then approve as Esha.
 6. **PACKING:** mark the approved replacement packed, then mark it shipped or needs token from Dispatch.
 7. **ADMIN:** verify users, Telegram configuration state, and the audited override control.
@@ -133,7 +133,7 @@ The repository also includes a production `Dockerfile` and `compose.hostinger.ya
 The workflow migration introduces Logistics and the `LABEL_UPLOADED` state while preserving existing Printing and Packing assignments. Use a short maintenance window and complete these steps in order:
 
 1. Confirm the exact Supabase project URL/reference, take a Supabase backup, and export `select id, full_name, role from public.profiles;` for rollback evidence.
-2. Apply every pending SQL migration in filename order with `supabase db push`, or apply `202609130001_add_logistics_role.sql` and then `202609130002_logistics_workflow.sql` in that exact project's SQL editor. Confirm the `LOGISTICS` role, `LABEL_UPLOADED` status, `submit_logistics_label`, and `submit_packing_qc` functions exist before proceeding.
+2. Apply every pending SQL migration in filename order with `supabase db push`, or apply `202609130001_add_logistics_role.sql` and then `202609130002_logistics_workflow.sql` in that exact project's SQL editor. Confirm the `LOGISTICS` role, `LABEL_UPLOADED` status, `PROOF_PHOTO` attachment type, `submit_logistics_package`, and `submit_packing_qc` functions exist before proceeding.
 3. Assign at least one active Logistics profile, build and start the new container, verify `/login` and one controlled lifecycle, then switch HTTPS traffic. The old build cannot understand `LABEL_UPLOADED`, so application rollback also requires restoring the pre-migration database backup.
 
 Keep production values in an uncommitted `.env.production` file beside the Compose file. Generate `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` once with `openssl rand -base64 32` and retain the same value across builds. Compose passes that server-only value to the BuildKit builder as a secret and also supplies runtime secrets through the env file; only `NEXT_PUBLIC_*` values are normal build arguments. Deploy with:
