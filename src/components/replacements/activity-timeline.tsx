@@ -16,6 +16,7 @@ import { formatDate } from "@/lib/utils";
 const actionCopy: Record<string, string> = {
   REPLACEMENT_CREATED: "Created replacement request",
   LABEL_PRINTED: "Printed the replacement label",
+  LABEL_UPLOADED: "Uploaded the shipping label",
   QC_SUBMITTED: "Submitted QC photos",
   LOGISTICS_SUBMITTED: "Added the shipping label and proof photos",
   QC_REJECTED: "Rejected QC",
@@ -33,6 +34,7 @@ const actionCopy: Record<string, string> = {
 function ActivityIcon({ action }: { action: string }) {
   switch (action) {
     case "LABEL_PRINTED":
+    case "LABEL_UPLOADED":
       return <Printer className="size-4 text-violet-600" />;
     case "QC_SUBMITTED":
     case "LOGISTICS_SUBMITTED":

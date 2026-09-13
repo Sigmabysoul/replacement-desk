@@ -1,14 +1,11 @@
--- Consolidate the former Printing and Packing responsibilities into Logistics.
--- Existing users and in-flight orders are preserved; only the actor permissions
--- and the new-order handoff change.
-update public.profiles
-set role = 'LOGISTICS'
-where role in ('PRINTING', 'PACKING');
+-- Split the replacement handoff into four explicit departments:
+-- Esha creates/reviews, Logistics uploads the label, Printing prints it, and
+-- Packing supplies QC evidence, packs, and completes dispatch.
 
-alter table public.profiles alter column role set default 'LOGISTICS';
+alter table public.profiles alter column role set default 'PRINTING';
 
--- Self-service/auth-created profiles never receive a privileged role from user
--- metadata. An administrator must still assign Esha or Admin deliberately.
+-- Auth-created profiles receive the least privileged operational fallback.
+-- Replacement Desk administrators explicitly assign the final role afterward.
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
@@ -16,7 +13,7 @@ begin
   values (
     new.id,
     coalesce(nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''), split_part(new.email, '@', 1)),
-    'LOGISTICS'
+    'PRINTING'
   );
   return new;
 end;
@@ -91,6 +88,8 @@ begin
 end;
 $$;
 
+-- Attachment metadata is created only by the guarded RPCs below. Storage
+-- uploads are limited to the two departments that actually provide files.
 drop policy if exists "authorized users can add request files" on public.attachments;
 drop policy if exists "logistics can add request files" on public.attachments;
 
@@ -99,7 +98,7 @@ create policy "authorized users can upload replacement files" on storage.objects
 for insert to authenticated with check (
   bucket_id = 'replacement-files'
   and name like 'replacements/%'
-  and public.current_active_role() in ('LOGISTICS', 'ADMIN')
+  and public.current_active_role() in ('LOGISTICS', 'PACKING', 'ADMIN')
   and coalesce((metadata ->> 'size')::bigint, 0) <= 26214400
 );
 
@@ -121,23 +120,21 @@ begin
   select public.current_active_role() into actor_role;
   if actor_role is null then raise exception 'Active account required'; end if;
 
-  -- LABEL_PRINTED is retained for legacy clients/orders. New clients submit the
-  -- label and photos together through submit_logistics_package instead.
   if p_target_status = 'LABEL_PRINTED'
-    and not (current_row.status = 'NEW' and actor_role in ('LOGISTICS', 'ADMIN'))
-    then raise exception 'Only Logistics can confirm a new label';
+    and not (current_row.status = 'LABEL_UPLOADED' and actor_role in ('PRINTING', 'ADMIN'))
+    then raise exception 'Only Printing can mark an uploaded label as printed';
   elsif p_target_status in ('QC_APPROVED', 'QC_REJECTED')
     and not (current_row.status = 'QC_PENDING' and actor_role in ('ESHA', 'ADMIN'))
     then raise exception 'Only Esha can review pending QC';
   elsif p_target_status = 'PACKED'
-    and not (current_row.status = 'QC_APPROVED' and actor_role in ('LOGISTICS', 'ADMIN'))
-    then raise exception 'QC must be approved before Logistics packs the order';
+    and not (current_row.status = 'QC_APPROVED' and actor_role in ('PACKING', 'ADMIN'))
+    then raise exception 'QC must be approved before Packing packs the order';
   elsif p_target_status = 'SHIPPED'
-    and not (current_row.status in ('PACKED', 'NEEDS_TOKEN') and actor_role in ('ESHA', 'ADMIN'))
-    then raise exception 'Only packed replacements can be shipped by Esha';
+    and not (current_row.status in ('PACKED', 'NEEDS_TOKEN') and actor_role in ('PACKING', 'ADMIN'))
+    then raise exception 'Only Packing can mark a packed replacement as shipped';
   elsif p_target_status = 'NEEDS_TOKEN'
-    and not (current_row.status = 'PACKED' and actor_role in ('ESHA', 'ADMIN'))
-    then raise exception 'Only packed replacements can need a token';
+    and not (current_row.status = 'PACKED' and actor_role in ('PACKING', 'ADMIN'))
+    then raise exception 'Only Packing can mark a packed replacement as needing a token';
   elsif p_target_status = 'CANCELLED'
     and not (current_row.status not in ('SHIPPED', 'CANCELLED') and actor_role = 'ADMIN')
     then raise exception 'Only Admin can cancel an open replacement';
@@ -189,69 +186,115 @@ begin
 end;
 $$;
 
-create or replace function public.submit_logistics_package(
+create or replace function public.submit_logistics_label(
   p_replacement_id uuid,
-  p_submission_id uuid,
-  p_label_attachments jsonb,
-  p_photo_attachments jsonb
+  p_upload_id uuid,
+  p_attachments jsonb
 )
 returns public.replacements language plpgsql security definer set search_path = '' as $$
 declare
   current_row public.replacements;
   actor_role public.app_role;
-  next_submission integer;
-  label_count integer := 0;
-  photo_count integer := 0;
+  attachment_count integer := 0;
 begin
   select * into current_row from public.replacements where id = p_replacement_id for update;
   if not found then raise exception 'Replacement not found'; end if;
 
   select public.current_active_role() into actor_role;
   if actor_role is null or actor_role not in ('LOGISTICS', 'ADMIN') then
-    raise exception 'Only Logistics can add labels and proof photos';
+    raise exception 'Only Logistics can upload the shipping label';
   end if;
-  if current_row.status not in ('NEW', 'LABEL_PRINTED', 'QC_REJECTED') then
-    raise exception 'Logistics files cannot be submitted from this status';
+  if current_row.status <> 'NEW' then
+    raise exception 'A label can only be uploaded for a new replacement';
   end if;
-  if jsonb_typeof(p_label_attachments) is distinct from 'array' or jsonb_array_length(p_label_attachments) > 4 then
-    raise exception 'A maximum of four label files is allowed';
+  if jsonb_typeof(p_attachments) is distinct from 'array' or jsonb_array_length(p_attachments) <> 1 then
+    raise exception 'Exactly one shipping label is required';
   end if;
-  if jsonb_typeof(p_photo_attachments) is distinct from 'array' or jsonb_array_length(p_photo_attachments) not between 1 and 12 then
-    raise exception 'Between one and twelve proof photos are required';
-  end if;
-  if jsonb_array_length(p_label_attachments) = 0
-    and not exists (
-      select 1
-      from public.attachments attachment
-      join storage.objects stored
-        on stored.bucket_id = 'replacement-files'
-        and stored.name = attachment.storage_path
-      where attachment.replacement_id = p_replacement_id
-        and attachment.attachment_type = 'LABEL'
-    )
-    then raise exception 'A shipping label is required for this replacement';
-  end if;
-
   if (
     select count(*)
-    from jsonb_to_recordset(p_label_attachments) as item(storage_path text)
+    from jsonb_to_recordset(p_attachments) as item(storage_path text)
     join storage.objects as stored
       on stored.bucket_id = 'replacement-files'
       and stored.name = item.storage_path
       and stored.owner_id = auth.uid()::text
-  ) <> jsonb_array_length(p_label_attachments) then
-    raise exception 'Label storage objects were not uploaded by the current user';
+  ) <> 1 then
+    raise exception 'The label storage object was not uploaded by the current user';
   end if;
 
+  insert into public.attachments(
+    replacement_id, qc_submission_id, attachment_type, storage_path, file_name, mime_type, uploaded_by
+  )
+  select
+    p_replacement_id, null, 'LABEL', item.storage_path, item.file_name, item.mime_type, auth.uid()
+  from jsonb_to_recordset(p_attachments) as item(storage_path text, file_name text, mime_type text)
+  where item.mime_type in ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')
+    and item.storage_path like (
+      'replacements/' || p_replacement_id || '/logistics/' || p_upload_id || '/labels/%'
+    );
+  get diagnostics attachment_count = row_count;
+  if attachment_count <> 1 then raise exception 'Invalid label metadata'; end if;
+
+  update public.replacements set status = 'LABEL_UPLOADED'
+  where id = p_replacement_id
+  returning * into current_row;
+
+  insert into public.activity_logs(replacement_id, actor_id, action, metadata)
+  values (
+    p_replacement_id,
+    auth.uid(),
+    'LABEL_UPLOADED',
+    jsonb_build_object('upload_id', p_upload_id, 'attachment_count', attachment_count)
+  );
+  return current_row;
+end;
+$$;
+
+create or replace function public.submit_packing_qc(
+  p_replacement_id uuid,
+  p_submission_id uuid,
+  p_attachments jsonb
+)
+returns public.replacements language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.replacements;
+  actor_role public.app_role;
+  next_submission integer;
+  attachment_count integer := 0;
+begin
+  select * into current_row from public.replacements where id = p_replacement_id for update;
+  if not found then raise exception 'Replacement not found'; end if;
+
+  select public.current_active_role() into actor_role;
+  if actor_role is null or actor_role not in ('PACKING', 'ADMIN') then
+    raise exception 'Only Packing can submit QC photos';
+  end if;
+  if current_row.status not in ('LABEL_PRINTED', 'QC_REJECTED') then
+    raise exception 'QC can only be submitted after label printing or a rejection';
+  end if;
+  if jsonb_typeof(p_attachments) is distinct from 'array'
+    or jsonb_array_length(p_attachments) not between 1 and 12 then
+    raise exception 'Between one and twelve QC photos are required';
+  end if;
+  if not exists (
+    select 1
+    from public.attachments attachment
+    join storage.objects stored
+      on stored.bucket_id = 'replacement-files'
+      and stored.name = attachment.storage_path
+    where attachment.replacement_id = p_replacement_id
+      and attachment.attachment_type = 'LABEL'
+  ) then
+    raise exception 'A stored shipping label is required before QC';
+  end if;
   if (
     select count(*)
-    from jsonb_to_recordset(p_photo_attachments) as item(storage_path text)
+    from jsonb_to_recordset(p_attachments) as item(storage_path text)
     join storage.objects as stored
       on stored.bucket_id = 'replacement-files'
       and stored.name = item.storage_path
       and stored.owner_id = auth.uid()::text
-  ) <> jsonb_array_length(p_photo_attachments) then
-    raise exception 'Proof photo storage objects were not uploaded by the current user';
+  ) <> jsonb_array_length(p_attachments) then
+    raise exception 'QC photo storage objects were not uploaded by the current user';
   end if;
 
   select coalesce(max(submission_number), 0) + 1
@@ -266,31 +309,17 @@ begin
     replacement_id, qc_submission_id, attachment_type, storage_path, file_name, mime_type, uploaded_by
   )
   select
-    p_replacement_id, null, 'LABEL', item.storage_path, item.file_name, item.mime_type, auth.uid()
-  from jsonb_to_recordset(p_label_attachments) as item(storage_path text, file_name text, mime_type text)
-  where item.mime_type in ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')
-    and item.storage_path like (
-      'replacements/' || p_replacement_id || '/logistics/' || p_submission_id || '/labels/%'
-    );
-  get diagnostics label_count = row_count;
-  if label_count <> jsonb_array_length(p_label_attachments) then raise exception 'Invalid label metadata'; end if;
-
-  insert into public.attachments(
-    replacement_id, qc_submission_id, attachment_type, storage_path, file_name, mime_type, uploaded_by
-  )
-  select
     p_replacement_id, p_submission_id, 'QC_PHOTO', item.storage_path, item.file_name, item.mime_type, auth.uid()
-  from jsonb_to_recordset(p_photo_attachments) as item(storage_path text, file_name text, mime_type text)
+  from jsonb_to_recordset(p_attachments) as item(storage_path text, file_name text, mime_type text)
   where item.mime_type in ('image/jpeg', 'image/png', 'image/webp')
     and item.storage_path like (
-      'replacements/' || p_replacement_id || '/logistics/' || p_submission_id || '/photos/%'
+      'replacements/' || p_replacement_id || '/packing/' || p_submission_id || '/photos/%'
     );
-  get diagnostics photo_count = row_count;
-  if photo_count <> jsonb_array_length(p_photo_attachments) then raise exception 'Invalid proof photo metadata'; end if;
+  get diagnostics attachment_count = row_count;
+  if attachment_count <> jsonb_array_length(p_attachments) then raise exception 'Invalid QC photo metadata'; end if;
 
   update public.replacements set
     status = 'QC_PENDING',
-    label_printed_at = coalesce(label_printed_at, now()),
     qc_submitted_at = now()
   where id = p_replacement_id
   returning * into current_row;
@@ -299,27 +328,27 @@ begin
   values (
     p_replacement_id,
     auth.uid(),
-    'LOGISTICS_SUBMITTED',
+    'QC_SUBMITTED',
     jsonb_build_object(
       'submission_id', p_submission_id,
       'submission_number', next_submission,
-      'label_count', label_count,
-      'photo_count', photo_count
+      'attachment_count', attachment_count
     )
   );
   return current_row;
 end;
 $$;
 
-revoke all on function public.submit_logistics_package(uuid, uuid, jsonb, jsonb) from public;
-grant execute on function public.submit_logistics_package(uuid, uuid, jsonb, jsonb) to authenticated;
+revoke all on function public.submit_logistics_label(uuid, uuid, jsonb) from public;
+grant execute on function public.submit_logistics_label(uuid, uuid, jsonb) to authenticated;
+revoke all on function public.submit_packing_qc(uuid, uuid, jsonb) from public;
+grant execute on function public.submit_packing_qc(uuid, uuid, jsonb) to authenticated;
 
--- Retire the old Packing-only RPC from public clients. It remains in the schema
--- solely so historical migrations and audit data stay understandable.
+-- Old upload RPCs remain defined for migration history but are not callable.
 revoke execute on function public.submit_qc(uuid, uuid, jsonb) from authenticated;
+drop function if exists public.submit_logistics_package(uuid, uuid, jsonb, jsonb);
 
--- Harden older security-definer mutations against SQL's three-valued NULL
--- comparisons. Inactive profiles return NULL from current_active_role().
+-- Harden older security-definer mutations against SQL NULL role comparisons.
 create or replace function public.update_replacement_details(
   p_replacement_id uuid,
   p_order_reference text,

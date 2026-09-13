@@ -2,6 +2,7 @@ import type { Replacement, Role } from "@/lib/types";
 
 export type NotificationType =
   | "NEW_REPLACEMENT"
+  | "LABEL_UPLOADED"
   | "LABEL_PRINTED"
   | "QC_SUBMITTED"
   | "QC_REJECTED"
@@ -12,10 +13,11 @@ export type NotificationType =
 
 export const NOTIFICATION_RECIPIENTS: Record<NotificationType, readonly Role[]> = {
   NEW_REPLACEMENT: ["LOGISTICS"],
-  LABEL_PRINTED: ["LOGISTICS", "ESHA"],
+  LABEL_UPLOADED: ["PRINTING"],
+  LABEL_PRINTED: ["PACKING"],
   QC_SUBMITTED: ["ESHA"],
-  QC_REJECTED: ["LOGISTICS"],
-  QC_APPROVED: ["LOGISTICS"],
+  QC_REJECTED: ["PACKING"],
+  QC_APPROVED: ["PACKING"],
   PACKED: ["ESHA", "ADMIN"],
   SHIPPED: ["ESHA", "ADMIN"],
   NEEDS_TOKEN: ["ESHA", "ADMIN"],
@@ -63,13 +65,23 @@ export function formatTelegramMessage(
       );
       break;
 
+    case "LABEL_UPLOADED":
+      lines.push(
+        "🏷 LABEL READY FOR PRINTING",
+        "",
+        replacement.replacement_number,
+        "",
+        "Logistics uploaded the shipping label. Please print it.",
+      );
+      break;
+
     case "QC_SUBMITTED":
       lines.push(
         "📸 QC APPROVAL REQUIRED",
         "",
         replacement.replacement_number,
         "",
-        "Logistics added the shipping label and proof photos.",
+        "Packing submitted QC photos for Esha's approval.",
       );
       break;
 

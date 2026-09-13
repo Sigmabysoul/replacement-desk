@@ -1,6 +1,6 @@
 # Replacement Desk
 
-Replacement Desk is a standalone internal operations app for customer replacement orders. Esha creates the order, Logistics attaches the shipping label and proof photos, Esha reviews the submission, Logistics packs it, and Esha records pickup or a missing token. Every important action is retained in an append-only activity history.
+Replacement Desk is a standalone internal operations app for customer replacement orders. Esha creates the order, Logistics uploads the shipping label, Printing marks it printed, Packing submits QC photos for Esha's review, and Packing packs and completes dispatch. Every important action is retained in an append-only activity history.
 
 ## Architecture
 
@@ -47,7 +47,7 @@ Public self-registration is not implemented. In Supabase Authentication, keep ne
 To create the first admin:
 
 1. In Supabase Dashboard → Authentication → Users, create a user with email/password.
-2. The database trigger creates a LOGISTICS profile automatically.
+2. The database trigger creates a PRINTING profile automatically as the narrowest operational fallback.
 3. In SQL Editor, promote that exact user ID:
 
    ```sql
@@ -69,7 +69,7 @@ Admins assign a temporary password of at least 12 characters and share it throug
 
 Missing chat IDs are skipped. Telegram delivery or logging failure never rolls back a replacement action. Attempts are recorded in `notifications` when the service-role key is configured.
 
-During the role cutover, if `TELEGRAM_LOGISTICS_CHAT_ID` is not yet set, Logistics alerts are sent to both distinct legacy `TELEGRAM_PRINTING_CHAT_ID` and `TELEGRAM_PACKING_CHAT_ID` values. Set the dedicated Logistics chat variable when the team has one combined chat.
+Use a separate chat ID for each operational handoff so the next responsible team is notified without alerting everyone.
 
 ## Environment variables
 
@@ -83,6 +83,8 @@ During the role cutover, if `TELEGRAM_LOGISTICS_CHAT_ID` is not yet set, Logisti
 | `TELEGRAM_BOT_TOKEN` | Server only | No; required for Telegram |
 | `TELEGRAM_ESHA_CHAT_ID` | Server only | Optional recipient |
 | `TELEGRAM_LOGISTICS_CHAT_ID` | Server only | Optional recipient |
+| `TELEGRAM_PRINTING_CHAT_ID` | Server only | Optional recipient |
+| `TELEGRAM_PACKING_CHAT_ID` | Server only | Optional recipient |
 | `TELEGRAM_ADMIN_CHAT_ID` | Server only | Optional recipient |
 | `NEXT_PUBLIC_APP_URL` | Browser/server | Yes in production |
 
@@ -93,11 +95,12 @@ Never expose or prefix the service-role key or bot token with `NEXT_PUBLIC_`.
 Create one account for each role on Admin → Users, then test in order:
 
 1. **ESHA:** create a replacement using order details only. Confirm no file upload is offered.
-2. **LOGISTICS:** attach a shipping label and one or more proof photos. Confirm review and dispatch controls are absent.
-3. **ESHA:** reject with a required reason; sign back in as Logistics and resubmit photos without losing the original label; then approve as Esha.
-4. **LOGISTICS:** mark the approved replacement packed.
-5. **ESHA or ADMIN:** use Dispatch to mark it shipped or needs token.
-6. **ADMIN:** verify users, Telegram configuration state, and the audited override control.
+2. **LOGISTICS:** upload one shipping label. Confirm QC, printing, packing, and dispatch controls are absent.
+3. **PRINTING:** mark the uploaded label printed. Confirm file upload and QC controls are absent.
+4. **PACKING:** upload QC photos and request Esha approval.
+5. **ESHA:** reject with a required reason; sign back in as Packing and resubmit photos without losing the original label; then approve as Esha.
+6. **PACKING:** mark the approved replacement packed, then mark it shipped or needs token from Dispatch.
+7. **ADMIN:** verify users, Telegram configuration state, and the audited override control.
 
 Use distinct browser profiles or sign out between roles. Direct attempts to bypass the UI should fail in PostgreSQL.
 
@@ -127,11 +130,11 @@ GitHub integration automatically builds the latest selected branch on subsequent
 
 The repository also includes a production `Dockerfile` and `compose.hostinger.yaml` for a Hostinger VPS that already runs Coolify. This deployment joins the existing external `coolify` Docker network but does not publish a host port. An existing reverse proxy can reach the stable `replacement-desk` network alias on port 3000 without exposing the Next.js server directly.
 
-The Logistics migration changes existing Printing/Packing roles and must be coordinated with the new app. Use a short maintenance window and complete these steps in order:
+The workflow migration introduces Logistics and the `LABEL_UPLOADED` state while preserving existing Printing and Packing assignments. Use a short maintenance window and complete these steps in order:
 
-1. Confirm the exact Supabase project URL/reference, take a Supabase backup, and export `select id, full_name, role from public.profiles;` so legacy role assignments can be restored during rollback.
-2. Apply every pending SQL migration in filename order with `supabase db push`, or apply `202609130001_add_logistics_role.sql` and then `202609130002_logistics_workflow.sql` in that exact project's SQL editor. Confirm `LOGISTICS` profiles and the `submit_logistics_package` function exist before proceeding.
-3. Build and start the new container, verify `/login` and one controlled lifecycle, then switch HTTPS traffic. Do not roll the old application back after the role migration without restoring the exported role mapping.
+1. Confirm the exact Supabase project URL/reference, take a Supabase backup, and export `select id, full_name, role from public.profiles;` for rollback evidence.
+2. Apply every pending SQL migration in filename order with `supabase db push`, or apply `202609130001_add_logistics_role.sql` and then `202609130002_logistics_workflow.sql` in that exact project's SQL editor. Confirm the `LOGISTICS` role, `LABEL_UPLOADED` status, `submit_logistics_label`, and `submit_packing_qc` functions exist before proceeding.
+3. Assign at least one active Logistics profile, build and start the new container, verify `/login` and one controlled lifecycle, then switch HTTPS traffic. The old build cannot understand `LABEL_UPLOADED`, so application rollback also requires restoring the pre-migration database backup.
 
 Keep production values in an uncommitted `.env.production` file beside the Compose file. Generate `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` once with `openssl rand -base64 32` and retain the same value across builds. Compose passes that server-only value to the BuildKit builder as a secret and also supplies runtime secrets through the env file; only `NEXT_PUBLIC_*` values are normal build arguments. Deploy with:
 

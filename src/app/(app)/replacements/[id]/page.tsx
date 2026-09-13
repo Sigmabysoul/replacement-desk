@@ -275,7 +275,7 @@ export default async function ReplacementDetailPage({
                           </span>
                         </div>
                         <span className="text-xs font-medium text-slate-500">
-                          By {qc.submitter?.full_name ?? "Logistics"} • {formatDate(qc.submitted_at)}
+                          By {qc.submitter?.full_name ?? "Packing"} • {formatDate(qc.submitted_at)}
                         </span>
                       </div>
 
@@ -381,7 +381,7 @@ export default async function ReplacementDetailPage({
 
         {/* Right Sidebar: Contextual Actions & Commenting */}
         <div className="grid content-start gap-5">
-          <ActionPanel replacement={replacement} profile={profile} attachments={attachments} />
+          <ActionPanel replacement={replacement} profile={profile} />
           <Card className="p-4 sm:p-5">
             <h2 className="font-black text-slate-950">Add comment</h2>
             <form action={addCommentAction} className="mt-3 grid gap-3">

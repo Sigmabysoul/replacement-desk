@@ -17,29 +17,38 @@ import { validateMagicBytes } from "@/lib/security/magic-bytes";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rate-limit";
 
 describe("replacement workflow permissions", () => {
-  it("prevents logistics from approving QC", () => {
+  it("keeps Logistics limited to label upload", () => {
+    expect(canPerform("LOGISTICS", "UPLOAD_LABEL")).toBe(true);
     expect(canPerform("LOGISTICS", "APPROVE_QC")).toBe(false);
-  });
-
-  it("prevents logistics from marking shipped", () => {
+    expect(canPerform("LOGISTICS", "SUBMIT_QC")).toBe(false);
     expect(canPerform("LOGISTICS", "MARK_SHIPPED")).toBe(false);
   });
 
-  it("allows logistics to submit the handoff and mark packed", () => {
-    expect(canPerform("LOGISTICS", "SUBMIT_LOGISTICS")).toBe(true);
-    expect(canPerform("LOGISTICS", "MARK_PACKED")).toBe(true);
+  it("keeps Printing limited to print confirmation", () => {
+    expect(canPerform("PRINTING", "MARK_LABEL_PRINTED")).toBe(true);
+    expect(canPerform("PRINTING", "SUBMIT_QC")).toBe(false);
+    expect(canPerform("PRINTING", "MARK_PACKED")).toBe(false);
   });
 
-  it("allows esha to approve/reject QC and mark shipped", () => {
+  it("allows Esha to review QC but not finish dispatch", () => {
     expect(canPerform("ESHA", "APPROVE_QC")).toBe(true);
     expect(canPerform("ESHA", "REJECT_QC")).toBe(true);
-    expect(canPerform("ESHA", "MARK_SHIPPED")).toBe(true);
-    expect(canPerform("ESHA", "MARK_NEEDS_TOKEN")).toBe(true);
+    expect(canPerform("ESHA", "MARK_SHIPPED")).toBe(false);
+    expect(canPerform("ESHA", "MARK_NEEDS_TOKEN")).toBe(false);
+  });
+
+  it("allows Packing to submit QC, pack, and finish dispatch", () => {
+    expect(canPerform("PACKING", "SUBMIT_QC")).toBe(true);
+    expect(canPerform("PACKING", "MARK_PACKED")).toBe(true);
+    expect(canPerform("PACKING", "MARK_SHIPPED")).toBe(true);
+    expect(canPerform("PACKING", "MARK_NEEDS_TOKEN")).toBe(true);
   });
 
   it("allows admin to perform all actions", () => {
     expect(canPerform("ADMIN", "CREATE_REPLACEMENT")).toBe(true);
-    expect(canPerform("ADMIN", "SUBMIT_LOGISTICS")).toBe(true);
+    expect(canPerform("ADMIN", "UPLOAD_LABEL")).toBe(true);
+    expect(canPerform("ADMIN", "MARK_LABEL_PRINTED")).toBe(true);
+    expect(canPerform("ADMIN", "SUBMIT_QC")).toBe(true);
     expect(canPerform("ADMIN", "APPROVE_QC")).toBe(true);
     expect(canPerform("ADMIN", "REJECT_QC")).toBe(true);
     expect(canPerform("ADMIN", "MARK_PACKED")).toBe(true);
@@ -49,9 +58,15 @@ describe("replacement workflow permissions", () => {
 });
 
 describe("replacement workflow status transitions", () => {
+  it("requires label upload before Printing can mark it printed", () => {
+    expect(canTransition("NEW", "LABEL_UPLOADED")).toBe(true);
+    expect(canTransition("NEW", "LABEL_PRINTED")).toBe(false);
+    expect(canTransition("LABEL_UPLOADED", "LABEL_PRINTED")).toBe(true);
+  });
+
   it("cannot pack before approval", () => {
     expect(canTransition("QC_PENDING", "PACKED")).toBe(false);
-    expect(() => assertWorkflowAction("LOGISTICS", "MARK_PACKED", "QC_PENDING", "PACKED")).toThrow();
+    expect(() => assertWorkflowAction("PACKING", "MARK_PACKED", "QC_PENDING", "PACKED")).toThrow();
   });
 
   it("allows rejected QC to be resubmitted", () => {
@@ -81,14 +96,15 @@ describe("replacement workflow status transitions", () => {
   });
 
   it("determines available actions accurately", () => {
-    expect(availableActions("LOGISTICS", "NEW")).toContain("SUBMIT_LOGISTICS");
-    expect(availableActions("LOGISTICS", "LABEL_PRINTED")).toContain("SUBMIT_LOGISTICS");
-    expect(availableActions("LOGISTICS", "QC_REJECTED")).toContain("SUBMIT_LOGISTICS");
+    expect(availableActions("LOGISTICS", "NEW")).toContain("UPLOAD_LABEL");
+    expect(availableActions("PRINTING", "LABEL_UPLOADED")).toContain("MARK_LABEL_PRINTED");
+    expect(availableActions("PACKING", "LABEL_PRINTED")).toContain("SUBMIT_QC");
+    expect(availableActions("PACKING", "QC_REJECTED")).toContain("SUBMIT_QC");
     expect(availableActions("ESHA", "QC_PENDING")).toEqual(
       expect.arrayContaining(["APPROVE_QC", "REJECT_QC"])
     );
-    expect(availableActions("LOGISTICS", "QC_APPROVED")).toContain("MARK_PACKED");
-    expect(availableActions("ESHA", "PACKED")).toEqual(
+    expect(availableActions("PACKING", "QC_APPROVED")).toContain("MARK_PACKED");
+    expect(availableActions("PACKING", "PACKED")).toEqual(
       expect.arrayContaining(["MARK_SHIPPED", "MARK_NEEDS_TOKEN"])
     );
   });
@@ -193,6 +209,18 @@ describe("telegram notification formatting", () => {
     const msg = formatTelegramMessage("LABEL_PRINTED", mockRep, appUrl);
     expect(msg).toContain("🖨 LABEL PRINTED");
     expect(msg).toContain("The replacement label has been printed.");
+  });
+
+  it("formats LABEL_UPLOADED for Printing", () => {
+    const msg = formatTelegramMessage("LABEL_UPLOADED", mockRep, appUrl);
+    expect(msg).toContain("🏷 LABEL READY FOR PRINTING");
+    expect(msg).toContain("Logistics uploaded the shipping label");
+  });
+
+  it("formats QC_SUBMITTED for Esha", () => {
+    const msg = formatTelegramMessage("QC_SUBMITTED", mockRep, appUrl);
+    expect(msg).toContain("📸 QC APPROVAL REQUIRED");
+    expect(msg).toContain("Packing submitted QC photos");
   });
 
   it("formats QC_REJECTED with reason according to Section 10", () => {

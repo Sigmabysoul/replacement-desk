@@ -5,6 +5,8 @@ import {
   CirclePlus,
   Clock3,
   PackageCheck,
+  Printer,
+  Camera,
   ScanLine,
   Truck,
 } from "lucide-react";
@@ -23,10 +25,24 @@ const metrics: {
 }[] = [
   {
     label: "Awaiting logistics",
-    statuses: ["NEW", "LABEL_PRINTED"],
+    statuses: ["NEW"],
     icon: PackageCheck,
     tone: "bg-indigo-50 text-indigo-700",
     href: "/replacements?scope=all&status=AWAITING_LOGISTICS",
+  },
+  {
+    label: "Awaiting printing",
+    statuses: ["LABEL_UPLOADED"],
+    icon: Printer,
+    tone: "bg-fuchsia-50 text-fuchsia-700",
+    href: "/replacements?scope=all&status=LABEL_UPLOADED",
+  },
+  {
+    label: "Awaiting Packing QC",
+    statuses: ["LABEL_PRINTED"],
+    icon: Camera,
+    tone: "bg-violet-50 text-violet-700",
+    href: "/replacements?scope=all&status=AWAITING_QC",
   },
   {
     label: "Waiting for Esha review",
@@ -165,6 +181,24 @@ export default async function DashboardPage() {
           aria-label="Open orders awaiting Logistics"
         >
           <PackageCheck className="size-6" />
+        </Link>
+      )}
+      {profile.role === "PRINTING" && (
+        <Link
+          href="/replacements?scope=all&status=LABEL_UPLOADED"
+          className="fixed bottom-20 right-4 grid size-14 place-items-center rounded-2xl bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 lg:bottom-6"
+          aria-label="Open orders awaiting Printing"
+        >
+          <Printer className="size-6" />
+        </Link>
+      )}
+      {profile.role === "PACKING" && (
+        <Link
+          href="/replacements?scope=all&status=AWAITING_QC"
+          className="fixed bottom-20 right-4 grid size-14 place-items-center rounded-2xl bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 lg:bottom-6"
+          aria-label="Open orders awaiting Packing QC"
+        >
+          <Camera className="size-6" />
         </Link>
       )}
     </div>

@@ -2,29 +2,35 @@
 
 ```text
 NEW
- │ Logistics uploads the shipping label and proof photos together
+ │ Logistics uploads the shipping label
+ ▼
+LABEL_UPLOADED
+ │ Printing marks the label printed
+ ▼
+LABEL_PRINTED
+ │ Packing uploads QC photos and asks Esha for approval
  ▼
 QC_PENDING
  ├── Esha rejects with reason ──► QC_REJECTED
- │                                  │ Logistics fixes the item and resubmits photos
+ │                                  │ Packing fixes the item and resubmits photos
  │                                  └──────────────► QC_PENDING
  │
  └── Esha approves ─────────────► QC_APPROVED
-                                      │ Logistics confirms pack
+                                      │ Packing confirms pack
                                       ▼
                                    PACKED
-                                    ├── picked up ──► SHIPPED
-                                    └── not picked ─► NEEDS_TOKEN
+                                    ├── Packing: picked up ──► SHIPPED
+                                    └── Packing: no pickup ──► NEEDS_TOKEN
                                                            │ later pickup
                                                            └──► SHIPPED
 ```
 
-`LABEL_PRINTED` remains supported only so orders already at that stage before the Logistics migration can continue to `QC_PENDING`; new orders skip that legacy stage.
+Existing orders already at `LABEL_PRINTED` continue directly with Packing QC. New orders use the explicit `LABEL_UPLOADED` handoff so uploading and printing cannot be confused.
 
 Admin may cancel an open replacement or perform a reason-required, audited status override for exceptional recovery. Normal users only receive controls permitted by both their role and the current status. PostgreSQL rechecks every transition inside a locked transaction.
 
 ## Audit events
 
-Creation, edits, every Logistics label/photo submission, each QC decision, packing, dispatch, comments, cancellation, and admin overrides create immutable activity entries. Each entry records the actor and server timestamp. Submission attempts use separate numbered rows, so rejection and resubmission never overwrite earlier evidence.
+Creation, edits, Logistics label upload, Printing confirmation, every Packing QC submission, each QC decision, packing, dispatch, comments, cancellation, and admin overrides create immutable activity entries. Each entry records the actor and server timestamp. QC attempts use separate numbered rows, so rejection and resubmission never overwrite earlier evidence.
 
 Telegram is downstream of the database commit. It can alert the relevant role, but it never becomes the source of truth and cannot prevent work from completing.

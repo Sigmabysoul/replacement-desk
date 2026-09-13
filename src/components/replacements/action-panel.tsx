@@ -1,5 +1,5 @@
-import { Check, PackageCheck, Send, TriangleAlert, X } from "lucide-react";
-import { adminOverrideAction, submitLogisticsAction, transitionAction } from "@/app/actions";
+import { Check, PackageCheck, Printer, Send, TriangleAlert, X } from "lucide-react";
+import { adminOverrideAction, submitLogisticsLabelAction, submitPackingQcAction, transitionAction } from "@/app/actions";
 import { Card } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field, Select, Textarea } from "@/components/ui/field";
@@ -7,33 +7,32 @@ import { STATUSES } from "@/lib/types";
 import { statusLabel } from "@/lib/utils";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { availableActions } from "@/lib/replacements/workflow";
-import { LogisticsUploadForm } from "@/components/replacements/logistics-upload-form";
-import type { Attachment, Profile, Replacement } from "@/lib/types";
+import { LogisticsLabelUploadForm } from "@/components/replacements/logistics-label-upload-form";
+import { PackingQcUploadForm } from "@/components/replacements/packing-qc-upload-form";
+import type { Profile, Replacement } from "@/lib/types";
 
 /**
  * Role-aware operational action panel rendered on the replacement detail screen.
  *
  * Dynamically presents only legal actions based on user's active role and current status:
- * - LOGISTICS: Uploads the label and proof photos, then packs an approved order.
- * - ESHA: Reviews QC photos (Approve / Reject with feedback), marks dispatched (SHIPPED / NEEDS_TOKEN).
+ * - LOGISTICS: Uploads the shipping label.
+ * - PRINTING: Confirms that the uploaded label was printed.
+ * - PACKING: Submits QC photos, packs approved orders, and completes dispatch.
+ * - ESHA: Reviews QC photos (Approve / Reject with feedback).
  * - ADMIN: Performs any standard transition or uses emergency status override with reason logging.
  *
  * @param props.replacement Current replacement order data.
  * @param props.profile Active user session profile.
- * @param props.attachments Array of uploaded files (labels, QC photos, customer proofs).
  */
 export function ActionPanel({
   replacement,
   profile,
-  attachments,
 }: {
   replacement: Replacement;
   profile: Profile;
-  attachments: Attachment[];
 }) {
   const actions = availableActions(profile.role, replacement.status);
-  const hasLabel = attachments.some((item) => item.attachment_type === "LABEL");
-  const actionable = actions.some((action) => action !== "COMMENT" && action !== "UPLOAD");
+  const actionable = actions.some((action) => action !== "COMMENT");
 
   if (!actionable && !["SHIPPED", "CANCELLED"].includes(replacement.status)) {
     return (
@@ -50,12 +49,23 @@ export function ActionPanel({
         <h2 className="font-black text-slate-950">Next action</h2>
       </div>
       <div className="grid gap-4 p-4 sm:p-5">
-        {actions.includes("SUBMIT_LOGISTICS") && (
-          <LogisticsUploadForm
-            replacementId={replacement.id}
-            requiresLabel={!hasLabel}
-            action={submitLogisticsAction}
-          />
+        {actions.includes("UPLOAD_LABEL") && (
+          <LogisticsLabelUploadForm replacementId={replacement.id} action={submitLogisticsLabelAction} />
+        )}
+
+        {actions.includes("MARK_LABEL_PRINTED") && (
+          <form action={transitionAction}>
+            <input type="hidden" name="replacement_id" value={replacement.id} />
+            <input type="hidden" name="target_status" value="LABEL_PRINTED" />
+            <ConfirmButton message="Confirm that this shipping label has been printed.">
+              <Printer className="size-5" />
+              MARK LABEL PRINTED
+            </ConfirmButton>
+          </form>
+        )}
+
+        {actions.includes("SUBMIT_QC") && (
+          <PackingQcUploadForm replacementId={replacement.id} action={submitPackingQcAction} />
         )}
 
         {actions.includes("APPROVE_QC") && (
@@ -63,7 +73,7 @@ export function ActionPanel({
             <form action={transitionAction}>
               <input type="hidden" name="replacement_id" value={replacement.id} />
               <input type="hidden" name="target_status" value="QC_APPROVED" />
-              <ConfirmButton message="Approve this submission? Logistics will be allowed to pack the order.">
+              <ConfirmButton message="Approve this submission? Packing will be allowed to pack the order.">
                 <Check className="size-5" />
                 APPROVE QC
               </ConfirmButton>

@@ -3,18 +3,20 @@ import type { ReplacementStatus, Role } from "@/lib/types";
 export type WorkflowAction =
   | "CREATE_REPLACEMENT"
   | "EDIT_REPLACEMENT"
-  | "SUBMIT_LOGISTICS"
+  | "UPLOAD_LABEL"
+  | "MARK_LABEL_PRINTED"
+  | "SUBMIT_QC"
   | "APPROVE_QC"
   | "REJECT_QC"
   | "MARK_PACKED"
   | "MARK_SHIPPED"
   | "MARK_NEEDS_TOKEN"
   | "CANCEL_REPLACEMENT"
-  | "COMMENT"
-  | "UPLOAD";
+  | "COMMENT";
 
 const transitions: Record<ReplacementStatus, readonly ReplacementStatus[]> = {
-  NEW: ["LABEL_PRINTED", "QC_PENDING", "CANCELLED"],
+  NEW: ["LABEL_UPLOADED", "CANCELLED"],
+  LABEL_UPLOADED: ["LABEL_PRINTED", "CANCELLED"],
   LABEL_PRINTED: ["QC_PENDING", "CANCELLED"],
   QC_PENDING: ["QC_APPROVED", "QC_REJECTED", "CANCELLED"],
   QC_REJECTED: ["QC_PENDING", "CANCELLED"],
@@ -28,24 +30,25 @@ const transitions: Record<ReplacementStatus, readonly ReplacementStatus[]> = {
 const permissions: Record<WorkflowAction, readonly Role[]> = {
   CREATE_REPLACEMENT: ["ESHA", "ADMIN"],
   EDIT_REPLACEMENT: ["ESHA", "ADMIN"],
-  SUBMIT_LOGISTICS: ["LOGISTICS", "ADMIN"],
+  UPLOAD_LABEL: ["LOGISTICS", "ADMIN"],
+  MARK_LABEL_PRINTED: ["PRINTING", "ADMIN"],
+  SUBMIT_QC: ["PACKING", "ADMIN"],
   APPROVE_QC: ["ESHA", "ADMIN"],
   REJECT_QC: ["ESHA", "ADMIN"],
-  MARK_PACKED: ["LOGISTICS", "ADMIN"],
-  MARK_SHIPPED: ["ESHA", "ADMIN"],
-  MARK_NEEDS_TOKEN: ["ESHA", "ADMIN"],
+  MARK_PACKED: ["PACKING", "ADMIN"],
+  MARK_SHIPPED: ["PACKING", "ADMIN"],
+  MARK_NEEDS_TOKEN: ["PACKING", "ADMIN"],
   CANCEL_REPLACEMENT: ["ADMIN"],
-  COMMENT: ["ESHA", "LOGISTICS", "ADMIN"],
-  UPLOAD: ["LOGISTICS", "ADMIN"],
+  COMMENT: ["ESHA", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"],
 };
 
 /**
  * Determines whether a replacement order can legally transition from one status to another.
  *
  * Enforces the core state machine:
- * - NEW -> QC_PENDING after Logistics supplies the label and proof photos
- * - NEW -> LABEL_PRINTED remains valid for legacy in-flight orders
- * - LABEL_PRINTED -> QC_PENDING or CANCELLED
+ * - NEW -> LABEL_UPLOADED after Logistics supplies the shipping label
+ * - LABEL_UPLOADED -> LABEL_PRINTED after Printing confirms the label is printed
+ * - LABEL_PRINTED -> QC_PENDING after Packing submits proof photos
  * - QC_PENDING -> QC_APPROVED, QC_REJECTED, or CANCELLED
  * - QC_REJECTED -> QC_PENDING or CANCELLED
  * - QC_APPROVED -> PACKED or CANCELLED
@@ -65,8 +68,10 @@ export function canTransition(from: ReplacementStatus, to: ReplacementStatus) {
  * Checks whether a user with the given role is authorized to perform a workflow action.
  *
  * Role capabilities:
- * - ESHA: Creates, edits, reviews QC, marks shipped, marks needs token.
- * - LOGISTICS: Adds the shipping label and proof photos, then packs approved orders.
+ * - ESHA: Creates and edits replacements, then reviews Packing's QC evidence.
+ * - LOGISTICS: Uploads the shipping label.
+ * - PRINTING: Confirms the uploaded label was printed.
+ * - PACKING: Submits QC photos, packs approved orders, and finishes dispatch.
  * - ADMIN: Superuser across all operations and cancellations.
  *
  * @param role User's operational role.
@@ -108,10 +113,9 @@ export function assertWorkflowAction(
  */
 export function availableActions(role: Role, status: ReplacementStatus): WorkflowAction[] {
   const actions: WorkflowAction[] = ["COMMENT"];
-  if (canPerform(role, "UPLOAD")) actions.push("UPLOAD");
-  if (["NEW", "LABEL_PRINTED", "QC_REJECTED"].includes(status) && canPerform(role, "SUBMIT_LOGISTICS")) {
-    actions.push("SUBMIT_LOGISTICS");
-  }
+  if (status === "NEW" && canPerform(role, "UPLOAD_LABEL")) actions.push("UPLOAD_LABEL");
+  if (status === "LABEL_UPLOADED" && canPerform(role, "MARK_LABEL_PRINTED")) actions.push("MARK_LABEL_PRINTED");
+  if (["LABEL_PRINTED", "QC_REJECTED"].includes(status) && canPerform(role, "SUBMIT_QC")) actions.push("SUBMIT_QC");
   if (status === "QC_PENDING" && canPerform(role, "APPROVE_QC")) actions.push("APPROVE_QC", "REJECT_QC");
   if (status === "QC_APPROVED" && canPerform(role, "MARK_PACKED")) actions.push("MARK_PACKED");
   if (status === "PACKED") {

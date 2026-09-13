@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Replacement } from "@/lib/types";
 
 export default async function DispatchPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  await requireProfile(["ESHA", "ADMIN"]);
+  await requireProfile(["PACKING", "ADMIN"]);
   const { error: queryError } = await searchParams;
 
   const supabase = await createClient();

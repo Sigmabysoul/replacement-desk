@@ -1,8 +1,9 @@
-export const ROLES = ["ESHA", "LOGISTICS", "ADMIN"] as const;
+export const ROLES = ["ESHA", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const STATUSES = [
   "NEW",
+  "LABEL_UPLOADED",
   "LABEL_PRINTED",
   "QC_PENDING",
   "QC_REJECTED",

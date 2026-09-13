@@ -14,18 +14,9 @@ export type { NotificationType };
  * E.g., `TELEGRAM_ESHA_CHAT_ID`, `TELEGRAM_LOGISTICS_CHAT_ID`.
  *
  * @param role The target department role.
- * @returns Unique configured chat IDs. During cutover, both legacy operational
- * chats receive Logistics alerts until a dedicated Logistics chat is set.
+ * @returns Unique configured chat IDs for the requested department.
  */
 function chatIds(role: Role): string[] {
-  if (role === "LOGISTICS") {
-    const dedicated = process.env.TELEGRAM_LOGISTICS_CHAT_ID;
-    if (dedicated) return [dedicated];
-    return [...new Set([
-      process.env.TELEGRAM_PACKING_CHAT_ID,
-      process.env.TELEGRAM_PRINTING_CHAT_ID,
-    ].filter((value): value is string => Boolean(value)))];
-  }
   const target = process.env[`TELEGRAM_${role}_CHAT_ID`];
   return target ? [target] : [];
 }

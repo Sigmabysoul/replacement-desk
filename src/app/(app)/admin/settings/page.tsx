@@ -69,10 +69,8 @@ export default async function SettingsPage() {
           label="Logistics Chat ID"
           configured={Boolean(process.env.TELEGRAM_LOGISTICS_CHAT_ID)}
         />
-        <Setting
-          label="Legacy Logistics fallback chats"
-          configured={Boolean(process.env.TELEGRAM_PACKING_CHAT_ID || process.env.TELEGRAM_PRINTING_CHAT_ID)}
-        />
+        <Setting label="Printing Chat ID" configured={Boolean(process.env.TELEGRAM_PRINTING_CHAT_ID)} />
+        <Setting label="Packing Chat ID" configured={Boolean(process.env.TELEGRAM_PACKING_CHAT_ID)} />
         <Setting label="Admin Chat ID" configured={Boolean(process.env.TELEGRAM_ADMIN_CHAT_ID)} />
       </Card>
 
