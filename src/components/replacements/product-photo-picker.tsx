@@ -99,7 +99,6 @@ export function ProductPhotoPicker() {
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
-          capture="environment"
           multiple
           onChange={handleChange}
           className="absolute inset-0 cursor-pointer opacity-0"
