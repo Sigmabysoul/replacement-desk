@@ -5,7 +5,7 @@
 alter table public.profiles alter column role set default 'PRINTING';
 
 -- Auth-created profiles receive the least privileged operational fallback.
--- Replacement Desk administrators explicitly assign the final role afterward.
+-- TBC_KART administrators explicitly assign the final role afterward.
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin

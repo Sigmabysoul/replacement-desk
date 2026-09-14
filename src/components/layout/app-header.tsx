@@ -17,7 +17,7 @@ export function AppHeader({ profile }: { profile: Profile }) {
             </span>
             <div className="min-w-0">
               <strong className="block truncate text-sm font-bold tracking-tight text-foreground">
-                Replacement Desk
+                TBC_KART
               </strong>
               <span className="hidden sm:block text-[11px] font-medium text-muted-foreground truncate">
                 Operations workspace

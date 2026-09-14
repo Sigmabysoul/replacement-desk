@@ -10,7 +10,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: { default: "Replacement Desk", template: "%s · Replacement Desk" },
+  title: { default: "TBC_KART", template: "%s · TBC_KART" },
   description: "Manage replacement printing, quality checks, packing, and dispatch.",
   appleWebApp: {
     capable: true,

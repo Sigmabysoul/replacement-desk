@@ -1,4 +1,4 @@
--- Replacement Desk core schema. Apply with `supabase db push` or in the SQL editor.
+-- TBC_KART core schema. Apply with `supabase db push` or in the SQL editor.
 create extension if not exists pgcrypto;
 
 create type public.app_role as enum ('customer_support', 'PRINTING', 'PACKING', 'ADMIN');

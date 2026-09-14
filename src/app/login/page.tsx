@@ -28,7 +28,7 @@ export default async function LoginPage({
             <PackageCheck className="size-7" />
           </span>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-950">Replacement Desk</h1>
+            <h1 className="text-2xl font-black tracking-tight text-slate-950">TBC_KART</h1>
             <p className="text-xs sm:text-sm font-medium text-slate-600">Orders, labels, printing, QC approval, and dispatch</p>
           </div>
         </div>

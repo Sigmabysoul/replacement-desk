@@ -1,6 +1,6 @@
-# Replacement Desk
+# TBC_KART
 
-Replacement Desk is a standalone internal operations app for customer replacement orders. customer_support creates the order with product photos, Logistics uploads the shipping label, Printing marks the label printed, Packing submits separate QC pictures for customer_support's review, and Packing packs and completes dispatch. Every important action is retained in an append-only activity history.
+TBC_KART is a standalone internal operations app for customer replacement orders. customer_support creates the order with product photos, Logistics uploads the shipping label, Printing marks the label printed, Packing submits separate QC pictures for customer_support's review, and Packing packs and completes dispatch. Every important action is retained in an append-only activity history.
 
 ## Architecture
 

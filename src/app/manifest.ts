@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Replacement Desk",
+    name: "TBC_KART",
     short_name: "Replacements",
     description: "Manage replacement printing, quality checks, packing, and dispatch.",
     start_url: "/",

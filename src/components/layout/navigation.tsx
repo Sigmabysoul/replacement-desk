@@ -52,7 +52,7 @@ export function Navigation({ role }: { role: Role }) {
             <PackageCheck className="size-6" />
           </span>
           <span>
-            <strong className="block leading-5">Replacement Desk</strong>
+            <strong className="block leading-5">TBC_KART</strong>
             <small className="text-slate-400">Operations workspace</small>
           </span>
         </Link>

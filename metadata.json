@@ -1,5 +1,5 @@
 {
-  "name": "Replacement Desk",
+  "name": "TBC_KART",
   "description": "Manage replacement printing, quality checks, packing, and dispatch.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

@@ -1,5 +1,5 @@
 -- =============================================================================
--- Replacement Desk - Complete Database Schema & Initialization
+-- TBC_KART - Complete Database Schema & Initialization
 -- Compatible with Supabase PostgreSQL (PostgREST, Auth, Storage, Realtime)
 -- =============================================================================
 

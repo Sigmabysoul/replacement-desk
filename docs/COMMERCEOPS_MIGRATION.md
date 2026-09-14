@@ -1,6 +1,6 @@
 # Future CommerceOps migration
 
-Replacement Desk deliberately uses stable UUIDs, explicit statuses, UTC timestamps, and append-only activity so it can later become a CommerceOps module without rewriting its operational history.
+TBC_KART deliberately uses stable UUIDs, explicit statuses, UTC timestamps, and append-only activity so it can later become a CommerceOps module without rewriting its operational history.
 
 ## Data mapping
 

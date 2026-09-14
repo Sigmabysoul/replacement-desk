@@ -393,4 +393,4 @@ end
 $$;
 SQL
 
-echo "Replacement Desk PostgreSQL integration test passed."
+echo "TBC_KART PostgreSQL integration test passed."
