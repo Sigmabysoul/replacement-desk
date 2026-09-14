@@ -1,6 +1,6 @@
 # Replacement Desk
 
-Replacement Desk is a standalone internal operations app for customer replacement orders. Esha creates the order with product photos, Logistics uploads the shipping label, Printing marks the label printed, Packing submits separate QC pictures for Esha's review, and Packing packs and completes dispatch. Every important action is retained in an append-only activity history.
+Replacement Desk is a standalone internal operations app for customer replacement orders. customer_support creates the order with product photos, Logistics uploads the shipping label, Printing marks the label printed, Packing submits separate QC pictures for customer_support's review, and Packing packs and completes dispatch. Every important action is retained in an append-only activity history.
 
 ## Architecture
 
@@ -81,7 +81,7 @@ Use a separate chat ID for each operational handoff so the next responsible team
 | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | Server only | Yes for stable self-hosted deployments |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server only | Yes for admin invitations and notification logs |
 | `TELEGRAM_BOT_TOKEN` | Server only | No; required for Telegram |
-| `TELEGRAM_ESHA_CHAT_ID` | Server only | Optional recipient |
+| `TELEGRAM_customer_support_CHAT_ID` | Server only | Optional recipient |
 | `TELEGRAM_LOGISTICS_CHAT_ID` | Server only | Optional recipient |
 | `TELEGRAM_PRINTING_CHAT_ID` | Server only | Optional recipient |
 | `TELEGRAM_PACKING_CHAT_ID` | Server only | Optional recipient |
@@ -94,11 +94,11 @@ Never expose or prefix the service-role key or bot token with `NEXT_PUBLIC_`.
 
 Create one account for each role on Admin → Users, then test in order:
 
-1. **ESHA:** create a replacement with the order details and one or more product photos.
+1. **customer_support:** create a replacement with the order details and one or more product photos.
 2. **LOGISTICS:** upload one shipping label only. Confirm product-photo, QC, printing, packing, and dispatch controls are absent.
 3. **PRINTING:** mark the uploaded label printed. Confirm file upload and QC controls are absent.
-4. **PACKING:** upload separate QC pictures and request Esha approval.
-5. **ESHA:** reject with a required reason; sign back in as Packing and resubmit photos without losing the original label; then approve as Esha.
+4. **PACKING:** upload separate QC pictures and request customer_support approval.
+5. **customer_support:** reject with a required reason; sign back in as Packing and resubmit photos without losing the original label; then approve as customer_support.
 6. **PACKING:** mark the approved replacement packed, then mark it shipped or needs token from Dispatch.
 7. **ADMIN:** verify users, Telegram configuration state, and the audited override control.
 

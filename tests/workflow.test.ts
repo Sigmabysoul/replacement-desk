@@ -30,11 +30,11 @@ describe("replacement workflow permissions", () => {
     expect(canPerform("PRINTING", "MARK_PACKED")).toBe(false);
   });
 
-  it("allows Esha to review QC but not finish dispatch", () => {
-    expect(canPerform("ESHA", "APPROVE_QC")).toBe(true);
-    expect(canPerform("ESHA", "REJECT_QC")).toBe(true);
-    expect(canPerform("ESHA", "MARK_SHIPPED")).toBe(false);
-    expect(canPerform("ESHA", "MARK_NEEDS_TOKEN")).toBe(false);
+  it("allows customer_support to review QC but not finish dispatch", () => {
+    expect(canPerform("customer_support", "APPROVE_QC")).toBe(true);
+    expect(canPerform("customer_support", "REJECT_QC")).toBe(true);
+    expect(canPerform("customer_support", "MARK_SHIPPED")).toBe(false);
+    expect(canPerform("customer_support", "MARK_NEEDS_TOKEN")).toBe(false);
   });
 
   it("allows Packing to submit QC, pack, and finish dispatch", () => {
@@ -101,7 +101,7 @@ describe("replacement workflow status transitions", () => {
     expect(availableActions("PRINTING", "LABEL_UPLOADED")).toContain("MARK_LABEL_PRINTED");
     expect(availableActions("PACKING", "LABEL_PRINTED")).toContain("SUBMIT_QC");
     expect(availableActions("PACKING", "QC_REJECTED")).toContain("SUBMIT_QC");
-    expect(availableActions("ESHA", "QC_PENDING")).toEqual(
+    expect(availableActions("customer_support", "QC_PENDING")).toEqual(
       expect.arrayContaining(["APPROVE_QC", "REJECT_QC"])
     );
     expect(availableActions("PACKING", "QC_APPROVED")).toContain("MARK_PACKED");
@@ -197,12 +197,12 @@ describe("telegram notification formatting", () => {
   const appUrl = "https://app.example.com";
 
   it("formats NEW_REPLACEMENT according to Section 10", () => {
-    const msg = formatTelegramMessage("NEW_REPLACEMENT", mockRep, appUrl, undefined, "Esha");
+    const msg = formatTelegramMessage("NEW_REPLACEMENT", mockRep, appUrl, undefined, "customer_support");
     expect(msg).toContain("🔔 NEW REPLACEMENT");
     expect(msg).toContain("REP-2026-0012");
     expect(msg).toContain("Product: Garbage Bag 30L");
     expect(msg).toContain("Qty: 2");
-    expect(msg).toContain("Requested by: Esha");
+    expect(msg).toContain("Requested by: customer_support");
     expect(msg).toContain("Open: https://app.example.com/replacements/rep-uuid-1234");
   });
 
@@ -218,7 +218,7 @@ describe("telegram notification formatting", () => {
     expect(msg).toContain("Logistics uploaded the shipping label");
   });
 
-  it("formats QC_SUBMITTED for Esha", () => {
+  it("formats QC_SUBMITTED for customer_support", () => {
     const msg = formatTelegramMessage("QC_SUBMITTED", mockRep, appUrl);
     expect(msg).toContain("📸 QC APPROVAL REQUIRED");
     expect(msg).toContain("Packing submitted QC photos");

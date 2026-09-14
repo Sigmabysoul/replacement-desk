@@ -150,7 +150,7 @@ function getNotificationContent(
     case "QC_PENDING":
       return {
         title: `🔍 QC Submitted · ${repNumber}`,
-        body: `Packing submitted QC photos for ${orderRef}. Pending Esha review.`,
+        body: `Packing submitted QC photos for ${orderRef}. Pending customer_support review.`,
       };
     case "LABEL_UPLOADED":
       return {
@@ -165,7 +165,7 @@ function getNotificationContent(
     case "NEW":
       return {
         title: `🆕 New Replacement · ${repNumber}`,
-        body: `Order ${orderRef} · ${product} created by Esha.`,
+        body: `Order ${orderRef} · ${product} created by customer_support.`,
       };
     case "NEEDS_TOKEN":
       return {

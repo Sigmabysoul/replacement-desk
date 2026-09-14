@@ -1,4 +1,4 @@
--- Move product evidence to order creation. Esha must create each new replacement
+-- Move product evidence to order creation. customer_support must create each new replacement
 -- with product photos; Logistics now supplies only the shipping label.
 
 drop policy if exists "authorized users can upload replacement files" on storage.objects;
@@ -6,7 +6,7 @@ create policy "authorized users can upload replacement files" on storage.objects
 for insert to authenticated with check (
   bucket_id = 'replacement-files'
   and name like 'replacements/%'
-  and public.current_active_role() in ('ESHA', 'LOGISTICS', 'PACKING', 'ADMIN')
+  and public.current_active_role() in ('customer_support', 'LOGISTICS', 'PACKING', 'ADMIN')
   and coalesce((metadata ->> 'size')::bigint, 0) <= 26214400
 );
 
@@ -34,8 +34,8 @@ declare
   attachment_count integer := 0;
 begin
   select public.current_active_role() into actor_role;
-  if actor_role is null or actor_role not in ('ESHA', 'ADMIN') then
-    raise exception 'Only Esha can create replacement orders';
+  if actor_role is null or actor_role not in ('customer_support', 'ADMIN') then
+    raise exception 'Only customer_support can create replacement orders';
   end if;
   if jsonb_typeof(p_attachments) is distinct from 'array'
     or jsonb_array_length(p_attachments) not between 1 and 12 then
@@ -88,7 +88,7 @@ begin
   from jsonb_to_recordset(p_attachments) as item(storage_path text, file_name text, mime_type text)
   where item.mime_type in ('image/jpeg', 'image/png', 'image/webp')
     and item.storage_path like (
-      'replacements/' || p_replacement_id || '/esha/' || p_upload_id || '/photos/%'
+      'replacements/' || p_replacement_id || '/customer_support/' || p_upload_id || '/photos/%'
     );
   get diagnostics attachment_count = row_count;
   if attachment_count <> jsonb_array_length(p_attachments) then

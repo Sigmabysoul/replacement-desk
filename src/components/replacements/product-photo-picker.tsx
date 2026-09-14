@@ -12,7 +12,7 @@ interface SelectedPhoto {
   previewUrl: string;
 }
 
-/** Lets Esha capture and preview the product evidence submitted with a new order. */
+/** Lets customer_support capture and preview the product evidence submitted with a new order. */
 export function ProductPhotoPicker() {
   const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [error, setError] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 -- Preserve the already-shipped Logistics migration and advance existing databases
 -- to the corrected workflow: Logistics submits one label plus product evidence,
--- while Packing continues to submit separate QC evidence for Esha's review.
+-- while Packing continues to submit separate QC evidence for customer_support's review.
 
 alter type public.attachment_type add value if not exists 'PROOF_PHOTO' after 'LABEL';
 

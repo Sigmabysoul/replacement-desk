@@ -15,11 +15,11 @@ interface NavItem {
 }
 
 const mainItems: NavItem[] = [
-  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ["ESHA", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
-  { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["ESHA", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
-  { href: "/replacements/new", label: "New replacement", short: "New", icon: CirclePlus, roles: ["ESHA", "ADMIN"] },
+  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
+  { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
+  { href: "/replacements/new", label: "New replacement", short: "New", icon: CirclePlus, roles: ["customer_support", "ADMIN"] },
   { href: "/dispatch", label: "Dispatch", short: "Dispatch", icon: Truck, roles: ["PACKING", "ADMIN"] },
-  { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ["ESHA", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
+  { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
 ];
 
 export function Navigation({ role }: { role: Role }) {

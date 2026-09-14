@@ -29,7 +29,7 @@ declare
   clean_tracking_url text := nullif(trim(p_tracking_url), '');
 begin
   select public.current_active_role() into actor_role;
-  if actor_role not in ('ESHA', 'ADMIN') then raise exception 'Only Esha can edit replacement details'; end if;
+  if actor_role not in ('customer_support', 'ADMIN') then raise exception 'Only customer_support can edit replacement details'; end if;
   if nullif(trim(p_order_reference), '') is null or nullif(trim(p_product_name), '') is null or p_quantity not between 1 and 999 then
     raise exception 'Invalid replacement details';
   end if;

@@ -11,7 +11,7 @@ create extension if not exists pgcrypto;
 do $$
 begin
   if not exists (select 1 from pg_type where typname = 'app_role') then
-    create type public.app_role as enum ('ESHA', 'LOGISTICS', 'PRINTING', 'PACKING', 'ADMIN');
+    create type public.app_role as enum ('customer_support', 'LOGISTICS', 'PRINTING', 'PACKING', 'ADMIN');
   end if;
   if not exists (select 1 from pg_type where typname = 'replacement_status') then
     create type public.replacement_status as enum (
@@ -224,9 +224,9 @@ create policy "active users can view profiles" on public.profiles for select to 
 drop policy if exists "active users can view replacements" on public.replacements;
 create policy "active users can view replacements" on public.replacements for select to authenticated using (public.current_active_role() is not null);
 
-drop policy if exists "esha and admin can create replacements" on public.replacements;
-create policy "esha and admin can create replacements" on public.replacements for insert to authenticated with check (
-  public.current_active_role() in ('ESHA', 'ADMIN') and created_by = auth.uid() and status = 'NEW'
+drop policy if exists "customer_support and admin can create replacements" on public.replacements;
+create policy "customer_support and admin can create replacements" on public.replacements for insert to authenticated with check (
+  public.current_active_role() in ('customer_support', 'ADMIN') and created_by = auth.uid() and status = 'NEW'
 );
 
 drop policy if exists "active users can view qc" on public.qc_submissions;
@@ -257,7 +257,7 @@ drop policy if exists "authorized users can upload replacement files" on storage
 create policy "authorized users can upload replacement files" on storage.objects for insert to authenticated with check (
   bucket_id = 'replacement-files' and
   name like 'replacements/%' and
-  public.current_active_role() in ('ESHA', 'LOGISTICS', 'PACKING', 'ADMIN') and
+  public.current_active_role() in ('customer_support', 'LOGISTICS', 'PACKING', 'ADMIN') and
   coalesce((metadata ->> 'size')::bigint, 0) <= 26214400
 );
 
@@ -451,8 +451,8 @@ begin
     and not (current_row.status = 'LABEL_UPLOADED' and actor_role in ('PRINTING', 'ADMIN'))
     then raise exception 'Only Printing can mark an uploaded label as printed';
   elsif p_target_status in ('QC_APPROVED', 'QC_REJECTED')
-    and not (current_row.status = 'QC_PENDING' and actor_role in ('ESHA', 'ADMIN'))
-    then raise exception 'Only Esha can review pending QC';
+    and not (current_row.status = 'QC_PENDING' and actor_role in ('customer_support', 'ADMIN'))
+    then raise exception 'Only customer_support can review pending QC';
   elsif p_target_status = 'PACKED'
     and not (current_row.status = 'QC_APPROVED' and actor_role in ('PACKING', 'ADMIN'))
     then raise exception 'QC must be approved before Packing packs the order';
@@ -510,7 +510,7 @@ begin
 end;
 $$;
 
--- Edit Replacement Details (Esha / Admin)
+-- Edit Replacement Details (customer_support / Admin)
 create or replace function public.update_replacement_details(
   p_replacement_id uuid,
   p_order_reference text,
@@ -527,8 +527,8 @@ declare
   clean_tracking_url text := nullif(trim(p_tracking_url), '');
 begin
   select public.current_active_role() into actor_role;
-  if actor_role is null or actor_role not in ('ESHA', 'ADMIN') then
-    raise exception 'Only Esha can edit replacement details';
+  if actor_role is null or actor_role not in ('customer_support', 'ADMIN') then
+    raise exception 'Only customer_support can edit replacement details';
   end if;
   if nullif(trim(p_order_reference), '') is null
     or nullif(trim(p_product_name), '') is null
@@ -647,7 +647,7 @@ $$;
 drop function if exists public.submit_logistics_label(uuid, uuid, jsonb);
 drop function if exists public.submit_qc(uuid, uuid, jsonb);
 
--- Final creation handoff: Esha supplies product photos and Logistics supplies only the label.
+-- Final creation handoff: customer_support supplies product photos and Logistics supplies only the label.
 create or replace function public.create_replacement_with_photos(
   p_replacement_id uuid, p_upload_id uuid, p_order_reference text,
   p_customer_name text, p_customer_reference text, p_product_name text,
@@ -661,8 +661,8 @@ declare
   attachment_count integer := 0;
 begin
   select public.current_active_role() into actor_role;
-  if actor_role is null or actor_role not in ('ESHA', 'ADMIN') then
-    raise exception 'Only Esha can create replacement orders';
+  if actor_role is null or actor_role not in ('customer_support', 'ADMIN') then
+    raise exception 'Only customer_support can create replacement orders';
   end if;
   if jsonb_typeof(p_attachments) is distinct from 'array'
     or jsonb_array_length(p_attachments) not between 1 and 12 then
@@ -692,7 +692,7 @@ begin
   select p_replacement_id, null, 'PROOF_PHOTO', item.storage_path, item.file_name, item.mime_type, auth.uid()
   from jsonb_to_recordset(p_attachments) as item(storage_path text, file_name text, mime_type text)
   where item.mime_type in ('image/jpeg', 'image/png', 'image/webp')
-    and item.storage_path like ('replacements/' || p_replacement_id || '/esha/' || p_upload_id || '/photos/%');
+    and item.storage_path like ('replacements/' || p_replacement_id || '/customer_support/' || p_upload_id || '/photos/%');
   get diagnostics attachment_count = row_count;
   if attachment_count <> jsonb_array_length(p_attachments) then
     raise exception 'Invalid product photo metadata';

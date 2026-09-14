@@ -66,7 +66,7 @@ done
 "${psql[@]}" <<'SQL'
 insert into auth.users(id, email, raw_user_meta_data) values
   ('11111111-1111-1111-1111-111111111111', 'admin@example.com', '{"full_name":"Admin","role":"ADMIN"}'),
-  ('22222222-2222-2222-2222-222222222222', 'esha@example.com', '{"full_name":"Esha"}'),
+  ('22222222-2222-2222-2222-222222222222', 'customer_support@example.com', '{"full_name":"customer_support"}'),
   ('33333333-3333-3333-3333-333333333333', 'print@example.com', '{"full_name":"Printer"}'),
   ('44444444-4444-4444-4444-444444444444', 'pack@example.com', '{"full_name":"Packer"}'),
   ('55555555-5555-5555-5555-555555555555', 'inactive@example.com', '{"full_name":"Inactive"}');
@@ -80,7 +80,7 @@ end
 $$;
 
 update public.profiles set role = 'ADMIN' where id = '11111111-1111-1111-1111-111111111111';
-update public.profiles set role = 'ESHA' where id = '22222222-2222-2222-2222-222222222222';
+update public.profiles set role = 'customer_support' where id = '22222222-2222-2222-2222-222222222222';
 update public.profiles set role = 'PRINTING' where id = '33333333-3333-3333-3333-333333333333';
 update public.profiles set role = 'PACKING' where id = '44444444-4444-4444-4444-444444444444';
 update public.profiles set active = false where id = '55555555-5555-5555-5555-555555555555';
@@ -140,7 +140,7 @@ begin
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
     'ORDER-1', null, null, 'Test Product', 2, null, null, 'https://tracking.example.test/ORDER-1', '[]'
   );
-  raise exception 'Replacement without Esha product photos unexpectedly succeeded';
+  raise exception 'Replacement without customer_support product photos unexpectedly succeeded';
 exception when others then
   if sqlerrm <> 'Between one and twelve product photos are required' then raise; end if;
 end
@@ -151,26 +151,26 @@ begin
   perform public.create_replacement_with_photos(
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
     'ORDER-1', null, null, 'Test Product', 2, null, null, 'https://tracking.example.test/ORDER-1',
-    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/esha/99999999-9999-4999-8999-999999999999/photos/fabricated.jpg","file_name":"fabricated.jpg","mime_type":"image/jpeg"}]'
+    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/customer_support/99999999-9999-4999-8999-999999999999/photos/fabricated.jpg","file_name":"fabricated.jpg","mime_type":"image/jpeg"}]'
   );
-  raise exception 'Fabricated Esha product evidence unexpectedly succeeded';
+  raise exception 'Fabricated customer_support product evidence unexpectedly succeeded';
 exception when others then
   if sqlerrm <> 'Product photo storage objects were not uploaded by the current user' then raise; end if;
 end
 $$;
 
 insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
-  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/esha/99999999-9999-4999-8999-999999999999/photos/product.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
+  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/customer_support/99999999-9999-4999-8999-999999999999/photos/product.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
 select public.create_replacement_with_photos(
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
   'ORDER-1', null, null, 'Test Product', 2, null, null, 'https://tracking.example.test/ORDER-1',
-  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/esha/99999999-9999-4999-8999-999999999999/photos/product.jpg","file_name":"product.jpg","mime_type":"image/jpeg"}]'
+  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/customer_support/99999999-9999-4999-8999-999999999999/photos/product.jpg","file_name":"product.jpg","mime_type":"image/jpeg"}]'
 );
 
 do $$
 begin
   perform public.submit_logistics_label('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '[]');
-  raise exception 'Esha Logistics authorization unexpectedly succeeded';
+  raise exception 'customer_support Logistics authorization unexpectedly succeeded';
 exception when others then
   if sqlerrm <> 'Only Logistics can upload the shipping label' then raise; end if;
 end
@@ -185,7 +185,7 @@ begin
   );
   raise exception 'Logistics replacement creation unexpectedly succeeded';
 exception when others then
-  if sqlerrm <> 'Only Esha can create replacement orders' then raise; end if;
+  if sqlerrm <> 'Only customer_support can create replacement orders' then raise; end if;
 end
 $$;
 
@@ -303,7 +303,7 @@ select public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'QC
 do $$
 begin
   perform public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'SHIPPED');
-  raise exception 'Esha dispatch unexpectedly succeeded';
+  raise exception 'customer_support dispatch unexpectedly succeeded';
 exception when others then
   if sqlerrm <> 'Only Packing can mark a packed replacement as shipped' then raise; end if;
 end
@@ -329,7 +329,7 @@ begin
     raise exception 'Logistics label was not retained';
   end if;
   if (select count(*) from public.attachments where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and attachment_type = 'PROOF_PHOTO' and uploaded_by = '22222222-2222-2222-2222-222222222222') <> 1 then
-    raise exception 'Esha product photo was not retained with the order';
+    raise exception 'customer_support product photo was not retained with the order';
   end if;
   if (select count(*) from public.activity_logs where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') < 10 then
     raise exception 'Workflow audit trail is incomplete';
@@ -375,7 +375,7 @@ begin
     perform public.update_replacement_details('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'ATTACK', null, null, 'Attack', 1, null, null, null);
     raise exception 'Inactive profile edited a replacement';
   exception when others then
-    if sqlerrm <> 'Only Esha can edit replacement details' then raise; end if;
+    if sqlerrm <> 'Only customer_support can edit replacement details' then raise; end if;
   end;
   begin
     perform public.admin_override_replacement('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'CANCELLED', 'unauthorized override');

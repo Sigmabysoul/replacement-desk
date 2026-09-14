@@ -20,7 +20,7 @@ export function LogisticsUploadForm({
 
       <div className="rounded-xl bg-indigo-50 p-4">
         <p className="font-bold text-indigo-950">Add the shipping label</p>
-        <p className="mt-1 text-sm text-indigo-800">Esha already attached the product photos when creating this order.</p>
+        <p className="mt-1 text-sm text-indigo-800">customer_support already attached the product photos when creating this order.</p>
       </div>
 
       <label className="relative flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-3 text-center transition hover:border-indigo-400">

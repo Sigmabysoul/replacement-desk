@@ -28,18 +28,18 @@ const transitions: Record<ReplacementStatus, readonly ReplacementStatus[]> = {
 };
 
 const permissions: Record<WorkflowAction, readonly Role[]> = {
-  CREATE_REPLACEMENT: ["ESHA", "ADMIN"],
-  EDIT_REPLACEMENT: ["ESHA", "ADMIN"],
+  CREATE_REPLACEMENT: ["customer_support", "ADMIN"],
+  EDIT_REPLACEMENT: ["customer_support", "ADMIN"],
   SUBMIT_LOGISTICS: ["LOGISTICS", "ADMIN"],
   MARK_LABEL_PRINTED: ["PRINTING", "ADMIN"],
   SUBMIT_QC: ["PACKING", "ADMIN"],
-  APPROVE_QC: ["ESHA", "ADMIN"],
-  REJECT_QC: ["ESHA", "ADMIN"],
+  APPROVE_QC: ["customer_support", "ADMIN"],
+  REJECT_QC: ["customer_support", "ADMIN"],
   MARK_PACKED: ["PACKING", "ADMIN"],
   MARK_SHIPPED: ["PACKING", "ADMIN"],
   MARK_NEEDS_TOKEN: ["PACKING", "ADMIN"],
   CANCEL_REPLACEMENT: ["ADMIN"],
-  COMMENT: ["ESHA", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"],
+  COMMENT: ["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"],
 };
 
 /**
@@ -68,7 +68,7 @@ export function canTransition(from: ReplacementStatus, to: ReplacementStatus) {
  * Checks whether a user with the given role is authorized to perform a workflow action.
  *
  * Role capabilities:
- * - ESHA: Creates and edits replacements, then reviews Packing's QC evidence.
+ * - customer_support: Creates and edits replacements, then reviews Packing's QC evidence.
  * - LOGISTICS: Uploads the shipping label.
  * - PRINTING: Confirms the uploaded label was printed.
  * - PACKING: Uploads QC pictures, requests review, packs, and finishes dispatch.

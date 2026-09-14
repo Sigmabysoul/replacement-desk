@@ -8,7 +8,7 @@ import { ProductPhotoPicker } from "@/components/replacements/product-photo-pick
 import { requireProfile } from "@/lib/auth/session";
 
 export default async function NewReplacementPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  await requireProfile(["ESHA", "ADMIN"]);
+  await requireProfile(["customer_support", "ADMIN"]);
   const { error } = await searchParams;
 
   return (
@@ -42,7 +42,7 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
           </Field>
           <div className="sm:col-span-2">
             <Field label="Notes (optional)">
-              <Textarea name="notes" maxLength={2000} placeholder="Anything the team should know" />
+              <Textarea name="notes" maxLength={2000} placeholder="Anything the team should know?" />
             </Field>
           </div>
           <ProductPhotoPicker />

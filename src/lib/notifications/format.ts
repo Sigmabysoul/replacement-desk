@@ -15,12 +15,12 @@ export const NOTIFICATION_RECIPIENTS: Record<NotificationType, readonly Role[]> 
   NEW_REPLACEMENT: ["LOGISTICS"],
   LABEL_UPLOADED: ["PRINTING"],
   LABEL_PRINTED: ["PACKING"],
-  QC_SUBMITTED: ["ESHA"],
+  QC_SUBMITTED: ["customer_support"],
   QC_REJECTED: ["PACKING"],
   QC_APPROVED: ["PACKING"],
-  PACKED: ["ESHA", "ADMIN"],
-  SHIPPED: ["ESHA", "ADMIN"],
-  NEEDS_TOKEN: ["ESHA", "ADMIN"],
+  PACKED: ["customer_support", "ADMIN"],
+  SHIPPED: ["customer_support", "ADMIN"],
+  NEEDS_TOKEN: ["customer_support", "ADMIN"],
 };
 
 /**
@@ -51,7 +51,7 @@ export function formatTelegramMessage(
         "",
         `Product: ${replacement.product_name}`,
         `Qty: ${replacement.quantity}`,
-        `Requested by: ${actorName || "Esha"}`,
+        `Requested by: ${actorName || "customer_support"}`,
       );
       break;
 
@@ -81,7 +81,7 @@ export function formatTelegramMessage(
         "",
         replacement.replacement_number,
         "",
-        "Packing submitted QC photos for Esha's approval.",
+        "Packing submitted QC photos for customer_support's approval.",
       );
       break;
 

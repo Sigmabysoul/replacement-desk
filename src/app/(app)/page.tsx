@@ -45,7 +45,7 @@ const metrics: {
     href: "/replacements?scope=all&status=AWAITING_QC",
   },
   {
-    label: "Waiting for Esha review",
+    label: "Waiting for customer_support review",
     statuses: ["QC_PENDING"],
     icon: ScanLine,
     tone: "bg-amber-50 text-amber-800",
@@ -109,7 +109,7 @@ export default async function DashboardPage() {
           </h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">See what needs attention across replacement orders.</p>
         </div>
-        {["ESHA", "ADMIN"].includes(profile.role) && (
+        {["customer_support", "ADMIN"].includes(profile.role) && (
           <Link
             href="/replacements/new"
             className="hidden min-h-12 items-center gap-2 rounded-xl bg-[var(--brand)] px-4 text-sm font-bold text-white shadow-lg shadow-[var(--brand)]/20 transition hover:-translate-y-0.5 hover:brightness-95 sm:flex"

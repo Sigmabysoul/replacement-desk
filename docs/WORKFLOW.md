@@ -2,20 +2,20 @@
 
 ```text
 NEW
- │ Esha has already supplied product photos; Logistics uploads the shipping label
+ │ customer_support has already supplied product photos; Logistics uploads the shipping label
  ▼
 LABEL_UPLOADED
  │ Printing marks the label printed
  ▼
 LABEL_PRINTED
- │ Packing uploads QC photos and asks Esha for approval
+ │ Packing uploads QC photos and asks customer_support for approval
  ▼
 QC_PENDING
- ├── Esha rejects with reason ──► QC_REJECTED
+ ├── customer_support rejects with reason ──► QC_REJECTED
  │                                  │ Packing fixes the item and resubmits photos
  │                                  └──────────────► QC_PENDING
  │
- └── Esha approves ─────────────► QC_APPROVED
+ └── customer_support approves ─────────────► QC_APPROVED
                                       │ Packing confirms pack
                                       ▼
                                    PACKED
@@ -31,6 +31,6 @@ Admin may cancel an open replacement or perform a reason-required, audited statu
 
 ## Audit events
 
-Creation with Esha's product photos, edits, Logistics label upload, Printing confirmation, every Packing QC-picture submission, each QC decision, packing, dispatch, comments, cancellation, and admin overrides create immutable activity entries. Each entry records the actor and server timestamp. Esha's product evidence and Logistics' label remain attached to the order, while Packing QC attempts use separate numbered rows so rejection and resubmission never overwrite earlier evidence.
+Creation with customer_support's product photos, edits, Logistics label upload, Printing confirmation, every Packing QC-picture submission, each QC decision, packing, dispatch, comments, cancellation, and admin overrides create immutable activity entries. Each entry records the actor and server timestamp. customer_support's product evidence and Logistics' label remain attached to the order, while Packing QC attempts use separate numbered rows so rejection and resubmission never overwrite earlier evidence.
 
 Telegram is downstream of the database commit. It can alert the relevant role, but it never becomes the source of truth and cannot prevent work from completing.

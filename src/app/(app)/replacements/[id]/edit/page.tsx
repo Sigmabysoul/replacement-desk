@@ -17,7 +17,7 @@ export default async function EditReplacementPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireProfile(["ESHA", "ADMIN"]);
+  await requireProfile(["customer_support", "ADMIN"]);
   const { id } = await params;
   const { error } = await searchParams;
   const supabase = await createClient();

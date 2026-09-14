@@ -144,9 +144,9 @@ export async function logoutAction() {
 }
 
 /**
- * Creates a new replacement order with Esha's product photos.
+ * Creates a new replacement order with customer_support's product photos.
  *
- * Authorization: ESHA or ADMIN
+ * Authorization: customer_support or ADMIN
  * Workflow:
  * 1. Validates form fields (order reference, product, quantity, etc.).
  * 2. Uploads one to twelve product photos into private storage.
@@ -154,7 +154,7 @@ export async function logoutAction() {
  * 4. Notifies Logistics that the shipping label is required.
  */
 export async function createReplacementAction(formData: FormData) {
-  const profile = await requireProfile(["ESHA", "ADMIN"]);
+  const profile = await requireProfile(["customer_support", "ADMIN"]);
   const parsed = replacementSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(`/replacements/new?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
 
@@ -177,7 +177,7 @@ export async function createReplacementAction(formData: FormData) {
   const uploaded: string[] = [];
   let replacement: Replacement | null = null;
   try {
-    const photoUpload = await uploadFiles(replacementId, photos, "PROOF_PHOTO", `esha/${uploadId}/photos`);
+    const photoUpload = await uploadFiles(replacementId, photos, "PROOF_PHOTO", `customer_support/${uploadId}/photos`);
     uploaded.push(...photoUpload.uploaded);
     const { data, error } = await supabase.rpc("create_replacement_with_photos", {
       p_replacement_id: replacementId,
@@ -207,12 +207,12 @@ export async function createReplacementAction(formData: FormData) {
 /**
  * Updates editable order details (customer name, product, quantity, reason, notes).
  *
- * Authorization: ESHA or ADMIN
+ * Authorization: customer_support or ADMIN
  * Calls database RPC function `update_replacement_details` which logs changes
  * to `activity_logs` and enforces edit constraints.
  */
 export async function updateReplacementAction(formData: FormData) {
-  await requireProfile(["ESHA", "ADMIN"]);
+  await requireProfile(["customer_support", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
   const parsed = replacementSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
@@ -259,7 +259,7 @@ const notificationForStatus = {
  *
  * Authorization: Enforced atomically inside PostgreSQL via `transition_replacement` RPC:
  * - PRINTING: Can mark an uploaded label as printed.
- * - ESHA: Can review QC (QC_APPROVED / QC_REJECTED).
+ * - customer_support: Can review QC (QC_APPROVED / QC_REJECTED).
  * - PACKING: Can pack approved orders and finish dispatch (SHIPPED, NEEDS_TOKEN).
  * - ADMIN: Can execute all standard transitions or cancel.
  *
@@ -334,7 +334,7 @@ export async function submitLogisticsAction(formData: FormData) {
   redirect(`/replacements/${replacementId}${!sent.ok ? "?warning=Files%20saved%2C%20but%20Telegram%20notification%20failed." : ""}`);
 }
 
-/** Uploads Packing's QC photos and asks Esha to approve or reject the order. */
+/** Uploads Packing's QC photos and asks customer_support to approve or reject the order. */
 export async function submitPackingQcAction(formData: FormData) {
   await requireProfile(["PACKING", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
@@ -436,7 +436,7 @@ export async function createUserAction(formData: FormData) {
   const fullName = String(formData.get("full_name") ?? "").trim();
   const temporaryPassword = String(formData.get("temporary_password") ?? "");
   const role = String(formData.get("role") ?? "") as Role;
-  if (!email || !fullName || temporaryPassword.length < 12 || !["ESHA", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Use%20a%20valid%20email%20and%20a%20temporary%20password%20of%20at%20least%2012%20characters.");
+  if (!email || !fullName || temporaryPassword.length < 12 || !["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Use%20a%20valid%20email%20and%20a%20temporary%20password%20of%20at%20least%2012%20characters.");
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -465,7 +465,7 @@ export async function updateUserAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const role = String(formData.get("role") ?? "") as Role;
   const active = formData.get("active") === "true";
-  if (!/^[0-9a-f-]{36}$/i.test(id) || !["ESHA", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Invalid%20user%20update.");
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Invalid%20user%20update.");
   if (id === actor.id && (!active || role !== "ADMIN")) redirect("/admin/users?error=You%20cannot%20remove%20your%20own%20active%20administrator%20access.");
   const admin = createAdminClient();
   const { error } = await admin.from("profiles").update({ role, active }).eq("id", id);
@@ -495,13 +495,13 @@ export async function updatePasswordAction(formData: FormData) {
  *
  * Authorization:
  * - ADMIN: Can delete any order at any status.
- * - ESHA: Can delete only orders they personally created, and only while status is still 'NEW'.
+ * - customer_support: Can delete only orders they personally created, and only while status is still 'NEW'.
  *
  * Deletes the database record first so a database failure cannot leave an order
  * pointing at missing evidence, then performs best-effort privileged file cleanup.
  */
 export async function deleteReplacementAction(formData: FormData) {
-  const profile = await requireProfile(["ADMIN", "ESHA"]);
+  const profile = await requireProfile(["ADMIN", "customer_support"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(replacementId)) {
     redirect("/replacements?error=Invalid%20replacement%20ID.");

@@ -13,7 +13,7 @@ interface SelectedPhoto {
   previewUrl: string;
 }
 
-/** Collects Packing's QC pictures as a separate submission for Esha to review. */
+/** Collects Packing's QC pictures as a separate submission for customer_support to review. */
 export function PackingQcUploadForm({
   replacementId,
   action,
@@ -97,9 +97,9 @@ export function PackingQcUploadForm({
         aria-hidden="true"
       />
       <div className="rounded-xl bg-amber-50 p-4">
-        <p className="font-bold text-amber-950">Send QC pictures to Esha</p>
+        <p className="font-bold text-amber-950">Send QC pictures to customer_support</p>
         <p className="mt-1 text-sm text-amber-800">
-          Take a current picture of the product. Esha will use these QC pictures for approval.
+          Take a current picture of the product. customer_support will use these QC pictures for approval.
         </p>
       </div>
       {error && (
@@ -143,7 +143,7 @@ export function PackingQcUploadForm({
       )}
       <SubmitButton disabled={photos.length === 0} pendingText="Requesting approval…">
         <Send className="size-5" />
-        REQUEST ESHA QC APPROVAL
+        REQUEST customer_support QC APPROVAL
       </SubmitButton>
     </form>
   );
