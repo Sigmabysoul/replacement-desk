@@ -46,7 +46,7 @@ const permissions: Record<WorkflowAction, readonly Role[]> = {
  * Determines whether a replacement order can legally transition from one status to another.
  *
  * Enforces the core state machine:
- * - NEW -> LABEL_UPLOADED after Logistics supplies the label and product photos
+ * - NEW -> LABEL_UPLOADED after Logistics supplies the label
  * - LABEL_UPLOADED -> LABEL_PRINTED after Printing confirms the label is printed
  * - LABEL_PRINTED -> QC_PENDING after Packing uploads a QC picture and requests review
  * - QC_PENDING -> QC_APPROVED, QC_REJECTED, or CANCELLED
@@ -69,7 +69,7 @@ export function canTransition(from: ReplacementStatus, to: ReplacementStatus) {
  *
  * Role capabilities:
  * - ESHA: Creates and edits replacements, then reviews Packing's QC evidence.
- * - LOGISTICS: Uploads the shipping label and product proof photos.
+ * - LOGISTICS: Uploads the shipping label.
  * - PRINTING: Confirms the uploaded label was printed.
  * - PACKING: Uploads QC pictures, requests review, packs, and finishes dispatch.
  * - ADMIN: Superuser across all operations and cancellations.

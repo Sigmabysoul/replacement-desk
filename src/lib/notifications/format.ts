@@ -71,7 +71,7 @@ export function formatTelegramMessage(
         "",
         replacement.replacement_number,
         "",
-        "Logistics uploaded the shipping label and product photos. Please print the label.",
+        "Logistics uploaded the shipping label. Please print it.",
       );
       break;
 

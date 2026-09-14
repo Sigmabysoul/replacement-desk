@@ -58,7 +58,7 @@ SQL
 
 for migration in supabase/migrations/*.sql; do
   case "$(basename "$migration")" in
-    20260913*) continue ;;
+    2026091[34]*) continue ;;
   esac
   "${psql[@]}" -f "$migration" >/dev/null
 done
@@ -94,7 +94,7 @@ insert into public.attachments(replacement_id, attachment_type, storage_path, fi
 values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'LABEL', 'replacements/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/legacy-label.pdf', 'legacy-label.pdf', 'application/pdf', '33333333-3333-3333-3333-333333333333');
 SQL
 
-for migration in supabase/migrations/20260913*.sql; do
+for migration in supabase/migrations/2026091[34]*.sql; do
   "${psql[@]}" -f "$migration" >/dev/null
 done
 
@@ -123,33 +123,24 @@ $$;
 
 set role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
-insert into public.replacements(id, replacement_number, order_reference, product_name, quantity, created_by)
-values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'assigned-by-trigger', 'ORDER-1', 'Test Product', 2, '22222222-2222-2222-2222-222222222222');
 
 do $$
 begin
-  perform public.submit_logistics_package('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '[]', '[]');
-  raise exception 'Esha Logistics authorization unexpectedly succeeded';
-exception when others then
-  if sqlerrm <> 'Only Logistics can upload labels and product photos' then raise; end if;
+  insert into public.replacements(id, replacement_number, order_reference, product_name, quantity, created_by)
+  values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'assigned-by-trigger', 'ORDER-1', 'Test Product', 2, '22222222-2222-2222-2222-222222222222');
+  raise exception 'Direct replacement creation unexpectedly succeeded';
+exception when insufficient_privilege then
+  null;
 end
 $$;
 
-select public.update_replacement_details(
-  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'ORDER-1', null, null, 'Test Product', 2, null, null,
-  'https://tracking.example.test/ORDER-1'
-);
-
-select set_config('request.jwt.claim.sub', '66666666-6666-4666-8666-666666666666', false);
 do $$
 begin
-  perform public.submit_logistics_package(
-    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/label.pdf","file_name":"label.pdf","mime_type":"application/pdf"}]',
-    '[]'
+  perform public.create_replacement_with_photos(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
+    'ORDER-1', null, null, 'Test Product', 2, null, null, 'https://tracking.example.test/ORDER-1', '[]'
   );
-  raise exception 'Missing Logistics product photo unexpectedly succeeded';
+  raise exception 'Replacement without Esha product photos unexpectedly succeeded';
 exception when others then
   if sqlerrm <> 'Between one and twelve product photos are required' then raise; end if;
 end
@@ -157,11 +148,53 @@ $$;
 
 do $$
 begin
-  perform public.submit_logistics_package(
+  perform public.create_replacement_with_photos(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
+    'ORDER-1', null, null, 'Test Product', 2, null, null, 'https://tracking.example.test/ORDER-1',
+    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/esha/99999999-9999-4999-8999-999999999999/photos/fabricated.jpg","file_name":"fabricated.jpg","mime_type":"image/jpeg"}]'
+  );
+  raise exception 'Fabricated Esha product evidence unexpectedly succeeded';
+exception when others then
+  if sqlerrm <> 'Product photo storage objects were not uploaded by the current user' then raise; end if;
+end
+$$;
+
+insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
+  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/esha/99999999-9999-4999-8999-999999999999/photos/product.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
+select public.create_replacement_with_photos(
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
+  'ORDER-1', null, null, 'Test Product', 2, null, null, 'https://tracking.example.test/ORDER-1',
+  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/esha/99999999-9999-4999-8999-999999999999/photos/product.jpg","file_name":"product.jpg","mime_type":"image/jpeg"}]'
+);
+
+do $$
+begin
+  perform public.submit_logistics_label('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '[]');
+  raise exception 'Esha Logistics authorization unexpectedly succeeded';
+exception when others then
+  if sqlerrm <> 'Only Logistics can upload the shipping label' then raise; end if;
+end
+$$;
+
+select set_config('request.jwt.claim.sub', '66666666-6666-4666-8666-666666666666', false);
+do $$
+begin
+  perform public.create_replacement_with_photos(
+    '88888888-8888-4888-8888-888888888888', '99999999-9999-4999-8999-999999999999',
+    'UNAUTHORIZED', null, null, 'Test Product', 1, null, null, null, '[]'
+  );
+  raise exception 'Logistics replacement creation unexpectedly succeeded';
+exception when others then
+  if sqlerrm <> 'Only Esha can create replacement orders' then raise; end if;
+end
+$$;
+
+do $$
+begin
+  perform public.submit_logistics_label(
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/fabricated.pdf","file_name":"fabricated.pdf","mime_type":"application/pdf"}]',
-    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/photos/fabricated.jpg","file_name":"fabricated.jpg","mime_type":"image/jpeg"}]'
+    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/fabricated.pdf","file_name":"fabricated.pdf","mime_type":"application/pdf"}]'
   );
   raise exception 'Fabricated label evidence unexpectedly succeeded';
 exception when others then
@@ -170,13 +203,11 @@ end
 $$;
 
 insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
-  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/label.pdf', '{"size":1024}', '66666666-6666-4666-8666-666666666666'),
-  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/photos/product.jpg', '{"size":1024}', '66666666-6666-4666-8666-666666666666');
-select public.submit_logistics_package(
+  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/label.pdf', '{"size":1024}', '66666666-6666-4666-8666-666666666666');
+select public.submit_logistics_label(
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/label.pdf","file_name":"label.pdf","mime_type":"application/pdf"}]',
-  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/photos/product.jpg","file_name":"product.jpg","mime_type":"image/jpeg"}]'
+  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/label.pdf","file_name":"label.pdf","mime_type":"application/pdf"}]'
 );
 
 do $$
@@ -297,8 +328,8 @@ begin
   if (select count(*) from public.attachments where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and attachment_type = 'LABEL') <> 1 then
     raise exception 'Logistics label was not retained';
   end if;
-  if (select count(*) from public.attachments where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and attachment_type = 'PROOF_PHOTO') <> 1 then
-    raise exception 'Logistics product photo was not retained separately';
+  if (select count(*) from public.attachments where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and attachment_type = 'PROOF_PHOTO' and uploaded_by = '22222222-2222-2222-2222-222222222222') <> 1 then
+    raise exception 'Esha product photo was not retained with the order';
   end if;
   if (select count(*) from public.activity_logs where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') < 10 then
     raise exception 'Workflow audit trail is incomplete';
@@ -329,10 +360,10 @@ begin
     raise exception 'Inactive profile can read replacements';
   end if;
   begin
-    perform public.submit_logistics_package('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'ffffffff-ffff-4fff-8fff-ffffffffffff', '[]', '[]');
+    perform public.submit_logistics_label('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'ffffffff-ffff-4fff-8fff-ffffffffffff', '[]');
     raise exception 'Inactive profile submitted Logistics files';
   exception when others then
-    if sqlerrm <> 'Only Logistics can upload labels and product photos' then raise; end if;
+    if sqlerrm <> 'Only Logistics can upload the shipping label' then raise; end if;
   end;
   begin
     perform public.submit_packing_qc('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'ffffffff-ffff-4fff-8fff-ffffffffffff', '[]');

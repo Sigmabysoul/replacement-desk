@@ -15,7 +15,7 @@ import type { Profile, Replacement } from "@/lib/types";
  * Role-aware operational action panel rendered on the replacement detail screen.
  *
  * Dynamically presents only legal actions based on user's active role and current status:
- * - LOGISTICS: Uploads the shipping label and product proof photos.
+ * - LOGISTICS: Uploads the shipping label.
  * - PRINTING: Confirms that the uploaded label was printed.
  * - PACKING: Uploads QC pictures, requests Esha's review, packs, and dispatches.
  * - ESHA: Reviews QC photos (Approve / Reject with feedback).
@@ -52,7 +52,6 @@ export function ActionPanel({
         {actions.includes("SUBMIT_LOGISTICS") && (
           <LogisticsUploadForm
             replacementId={replacement.id}
-            requiresLabel={replacement.status === "NEW"}
             action={submitLogisticsAction}
           />
         )}

@@ -14,7 +14,7 @@ import { formatDate } from "@/lib/utils";
  * @returns Short human-readable status cue.
  */
 function actionHint(status: Replacement["status"], role: Role) {
-  if (status === "NEW") return role === "LOGISTICS" || role === "ADMIN" ? "Add label & product photos" : "Waiting for logistics";
+  if (status === "NEW") return role === "LOGISTICS" || role === "ADMIN" ? "Upload shipping label" : "Waiting for logistics";
   if (status === "LABEL_UPLOADED") return role === "PRINTING" || role === "ADMIN" ? "Print the label" : "Waiting for printing";
   if (status === "LABEL_PRINTED") return role === "PACKING" || role === "ADMIN" ? "Request Esha QC" : "Waiting for packing QC";
   if (status === "QC_REJECTED") return role === "PACKING" || role === "ADMIN" ? "Resubmit QC pictures" : "Waiting for packing QC";

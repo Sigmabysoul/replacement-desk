@@ -4,6 +4,7 @@ import { Field, Input, Textarea } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ReasonSelect } from "@/components/replacements/reason-select";
+import { ProductPhotoPicker } from "@/components/replacements/product-photo-picker";
 import { requireProfile } from "@/lib/auth/session";
 
 export default async function NewReplacementPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -15,7 +16,7 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
       <p className="text-sm font-bold text-indigo-700">NEW REQUEST</p>
       <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Create replacement</h1>
       <p className="mt-1 text-sm text-slate-600">
-        Add only the order details. Logistics will attach the shipping label and product photos next.
+        Add the order details and clear product photos. Logistics will attach only the shipping label next.
       </p>
       <form action={createReplacementAction} className="mt-6 grid gap-5">
         <Notice>{error}</Notice>
@@ -44,8 +45,9 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
               <Textarea name="notes" maxLength={2000} placeholder="Anything the team should know" />
             </Field>
           </div>
+          <ProductPhotoPicker />
         </Card>
-        <SubmitButton pendingText="Creating replacement…">CREATE REPLACEMENT</SubmitButton>
+        <SubmitButton pendingText="Creating replacement and uploading photos…">CREATE REPLACEMENT</SubmitButton>
       </form>
     </div>
   );

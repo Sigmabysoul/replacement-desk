@@ -144,28 +144,64 @@ export async function logoutAction() {
 }
 
 /**
- * Creates a new replacement order from Esha's order details only.
+ * Creates a new replacement order with Esha's product photos.
  *
  * Authorization: ESHA or ADMIN
  * Workflow:
  * 1. Validates form fields (order reference, product, quantity, etc.).
- * 2. Inserts the row into `replacements` with status 'NEW'.
- * 3. Generates the formatted sequence number (REP-YYYY-XXXX) via database trigger.
- * 4. Notifies Logistics that the shipping label and product photos are required.
+ * 2. Uploads one to twelve product photos into private storage.
+ * 3. Atomically creates the order and attachment metadata through PostgreSQL.
+ * 4. Notifies Logistics that the shipping label is required.
  */
 export async function createReplacementAction(formData: FormData) {
   const profile = await requireProfile(["ESHA", "ADMIN"]);
   const parsed = replacementSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(`/replacements/new?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("replacements").insert({ ...parsed.data, created_by: profile.id }).select("*").single();
-  if (error || !data) redirect(`/replacements/new?error=${encodeURIComponent(error?.message ?? "Could not create replacement.")}`);
-  const replacement = data as Replacement;
+  const photos = formFiles(formData, "product_photos");
+  if (!photos.length || photos.length > 12) {
+    redirect(`/replacements/new?error=${encodeURIComponent("Add between one and twelve product photos.")}`);
+  }
+  if (photos.reduce((sum, file) => sum + file.size, 0) > 80 * 1024 * 1024) {
+    redirect(`/replacements/new?error=${encodeURIComponent("The combined product photos must be 80 MB or smaller.")}`);
+  }
+  try {
+    await validateFiles(photos, false);
+  } catch (error) {
+    redirect(`/replacements/new?error=${encodeURIComponent(messageFrom(error))}`);
+  }
 
-  const sent = await notifyTelegram("NEW_REPLACEMENT", replacement, undefined, profile.full_name);
+  const replacementId = randomUUID();
+  const uploadId = randomUUID();
+  const supabase = await createClient();
+  const uploaded: string[] = [];
+  let replacement: Replacement | null = null;
+  try {
+    const photoUpload = await uploadFiles(replacementId, photos, "PROOF_PHOTO", `esha/${uploadId}/photos`);
+    uploaded.push(...photoUpload.uploaded);
+    const { data, error } = await supabase.rpc("create_replacement_with_photos", {
+      p_replacement_id: replacementId,
+      p_upload_id: uploadId,
+      p_order_reference: parsed.data.order_reference,
+      p_customer_name: parsed.data.customer_name,
+      p_customer_reference: parsed.data.customer_reference,
+      p_product_name: parsed.data.product_name,
+      p_quantity: parsed.data.quantity,
+      p_reason: parsed.data.reason,
+      p_notes: parsed.data.notes,
+      p_tracking_url: parsed.data.tracking_url,
+      p_attachments: photoUpload.rows,
+    });
+    if (error || !data) throw error ?? new Error("Could not create replacement.");
+    replacement = data as Replacement;
+  } catch (error) {
+    await cleanupUncommittedUploads(supabase, uploaded);
+    redirect(`/replacements/new?error=${encodeURIComponent(messageFrom(error))}`);
+  }
+
+  const sent = await notifyTelegram("NEW_REPLACEMENT", replacement!, undefined, profile.full_name);
   const warning = sent.ok ? "" : "Replacement created, but a Telegram notification could not be sent.";
-  redirect(`/replacements/${replacement.id}${warning ? `?warning=${encodeURIComponent(warning)}` : ""}`);
+  redirect(`/replacements/${replacement!.id}${warning ? `?warning=${encodeURIComponent(warning)}` : ""}`);
 }
 
 /**
@@ -254,26 +290,21 @@ export async function transitionAction(formData: FormData) {
 }
 
 /**
- * Uploads Logistics' shipping label and product photos, then hands the order to Printing.
+ * Uploads Logistics' shipping label, then hands the order to Printing.
  *
  * Authorization: LOGISTICS or ADMIN
  * Workflow:
- * The database verifies every storage object and atomically records both file
- * groups before changing the order from NEW to LABEL_UPLOADED.
+ * The database verifies the storage object and atomically records the label
+ * before changing the order from NEW to LABEL_UPLOADED.
  */
 export async function submitLogisticsAction(formData: FormData) {
   await requireProfile(["LOGISTICS", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
   const labels = formFiles(formData, "labels");
-  const photos = formFiles(formData, "proof_photos");
   if (!/^[0-9a-f-]{36}$/i.test(replacementId)) redirect("/replacements?error=Invalid%20replacement.");
   if (labels.length !== 1) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add exactly one shipping label.")}`);
-  if (!photos.length || photos.length > 12) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add between one and twelve product photos.")}`);
-  if ([...labels, ...photos].reduce((sum, file) => sum + file.size, 0) > 80 * 1024 * 1024) {
-    redirect(`/replacements/${replacementId}?error=${encodeURIComponent("The combined upload must be 80 MB or smaller.")}`);
-  }
   try {
-    await Promise.all([validateFiles(labels), validateFiles(photos, false)]);
+    await validateFiles(labels);
   } catch (error) {
     redirect(`/replacements/${replacementId}?error=${encodeURIComponent(messageFrom(error))}`);
   }
@@ -285,13 +316,10 @@ export async function submitLogisticsAction(formData: FormData) {
   try {
     const labelUpload = await uploadFiles(replacementId, labels, "LABEL", `logistics/${uploadId}/labels`);
     uploaded.push(...labelUpload.uploaded);
-    const photoUpload = await uploadFiles(replacementId, photos, "PROOF_PHOTO", `logistics/${uploadId}/photos`);
-    uploaded.push(...photoUpload.uploaded);
-    const { data, error } = await supabase.rpc("submit_logistics_package", {
+    const { data, error } = await supabase.rpc("submit_logistics_label", {
       p_replacement_id: replacementId,
       p_upload_id: uploadId,
-      p_label_attachments: labelUpload.rows,
-      p_photo_attachments: photoUpload.rows,
+      p_attachments: labelUpload.rows,
     });
     if (error) throw error;
     replacement = data as Replacement;

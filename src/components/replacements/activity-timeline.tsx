@@ -18,7 +18,7 @@ const actionCopy: Record<string, string> = {
   LABEL_PRINTED: "Printed the replacement label",
   LABEL_UPLOADED: "Uploaded the shipping label",
   QC_SUBMITTED: "Submitted QC photos",
-  LOGISTICS_SUBMITTED: "Added the shipping label and proof photos",
+  LOGISTICS_SUBMITTED: "Added the shipping label",
   QC_REJECTED: "Rejected QC",
   QC_APPROVED: "Approved QC",
   PACKED: "Packed the replacement",
