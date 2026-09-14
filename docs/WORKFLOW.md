@@ -1,8 +1,8 @@
-# Replacement workflow
+# Order workflow
 
 ```text
 NEW
- │ customer_support has already supplied product photos; Logistics uploads the shipping label
+ │ Customer Support has already supplied product photos; Logistics uploads the shipping label and adds tracking
  ▼
 LABEL_UPLOADED
  │ Printing marks the label printed
@@ -25,12 +25,18 @@ QC_PENDING
                                                            └──► SHIPPED
 ```
 
+Replacement and offline orders use the same operational workflow. Replacement orders capture length, breadth, and height in centimetres (manually or from a preset); offline orders intentionally omit dimensions. Standard is the default shipping speed. Every order receives a numeric `order_number` from 501 onward, while `replacement_number` remains the stable legacy audit key.
+
+Customer Support and Admin can create, update, and archive dimension presets. Archiving hides a preset from new forms but keeps the captured measurements and reference on older orders.
+
+Multi-order creation is a batch entry experience: each item remains an independent order with its own status, files, audit history, and automatic number. A branch may reuse the same customer details or create a different customer.
+
 Existing orders already at `LABEL_PRINTED` continue directly with Packing QC. New orders use the explicit `LABEL_UPLOADED` handoff so uploading and printing cannot be confused.
 
 Admin may cancel an open replacement or perform a reason-required, audited status override for exceptional recovery. Normal users only receive controls permitted by both their role and the current status. PostgreSQL rechecks every transition inside a locked transaction.
 
 ## Audit events
 
-Creation with customer_support's product photos, edits, Logistics label upload, Printing confirmation, every Packing QC-picture submission, each QC decision, packing, dispatch, comments, cancellation, and admin overrides create immutable activity entries. Each entry records the actor and server timestamp. customer_support's product evidence and Logistics' label remain attached to the order, while Packing QC attempts use separate numbered rows so rejection and resubmission never overwrite earlier evidence.
+Creation with Customer Support's product photos, edits, Logistics label/tracking handoff, Printing confirmation, every Packing QC-picture submission, each QC decision, packing, dispatch, comments, cancellation, and admin overrides create immutable activity entries. Each entry records the actor and server timestamp. Customer Support's product evidence and Logistics' label remain attached to the order, while Packing QC attempts use separate numbered rows so rejection and resubmission never overwrite earlier evidence.
 
 Telegram is downstream of the database commit. It can alert the relevant role, but it never becomes the source of truth and cannot prevent work from completing.

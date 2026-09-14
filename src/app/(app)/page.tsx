@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   CheckCircle2,
+  ClipboardList,
   CirclePlus,
   Clock3,
   PackageCheck,
@@ -98,6 +99,14 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false })
     .limit(40);
   const replacements = (data ?? []) as Replacement[];
+  const workShortcut = {
+    customer_support: { href: "/replacements?scope=all&status=QC_PENDING", label: "Open QC reviews", icon: ScanLine },
+    LOGISTICS: { href: "/replacements?scope=all&status=AWAITING_LOGISTICS", label: "Open orders awaiting Logistics", icon: PackageCheck },
+    PRINTING: { href: "/replacements?scope=all&status=LABEL_UPLOADED", label: "Open orders awaiting Printing", icon: Printer },
+    PACKING: { href: "/replacements?scope=all&status=AWAITING_QC", label: "Open orders awaiting Packing", icon: Camera },
+    ADMIN: { href: "/replacements?scope=all", label: "Open all operational work", icon: ClipboardList },
+  }[profile.role];
+  const WorkIcon = workShortcut.icon;
 
   return (
     <div className="grid gap-6 sm:gap-8">
@@ -154,7 +163,7 @@ export default async function DashboardPage() {
 
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-black text-slate-950">Recent replacements</h2>
+          <h2 className="text-lg font-black text-slate-950">Recent orders</h2>
           <Link href="/replacements" className="text-sm font-bold text-indigo-700 hover:text-indigo-900">
             View all
           </Link>
@@ -168,39 +177,19 @@ export default async function DashboardPage() {
         ) : (
           <Card className="grid place-items-center p-10 text-center">
             <Truck className="size-10 text-slate-300" />
-            <h3 className="mt-3 font-bold text-slate-800">No replacement requests yet</h3>
+            <h3 className="mt-3 font-bold text-slate-800">No orders yet</h3>
             <p className="mt-1 text-sm text-slate-500">New requests will appear here.</p>
           </Card>
         )}
       </section>
 
-      {profile.role === "LOGISTICS" && (
-        <Link
-          href="/replacements?scope=all&status=AWAITING_LOGISTICS"
-          className="fixed bottom-20 right-4 grid size-14 place-items-center rounded-2xl bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 lg:bottom-6"
-          aria-label="Open orders awaiting Logistics"
-        >
-          <PackageCheck className="size-6" />
-        </Link>
-      )}
-      {profile.role === "PRINTING" && (
-        <Link
-          href="/replacements?scope=all&status=LABEL_UPLOADED"
-          className="fixed bottom-20 right-4 grid size-14 place-items-center rounded-2xl bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 lg:bottom-6"
-          aria-label="Open orders awaiting Printing"
-        >
-          <Printer className="size-6" />
-        </Link>
-      )}
-      {profile.role === "PACKING" && (
-        <Link
-          href="/replacements?scope=all&status=AWAITING_QC"
-          className="fixed bottom-20 right-4 grid size-14 place-items-center rounded-2xl bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 lg:bottom-6"
-          aria-label="Open orders awaiting Packing QC"
-        >
-          <Camera className="size-6" />
-        </Link>
-      )}
+      <Link
+        href={workShortcut.href}
+        className="fixed bottom-20 right-4 grid size-14 place-items-center rounded-2xl bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 lg:bottom-6"
+        aria-label={workShortcut.label}
+      >
+        <WorkIcon className="size-6" />
+      </Link>
     </div>
   );
 }

@@ -36,7 +36,7 @@ export default async function ReplacementDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; warning?: string }>;
+  searchParams: Promise<{ error?: string; warning?: string; success?: string }>;
 }) {
   const profile = await requireProfile();
   const { id } = await params;
@@ -124,18 +124,19 @@ export default async function ReplacementDetailPage({
       </Link>
 
       <Notice>{notice.error}</Notice>
+      <Notice tone="success">{notice.success}</Notice>
       <Notice tone="warning">{notice.warning}</Notice>
 
       <section className="grid gap-5 lg:grid-cols-[1fr_380px]">
         <div className="grid gap-5">
           {/* Main Replacement Overview Card */}
           <Card className="overflow-hidden">
-            <div className="border-b border-slate-100 bg-[linear-gradient(135deg,#eef2ff,#fff)] p-5 sm:p-6">
+            <div className="border-b border-slate-100 bg-[linear-gradient(135deg,var(--muted),var(--card))] p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-bold text-indigo-700">REPLACEMENT</p>
+                  <p className="text-sm font-bold text-indigo-700">{replacement.order_type === "OFFLINE" ? "OFFLINE ORDER" : "REPLACEMENT"} · ORDER #{replacement.order_number} · {replacement.replacement_number}</p>
                   <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                    {replacement.replacement_number}
+                    {replacement.order_reference}
                   </h1>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -189,6 +190,16 @@ export default async function ReplacementDetailPage({
                   {replacement.order_reference}
                 </dd>
               </div>
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Shipping speed</dt>
+                <dd className="mt-1 font-semibold text-slate-800">{replacement.shipping_speed === "EXPRESS" ? "Express" : "Standard"}</dd>
+              </div>
+              {replacement.order_type === "REPLACEMENT" && replacement.length_cm && replacement.breadth_cm && replacement.height_cm ? (
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Dimensions</dt>
+                  <dd className="mt-1 font-semibold text-slate-800">{replacement.length_cm} × {replacement.breadth_cm} × {replacement.height_cm} cm</dd>
+                </div>
+              ) : null}
               {replacement.tracking_url && (
                 <div>
                   <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Tracking</dt>
@@ -221,6 +232,9 @@ export default async function ReplacementDetailPage({
                   <dd className="mt-1 font-semibold text-slate-800">{replacement.customer_name}</dd>
                 </div>
               )}
+              {replacement.customer_phone ? <div><dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Customer phone</dt><dd className="mt-1 font-semibold text-slate-800">{replacement.customer_phone}</dd></div> : null}
+              {replacement.customer_email ? <div><dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Customer email</dt><dd className="mt-1 font-semibold text-slate-800">{replacement.customer_email}</dd></div> : null}
+              {replacement.customer_address ? <div className="sm:col-span-2"><dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Delivery address</dt><dd className="mt-1 whitespace-pre-wrap font-semibold text-slate-800">{replacement.customer_address}</dd></div> : null}
               {replacement.reason && (
                 <div>
                   <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Reason</dt>

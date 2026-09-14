@@ -17,6 +17,20 @@ export type ReplacementStatus = (typeof STATUSES)[number];
 
 export type AttachmentType = "CUSTOMER_PHOTO" | "LABEL" | "PROOF_PHOTO" | "QC_PHOTO" | "OTHER";
 export type QcDecision = "PENDING" | "APPROVED" | "REJECTED";
+export type OrderType = "REPLACEMENT" | "OFFLINE";
+export type ShippingSpeed = "STANDARD" | "EXPRESS";
+
+export interface DimensionPreset {
+  id: string;
+  name: string;
+  length_cm: number;
+  breadth_cm: number;
+  height_cm: number;
+  active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Profile {
   id: string;
@@ -30,14 +44,25 @@ export interface Profile {
 export interface Replacement {
   id: string;
   replacement_number: string;
+  order_number: number;
+  order_type: OrderType;
+  order_group_id: string | null;
   order_reference: string;
   customer_name: string | null;
   customer_reference: string | null;
+  customer_address: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
   product_name: string;
   quantity: number;
   reason: string | null;
   notes: string | null;
   tracking_url: string | null;
+  shipping_speed: ShippingSpeed;
+  dimension_preset_id: string | null;
+  length_cm: number | null;
+  breadth_cm: number | null;
+  height_cm: number | null;
   status: ReplacementStatus;
   created_by: string;
   created_at: string;

@@ -1,6 +1,6 @@
 # TBC_KART
 
-TBC_KART is a standalone internal operations app for customer replacement orders. customer_support creates the order with product photos, Logistics uploads the shipping label, Printing marks the label printed, Packing submits separate QC pictures for customer_support's review, and Packing packs and completes dispatch. Every important action is retained in an append-only activity history.
+TBC_KART is a standalone internal operations app for replacement and offline orders. Customer Support creates one or more orders with product photos, Logistics uploads the shipping label and adds tracking, Printing marks the label printed, Packing submits separate QC pictures for Customer Support's review, and Packing packs and completes dispatch. Every important action is retained in an append-only activity history.
 
 ## Architecture
 
@@ -58,7 +58,7 @@ To create the first admin:
 
 4. Sign in. Admin → Users can then create email/password users, change roles, and activate/deactivate users.
 
-Admins assign a temporary password of at least 12 characters and share it through a secure channel. New users should immediately use Profile → Change password. Public registration remains unavailable.
+Admins assign a temporary password of at least 6 characters and share it through a secure channel. New users should immediately use Profile → Change password. Public registration remains unavailable.
 
 ## Telegram setup
 
@@ -94,8 +94,8 @@ Never expose or prefix the service-role key or bot token with `NEXT_PUBLIC_`.
 
 Create one account for each role on Admin → Users, then test in order:
 
-1. **customer_support:** create a replacement with the order details and one or more product photos.
-2. **LOGISTICS:** upload one shipping label only. Confirm product-photo, QC, printing, packing, and dispatch controls are absent.
+1. **customer_support:** create a replacement or offline order with one or more product photos. Verify replacement dimensions, multi-order customer branches, and automatic order numbers starting at 501. Create and edit a preset in Dimensions.
+2. **LOGISTICS:** upload one shipping label and optionally add its tracking link. Confirm product-photo, QC, printing, packing, and dispatch controls are absent.
 3. **PRINTING:** mark the uploaded label printed. Confirm file upload and QC controls are absent.
 4. **PACKING:** upload separate QC pictures and request customer_support approval.
 5. **customer_support:** reject with a required reason; sign back in as Packing and resubmit photos without losing the original label; then approve as customer_support.

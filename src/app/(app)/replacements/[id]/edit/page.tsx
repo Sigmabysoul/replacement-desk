@@ -52,9 +52,6 @@ export default async function EditReplacementPage({
           <Field label="Customer reference">
             <Input name="customer_reference" defaultValue={replacement.customer_reference ?? ""} />
           </Field>
-          <Field label="Tracking link" hint="Use the complete courier or marketplace URL starting with https://">
-            <Input name="tracking_url" type="url" inputMode="url" defaultValue={replacement.tracking_url ?? ""} />
-          </Field>
           <div className="sm:col-span-2">
             <Field label="Notes">
               <Textarea name="notes" defaultValue={replacement.notes ?? ""} />

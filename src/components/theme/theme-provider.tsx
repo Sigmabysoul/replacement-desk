@@ -56,6 +56,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.style.setProperty("--border", colors.border);
     document.documentElement.style.setProperty("--muted", colors.muted);
     document.documentElement.style.setProperty("--muted-foreground", colors.mutedForeground);
+    document.documentElement.dataset.themeMode = theme.mode;
     window.localStorage.setItem("replacement-desk-theme", JSON.stringify({ version: 2, themeId }));
   }, [theme, themeId]);
 

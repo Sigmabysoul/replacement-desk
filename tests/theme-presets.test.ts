@@ -17,10 +17,11 @@ function contrast(first: string, second: string) {
 }
 
 describe("workspace theme presets", () => {
-  it("offers ten uniquely named, uniquely identified themes", () => {
-    expect(THEME_PRESETS).toHaveLength(10);
-    expect(new Set(THEME_PRESETS.map((theme) => theme.id))).toHaveLength(10);
-    expect(new Set(THEME_PRESETS.map((theme) => theme.name))).toHaveLength(10);
+  it("offers separate light and dark theme collections", () => {
+    expect(THEME_PRESETS.filter((theme) => theme.mode === "light")).toHaveLength(10);
+    expect(THEME_PRESETS.filter((theme) => theme.mode === "dark")).toHaveLength(8);
+    expect(new Set(THEME_PRESETS.map((theme) => theme.id))).toHaveLength(18);
+    expect(new Set(THEME_PRESETS.map((theme) => theme.name))).toHaveLength(18);
   });
 
   it("keeps primary actions readable with white text", () => {

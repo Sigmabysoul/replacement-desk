@@ -37,37 +37,36 @@ export function ThemeButton() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-bold">Workspace themes</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">Ten balanced, low-glare palettes. Your choice saves automatically.</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">Choose from dedicated light and dark palettes. Your choice saves automatically.</p>
               </div>
               <Button type="button" variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close theme editor" className="size-8">
                 <X className="size-4" />
               </Button>
             </div>
-            <div className="mt-4 grid max-h-[min(65vh,34rem)] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-              {THEME_PRESETS.map((preset) => {
-                const selected = preset.id === theme.id;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => setTheme(preset.id)}
-                    aria-pressed={selected}
-                    className={`relative rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${selected ? "border-[var(--brand)] bg-muted ring-2 ring-[var(--brand)]/15" : "border-border bg-card hover:border-[var(--brand)]/50"}`}
-                  >
-                    <span className="mb-2 flex h-9 items-center gap-1 rounded-lg border border-black/5 px-2" style={{ backgroundColor: preset.colors.background }}>
-                      <span className="size-4 rounded-full shadow-sm" style={{ backgroundColor: preset.colors.primary }} />
-                      <span className="size-4 rounded-full shadow-sm" style={{ backgroundColor: preset.colors.secondary }} />
-                      <span className="size-4 rounded-full shadow-sm" style={{ backgroundColor: preset.colors.tertiary }} />
-                      <span className="ml-auto size-4 rounded-full border border-black/10 shadow-sm" style={{ backgroundColor: preset.colors.surface }} />
-                    </span>
-                    <span className="flex items-center gap-1.5 text-xs font-bold">
-                      {preset.name}
-                      {selected ? <Check className="size-3.5 text-[var(--brand)]" aria-hidden="true" /> : null}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] leading-4 text-muted-foreground">{preset.description}</span>
-                  </button>
-                );
-              })}
+            <div className="mt-4 grid max-h-[min(65vh,34rem)] gap-4 overflow-y-auto pr-1">
+              {(["light", "dark"] as const).map((mode) => (
+                <section key={mode}>
+                  <h3 className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">{mode} themes</h3>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {THEME_PRESETS.filter((preset) => preset.mode === mode).map((preset) => {
+                      const selected = preset.id === theme.id;
+                      return (
+                        <button key={preset.id} type="button" onClick={() => setTheme(preset.id)} aria-pressed={selected}
+                          className={`relative rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${selected ? "border-[var(--brand)] bg-muted ring-2 ring-[var(--brand)]/15" : "border-border bg-card hover:border-[var(--brand)]/50"}`}>
+                          <span className="mb-2 flex h-9 items-center gap-1 rounded-lg border border-black/10 px-2" style={{ backgroundColor: preset.colors.background }}>
+                            <span className="size-4 rounded-full shadow-sm" style={{ backgroundColor: preset.colors.primary }} />
+                            <span className="size-4 rounded-full shadow-sm" style={{ backgroundColor: preset.colors.secondary }} />
+                            <span className="size-4 rounded-full shadow-sm" style={{ backgroundColor: preset.colors.tertiary }} />
+                            <span className="ml-auto size-4 rounded-full border border-black/10 shadow-sm" style={{ backgroundColor: preset.colors.surface }} />
+                          </span>
+                          <span className="flex items-center gap-1.5 text-xs font-bold">{preset.name}{selected ? <Check className="size-3.5 text-[var(--brand)]" aria-hidden="true" /> : null}</span>
+                          <span className="mt-0.5 block text-[10px] leading-4 text-muted-foreground">{preset.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
             <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
               <Button type="button" variant="ghost" onClick={resetTheme}>

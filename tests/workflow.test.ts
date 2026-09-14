@@ -134,6 +134,10 @@ describe("schema validation", () => {
       quantity: "2",
       reason: "Damaged",
       notes: "Handle with care",
+      order_type: "REPLACEMENT",
+      length_cm: "30",
+      breadth_cm: "20",
+      height_cm: "10",
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -148,6 +152,10 @@ describe("schema validation", () => {
       product_name: "Garbage Bag 30L",
       quantity: 1,
       reason: "Seal broken during transit",
+      order_type: "REPLACEMENT",
+      length_cm: 30,
+      breadth_cm: 20,
+      height_cm: 10,
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -156,14 +164,23 @@ describe("schema validation", () => {
   });
 
   it("rejects empty order reference and invalid quantity", () => {
-    expect(replacementSchema.safeParse({ order_reference: "", product_name: "Test", quantity: 1 }).success).toBe(false);
-    expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 0 }).success).toBe(false);
-    expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 1000 }).success).toBe(false);
+    const dimensions = { order_type: "REPLACEMENT", length_cm: 30, breadth_cm: 20, height_cm: 10 };
+    expect(replacementSchema.safeParse({ order_reference: "", product_name: "Test", quantity: 1, ...dimensions }).success).toBe(false);
+    expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 0, ...dimensions }).success).toBe(false);
+    expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 1000, ...dimensions }).success).toBe(false);
   });
 
   it("accepts only http(s) tracking links", () => {
-    expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 1, tracking_url: "https://track.example/ABC" }).success).toBe(true);
-    expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 1, tracking_url: "javascript:alert(1)" }).success).toBe(false);
+    const dimensions = { order_type: "REPLACEMENT", length_cm: 30, breadth_cm: 20, height_cm: 10 };
+    expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 1, tracking_url: "https://track.example/ABC", ...dimensions }).success).toBe(true);
+    expect(replacementSchema.safeParse({ order_reference: "123", product_name: "Test", quantity: 1, tracking_url: "javascript:alert(1)", ...dimensions }).success).toBe(false);
+  });
+
+  it("requires dimensions only for replacement orders and defaults shipping to standard", () => {
+    const offline = replacementSchema.safeParse({ order_reference: "OFF-1", product_name: "Counter sale", quantity: 1, order_type: "OFFLINE" });
+    expect(offline.success).toBe(true);
+    if (offline.success) expect(offline.data.shipping_speed).toBe("STANDARD");
+    expect(replacementSchema.safeParse({ order_reference: "REP-1", product_name: "Item", quantity: 1, order_type: "REPLACEMENT" }).success).toBe(false);
   });
 
   it("validates comments", () => {

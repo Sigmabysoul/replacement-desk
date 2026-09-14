@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CirclePlus, ClipboardList, LayoutDashboard, PackageCheck, Settings, Truck, Users } from "lucide-react";
+import { CirclePlus, ClipboardList, LayoutDashboard, PackageCheck, Ruler, Settings, Truck, Users } from "lucide-react";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +17,8 @@ interface NavItem {
 const mainItems: NavItem[] = [
   { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
   { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
-  { href: "/replacements/new", label: "New replacement", short: "New", icon: CirclePlus, roles: ["customer_support", "ADMIN"] },
+  { href: "/replacements/new", label: "New order", short: "New", icon: CirclePlus, roles: ["customer_support", "ADMIN"] },
+  { href: "/dimensions", label: "Dimensions", short: "Sizes", icon: Ruler, roles: ["customer_support", "ADMIN"] },
   { href: "/dispatch", label: "Dispatch", short: "Dispatch", icon: Truck, roles: ["PACKING", "ADMIN"] },
   { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
 ];
@@ -35,7 +36,7 @@ export function Navigation({ role }: { role: Role }) {
         { href: "/", short: "Home", icon: LayoutDashboard },
         { href: "/replacements", short: "Orders", icon: ClipboardList },
         { href: "/replacements/new", short: "New", icon: CirclePlus },
-        { href: "/dispatch", short: "Dispatch", icon: Truck },
+        { href: "/dimensions", short: "Sizes", icon: Ruler },
         { href: "/admin/users", short: "Users", icon: Users },
       ]
     : operationalItems.map((item) => ({

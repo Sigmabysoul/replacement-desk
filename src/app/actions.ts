@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireProfile } from "@/lib/auth/session";
-import { ALLOWED_MIME_TYPES, commentSchema, MAX_FILE_SIZE, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
+import { ALLOWED_MIME_TYPES, commentSchema, dimensionPresetSchema, MAX_FILE_SIZE, replacementEditSchema, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
 import { safeFileName } from "@/lib/utils";
 import { notifyTelegram } from "@/lib/notifications/telegram";
 import { verifyFileSignature } from "@/lib/security/magic-bytes";
@@ -204,6 +204,85 @@ export async function createReplacementAction(formData: FormData) {
   redirect(`/replacements/${replacement!.id}${warning ? `?warning=${encodeURIComponent(warning)}` : ""}`);
 }
 
+/** Creates one or more replacement/offline orders while keeping every order independently traceable. */
+export async function createOrderBatchAction(formData: FormData) {
+  const profile = await requireProfile(["customer_support", "ADMIN"]);
+  let rawOrders: unknown;
+  try {
+    rawOrders = JSON.parse(String(formData.get("orders_manifest") ?? "null"));
+  } catch {
+    redirect(`/replacements/new?error=${encodeURIComponent("The order form is invalid. Refresh and try again.")}`);
+  }
+  if (!Array.isArray(rawOrders) || rawOrders.length < 1 || rawOrders.length > 20) {
+    redirect(`/replacements/new?error=${encodeURIComponent("Create between one and twenty orders at a time.")}`);
+  }
+
+  const parsedOrders = rawOrders.map((raw) => replacementSchema.safeParse(raw));
+  const invalid = parsedOrders.find((result) => !result.success);
+  if (invalid && !invalid.success) {
+    redirect(`/replacements/new?error=${encodeURIComponent(invalid.error.issues[0]?.message ?? "Check every order.")}`);
+  }
+
+  const localIds = rawOrders.map((raw) => String((raw as { id?: unknown }).id ?? ""));
+  if (new Set(localIds).size !== localIds.length || localIds.some((id) => !/^[a-zA-Z0-9:_-]{1,100}$/.test(id))) {
+    redirect(`/replacements/new?error=${encodeURIComponent("The order form contains an invalid item.")}`);
+  }
+
+  const idMap = new Map(localIds.map((id) => [id, randomUUID()]));
+  const filesByOrder = localIds.map((localId) => ({
+    localId,
+    replacementId: idMap.get(localId)!,
+    files: formFiles(formData, `product_photos:${localId}`),
+  }));
+  if (filesByOrder.some(({ files }) => files.length < 1 || files.length > 12)) {
+    redirect(`/replacements/new?error=${encodeURIComponent("Add between one and twelve product photos for every order.")}`);
+  }
+  if (filesByOrder.some(({ files }) => files.reduce((sum, file) => sum + file.size, 0) > 80 * 1024 * 1024)) {
+    redirect(`/replacements/new?error=${encodeURIComponent("Each order's combined product photos must be 80 MB or smaller.")}`);
+  }
+  const batchBytes = filesByOrder.flatMap(({ files }) => files).reduce((sum, file) => sum + file.size, 0);
+  if (batchBytes > 90 * 1024 * 1024) {
+    redirect(`/replacements/new?error=${encodeURIComponent("The complete batch of photos must be 90 MB or smaller. Submit fewer orders at once.")}`);
+  }
+  try {
+    await Promise.all(filesByOrder.map(({ files }) => validateFiles(files, false)));
+  } catch (error) {
+    redirect(`/replacements/new?error=${encodeURIComponent(messageFrom(error))}`);
+  }
+
+  const supabase = await createClient();
+  const uploaded: string[] = [];
+  const attachmentRows: Array<Record<string, unknown>> = [];
+  let created: Replacement[] = [];
+  try {
+    for (const item of filesByOrder) {
+      const uploadId = randomUUID();
+      const result = await uploadFiles(item.replacementId, item.files, "PROOF_PHOTO", `customer_support/${uploadId}/photos`);
+      uploaded.push(...result.uploaded);
+      attachmentRows.push(...result.rows);
+    }
+    const orders = parsedOrders.map((result, index) => ({
+      ...(result.success ? result.data : {}),
+      id: idMap.get(localIds[index]),
+      tracking_url: null,
+    }));
+    const { data, error } = await supabase.rpc("create_order_batch", {
+      p_group_id: orders.length > 1 ? randomUUID() : null,
+      p_orders: orders,
+      p_attachments: attachmentRows,
+    });
+    if (error || !data?.length) throw error ?? new Error("Could not create orders.");
+    created = data as Replacement[];
+  } catch (error) {
+    await cleanupUncommittedUploads(supabase, uploaded);
+    redirect(`/replacements/new?error=${encodeURIComponent(messageFrom(error))}`);
+  }
+
+  const notices = await Promise.all(created.map((order) => notifyTelegram("NEW_REPLACEMENT", order, undefined, profile.full_name)));
+  const warning = notices.some((notice) => !notice.ok) ? "Orders were created, but a Telegram notification could not be sent." : "";
+  redirect(`/replacements/${created[0].id}?success=${encodeURIComponent(`${created.length} order${created.length === 1 ? "" : "s"} created.`)}${warning ? `&warning=${encodeURIComponent(warning)}` : ""}`);
+}
+
 /**
  * Updates editable order details (customer name, product, quantity, reason, notes).
  *
@@ -214,9 +293,10 @@ export async function createReplacementAction(formData: FormData) {
 export async function updateReplacementAction(formData: FormData) {
   await requireProfile(["customer_support", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
-  const parsed = replacementSchema.safeParse(Object.fromEntries(formData));
+  const parsed = replacementEditSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
   const supabase = await createClient();
+  const { data: current } = await supabase.from("replacements").select("tracking_url").eq("id", replacementId).single();
   const { error } = await supabase.rpc("update_replacement_details", {
     p_replacement_id: replacementId,
     p_order_reference: parsed.data.order_reference,
@@ -226,7 +306,7 @@ export async function updateReplacementAction(formData: FormData) {
     p_quantity: parsed.data.quantity,
     p_reason: parsed.data.reason,
     p_notes: parsed.data.notes,
-    p_tracking_url: parsed.data.tracking_url,
+    p_tracking_url: current?.tracking_url ?? null,
   });
   if (error) redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent(error.message)}`);
   revalidatePath(`/replacements/${replacementId}`);
@@ -301,6 +381,7 @@ export async function submitLogisticsAction(formData: FormData) {
   await requireProfile(["LOGISTICS", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
   const labels = formFiles(formData, "labels");
+  const trackingUrl = String(formData.get("tracking_url") ?? "").trim();
   if (!/^[0-9a-f-]{36}$/i.test(replacementId)) redirect("/replacements?error=Invalid%20replacement.");
   if (labels.length !== 1) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add exactly one shipping label.")}`);
   try {
@@ -319,6 +400,7 @@ export async function submitLogisticsAction(formData: FormData) {
     const { data, error } = await supabase.rpc("submit_logistics_label", {
       p_replacement_id: replacementId,
       p_upload_id: uploadId,
+      p_tracking_url: trackingUrl || null,
       p_attachments: labelUpload.rows,
     });
     if (error) throw error;
@@ -428,15 +510,15 @@ export async function addCommentAction(formData: FormData) {
  * Creates a new user profile and Supabase Auth credentials.
  *
  * Authorization: ADMIN only
- * Generates an email-confirmed auth user with initial metadata and a minimum 12-character password.
+ * Generates an email-confirmed auth user with initial metadata and a minimum 6-character password.
  */
 export async function createUserAction(formData: FormData) {
   await requireProfile(["ADMIN"]);
-  const email = String(formData.get("email") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const fullName = String(formData.get("full_name") ?? "").trim();
   const temporaryPassword = String(formData.get("temporary_password") ?? "");
   const role = String(formData.get("role") ?? "") as Role;
-  if (!email || !fullName || temporaryPassword.length < 12 || !["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Use%20a%20valid%20email%20and%20a%20temporary%20password%20of%20at%20least%2012%20characters.");
+  if (!email || !fullName || temporaryPassword.length < 6 || !["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Use%20a%20valid%20lowercase%20email%20and%20a%20temporary%20password%20of%20at%20least%206%20characters.");
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -477,17 +559,52 @@ export async function updateUserAction(formData: FormData) {
  * Updates the current authenticated user's account password.
  *
  * Authorization: Current authenticated user.
- * Validates password match and enforces minimum 12-character password policy.
+ * Validates password match and enforces the app's minimum 6-character password policy.
  */
 export async function updatePasswordAction(formData: FormData) {
   await requireProfile();
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirm_password") ?? "");
-  if (password.length < 12 || password !== confirmPassword) redirect("/profile?error=Passwords%20must%20match%20and%20be%20at%20least%2012%20characters.");
+  if (password.length < 6 || password !== confirmPassword) redirect("/profile?error=Passwords%20must%20match%20and%20be%20at%20least%206%20characters.");
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password });
   if (error) redirect(`/profile?error=${encodeURIComponent(error.message)}`);
   redirect("/profile?success=Password%20updated.");
+}
+
+/** Creates or edits reusable centimetre dimensions. Customer Support and Admin share this responsibility. */
+export async function saveDimensionPresetAction(formData: FormData) {
+  const profile = await requireProfile(["customer_support", "ADMIN"]);
+  const parsed = dimensionPresetSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect(`/dimensions?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the dimensions.")}`);
+  const supabase = await createClient();
+  const values = {
+    name: parsed.data.name,
+    length_cm: parsed.data.length_cm,
+    breadth_cm: parsed.data.breadth_cm,
+    height_cm: parsed.data.height_cm,
+    active: true,
+  };
+  const { error } = parsed.data.id
+    ? await supabase.from("dimension_presets").update(values).eq("id", parsed.data.id)
+    : await supabase.from("dimension_presets").insert({ ...values, created_by: profile.id });
+  if (error) redirect(`/dimensions?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/dimensions");
+  revalidatePath("/replacements/new");
+  redirect("/dimensions?success=Dimension%20preset%20saved.");
+}
+
+/** Retires a preset without breaking old orders that reference its captured measurements. */
+export async function archiveDimensionPresetAction(formData: FormData) {
+  await requireProfile(["customer_support", "ADMIN"]);
+  const id = String(formData.get("id") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) redirect("/dimensions?error=Invalid%20dimension%20preset.");
+  const supabase = await createClient();
+  const { error } = await supabase.from("dimension_presets").update({ active: false }).eq("id", id);
+  if (error) redirect(`/dimensions?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/dimensions");
+  revalidatePath("/replacements/new");
+  redirect("/dimensions?success=Dimension%20preset%20archived.");
 }
 
 /**

@@ -45,7 +45,7 @@ export function ReplacementCard({ replacement, role }: { replacement: Replacemen
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate font-black tracking-tight text-slate-950">{replacement.order_reference}</p>
-            <p className="mt-0.5 text-xs font-semibold text-slate-500">{replacement.replacement_number}</p>
+            <p className="mt-0.5 text-xs font-semibold text-slate-500">#{replacement.order_number} · {replacement.order_type === "OFFLINE" ? "Offline" : "Replacement"} · {replacement.replacement_number}</p>
             <p className="mt-2 flex items-center gap-2 text-base font-semibold text-slate-800">
               <Package className="size-4 shrink-0 text-slate-400" />
               <span className="truncate">{replacement.product_name}</span>

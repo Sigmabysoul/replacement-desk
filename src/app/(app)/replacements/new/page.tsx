@@ -1,54 +1,26 @@
-import { createReplacementAction } from "@/app/actions";
-import { Card } from "@/components/ui/card";
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { createOrderBatchAction } from "@/app/actions";
+import { OrderBuilder } from "@/components/replacements/order-builder";
 import { Notice } from "@/components/ui/notice";
-import { SubmitButton } from "@/components/ui/submit-button";
-import { ReasonSelect } from "@/components/replacements/reason-select";
-import { ProductPhotoPicker } from "@/components/replacements/product-photo-picker";
 import { requireProfile } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
+import type { DimensionPreset } from "@/lib/types";
 
 export default async function NewReplacementPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   await requireProfile(["customer_support", "ADMIN"]);
-  const { error } = await searchParams;
+  const [{ error }, supabase] = await Promise.all([searchParams, createClient()]);
+  const { data } = await supabase.from("dimension_presets").select("*").eq("active", true).order("name");
+  const presets = (data ?? []) as DimensionPreset[];
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <p className="text-sm font-bold text-indigo-700">NEW REQUEST</p>
-      <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Create replacement</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        Add the order details and clear product photos. Logistics will attach only the shipping label next.
+    <div className="mx-auto max-w-5xl">
+      <p className="text-sm font-bold text-indigo-700">NEW ORDER</p>
+      <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground sm:text-3xl">Create orders</h1>
+      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+        Switch between replacement and offline orders, reuse a customer for several products, or start a separate customer branch.
+        Logistics will add the label and tracking link next.
       </p>
-      <form action={createReplacementAction} className="mt-6 grid gap-5">
-        <Notice>{error}</Notice>
-        <Card className="grid gap-5 p-4 sm:grid-cols-2 sm:p-6">
-          <Field label="Order reference">
-            <Input name="order_reference" required maxLength={100} autoFocus placeholder="e.g. FK123456" />
-          </Field>
-          <Field label="Product">
-            <Input name="product_name" required maxLength={200} placeholder="Product name" />
-          </Field>
-          <Field label="Quantity">
-            <Input name="quantity" type="number" inputMode="numeric" min={1} max={999} defaultValue={1} required />
-          </Field>
-          <ReasonSelect />
-          <Field label="Customer name (optional)">
-            <Input name="customer_name" maxLength={120} />
-          </Field>
-          <Field label="Customer reference (optional)">
-            <Input name="customer_reference" maxLength={100} />
-          </Field>
-          <Field label="Tracking link (optional)" hint="Paste the courier or marketplace tracking URL. It will stay with this order.">
-            <Input name="tracking_url" type="url" inputMode="url" maxLength={2000} placeholder="https://tracking.example.com/..." />
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label="Notes (optional)">
-              <Textarea name="notes" maxLength={2000} placeholder="Anything the team should know?" />
-            </Field>
-          </div>
-          <ProductPhotoPicker />
-        </Card>
-        <SubmitButton pendingText="Creating replacement and uploading photos…">CREATE REPLACEMENT</SubmitButton>
-      </form>
+      <div className="mt-5"><Notice>{error}</Notice></div>
+      <div className="mt-6"><OrderBuilder action={createOrderBatchAction} presets={presets} /></div>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileText, Send } from "lucide-react";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { Field, Input } from "@/components/ui/field";
 
 /** Collects Logistics' single shipping-label file before Printing takes over. */
 export function LogisticsUploadForm({
@@ -22,6 +23,10 @@ export function LogisticsUploadForm({
         <p className="font-bold text-indigo-950">Add the shipping label</p>
         <p className="mt-1 text-sm text-indigo-800">customer_support already attached the product photos when creating this order.</p>
       </div>
+
+      <Field label="Tracking link (optional)" hint="Logistics owns this field. Paste the courier or marketplace tracking URL.">
+        <Input name="tracking_url" type="url" inputMode="url" maxLength={2000} placeholder="https://tracking.example.com/..." />
+      </Field>
 
       <label className="relative flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-3 text-center transition hover:border-indigo-400">
         <FileText className="size-6 text-indigo-600" />

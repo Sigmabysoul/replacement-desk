@@ -67,6 +67,51 @@ button, input, textarea, select, a {
 }
 ::selection { background: color-mix(in srgb, var(--brand) 22%, white); color: var(--foreground); }
 
+@keyframes order-card-flip {
+  from { transform: perspective(1000px) rotateY(8deg); opacity: 0.72; }
+  to { transform: perspective(1000px) rotateY(0); opacity: 1; }
+}
+.order-card-flip { animation: order-card-flip 280ms ease-out; transform-origin: center; }
+
+html[data-theme-mode="dark"] {
+  color-scheme: dark;
+  --primary-foreground: #ffffff;
+  --color-indigo-50: color-mix(in srgb, var(--brand) 12%, var(--surface));
+  --color-indigo-100: color-mix(in srgb, var(--brand) 20%, var(--surface));
+  --color-indigo-200: color-mix(in srgb, var(--brand) 32%, var(--surface));
+  --color-indigo-300: color-mix(in srgb, var(--brand) 48%, var(--surface));
+}
+html[data-theme-mode="dark"] .text-slate-950,
+html[data-theme-mode="dark"] .text-slate-900,
+html[data-theme-mode="dark"] .text-slate-800,
+html[data-theme-mode="dark"] .text-slate-700 { color: var(--foreground) !important; }
+html[data-theme-mode="dark"] .text-slate-600,
+html[data-theme-mode="dark"] .text-slate-500,
+html[data-theme-mode="dark"] .text-slate-400 { color: var(--muted-foreground) !important; }
+html[data-theme-mode="dark"] .bg-white,
+html[data-theme-mode="dark"] .bg-slate-50,
+html[data-theme-mode="dark"] .bg-slate-100 { background-color: var(--surface) !important; }
+html[data-theme-mode="dark"] .bg-rose-50,
+html[data-theme-mode="dark"] .bg-emerald-50,
+html[data-theme-mode="dark"] .bg-amber-50,
+html[data-theme-mode="dark"] .bg-orange-50,
+html[data-theme-mode="dark"] .bg-cyan-50,
+html[data-theme-mode="dark"] .bg-fuchsia-50,
+html[data-theme-mode="dark"] .bg-violet-50 { background-color: var(--muted) !important; }
+html[data-theme-mode="dark"] .text-rose-950,
+html[data-theme-mode="dark"] .text-rose-900,
+html[data-theme-mode="dark"] .text-emerald-900,
+html[data-theme-mode="dark"] .text-amber-900,
+html[data-theme-mode="dark"] .text-indigo-950,
+html[data-theme-mode="dark"] .text-indigo-900 { color: var(--foreground) !important; }
+html[data-theme-mode="dark"] .border-slate-100,
+html[data-theme-mode="dark"] .border-slate-200,
+html[data-theme-mode="dark"] .border-slate-300 { border-color: var(--border) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .order-card-flip { animation: none; }
+}
+
 @media (max-width: 640px) {
   body { padding-bottom: env(safe-area-inset-bottom); }
 }

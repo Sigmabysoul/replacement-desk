@@ -47,10 +47,10 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
         <h2 className="font-black text-slate-950">Change password</h2>
         <form action={updatePasswordAction} className="mt-4 grid gap-4">
           <Field label="New password">
-            <PasswordInput id="profile-new-password" name="password" minLength={12} required autoComplete="new-password" />
+            <PasswordInput id="profile-new-password" name="password" minLength={6} required autoComplete="new-password" />
           </Field>
           <Field label="Confirm new password">
-            <PasswordInput id="profile-confirm-password" name="confirm_password" minLength={12} required autoComplete="new-password" />
+            <PasswordInput id="profile-confirm-password" name="confirm_password" minLength={6} required autoComplete="new-password" />
           </Field>
           <SubmitButton pendingText="Updating…">UPDATE PASSWORD</SubmitButton>
         </form>

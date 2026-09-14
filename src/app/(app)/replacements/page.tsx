@@ -45,7 +45,10 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
   if (params.date) query = query.gte("created_at", `${params.date}T00:00:00`).lt("created_at", `${params.date}T23:59:59.999`);
   if (params.q?.trim()) {
     const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").replace(/\s+/g, " ").slice(0, 100);
-    if (q) query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%`);
+    if (q) {
+      const orderNumberFilter = /^\d+$/.test(q) ? `,order_number.eq.${Number(q)}` : "";
+      query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}`);
+    }
   }
   const { data, error } = await query.limit(100);
   const replacements = (data ?? []) as Replacement[];
@@ -54,7 +57,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
     <div className="grid gap-6">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-700">All work</p>
-        <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Replacements</h1>
+        <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Orders</h1>
       </div>
 
       <Card className="p-4 sm:p-5">
@@ -95,9 +98,9 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
               name="q"
               type="search"
               defaultValue={params.q}
-              placeholder="REP number, order, product"
+              placeholder="Order #, reference, REP number, product"
               className="h-12 py-0 pl-12 pr-4"
-              aria-label="Search replacements"
+              aria-label="Search orders"
             />
           </div>
           <Select name="status" defaultValue={params.status ?? ""} aria-label="Filter by status">

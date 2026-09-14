@@ -138,7 +138,7 @@ do $$
 begin
   perform public.create_replacement_with_photos(
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
-    'ORDER-1', null, null, 'Test Product', 2, null, null, 'https://tracking.example.test/ORDER-1', '[]'
+    'ORDER-1', null, null, 'Test Product', 2, null, null, null, '[]'
   );
   raise exception 'Replacement without customer_support product photos unexpectedly succeeded';
 exception when others then
@@ -163,9 +163,36 @@ insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
   (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/customer_support/99999999-9999-4999-8999-999999999999/photos/product.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
 select public.create_replacement_with_photos(
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
-  'ORDER-1', null, null, 'Test Product', 2, null, null, 'https://tracking.example.test/ORDER-1',
+  'ORDER-1', null, null, 'Test Product', 2, null, null, null,
   '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/customer_support/99999999-9999-4999-8999-999999999999/photos/product.jpg","file_name":"product.jpg","mime_type":"image/jpeg"}]'
 );
+
+insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
+  (gen_random_uuid(), 'replacement-files', 'replacements/dddddddd-dddd-4ddd-8ddd-dddddddddddd/customer_support/12121212-1212-4121-8121-121212121212/photos/offline.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
+select public.create_order_batch(
+  null,
+  '[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","order_type":"OFFLINE","order_reference":"OFFLINE-1","customer_name":"Test Customer","customer_email":"TEST@EXAMPLE.COM","product_name":"Counter Product","quantity":1,"shipping_speed":"STANDARD"}]',
+  '[{"replacement_id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","storage_path":"replacements/dddddddd-dddd-4ddd-8ddd-dddddddddddd/customer_support/12121212-1212-4121-8121-121212121212/photos/offline.jpg","file_name":"offline.jpg","mime_type":"image/jpeg"}]'
+);
+do $$
+begin
+  if (select order_type from public.replacements where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd') <> 'OFFLINE' then raise exception 'Offline batch order type was not saved'; end if;
+  if (select customer_email from public.replacements where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd') <> 'test@example.com' then raise exception 'Customer email was not normalized'; end if;
+  if (select shipping_speed from public.replacements where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd') <> 'STANDARD' then raise exception 'Standard shipping was not the default'; end if;
+end
+$$;
+
+do $$
+begin
+  perform public.update_replacement_details(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'ORDER-1', null, null,
+    'Test Product', 2, null, null, 'https://tracking.example.test/not-allowed'
+  );
+  raise exception 'Customer Support unexpectedly added a tracking link';
+exception when others then
+  if sqlerrm <> 'Tracking links can only be added by Logistics' then raise; end if;
+end
+$$;
 
 do $$
 begin
@@ -207,6 +234,7 @@ insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
 select public.submit_logistics_label(
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  'https://tracking.example.test/ORDER-1',
   '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/label.pdf","file_name":"label.pdf","mime_type":"application/pdf"}]'
 );
 
@@ -214,6 +242,9 @@ do $$
 begin
   if (select status from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'LABEL_UPLOADED' then
     raise exception 'Logistics handoff did not reach LABEL_UPLOADED';
+  end if;
+  if (select tracking_url from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'https://tracking.example.test/ORDER-1' then
+    raise exception 'Logistics tracking link was not saved';
   end if;
   perform public.submit_packing_qc('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', '[]');
   raise exception 'Logistics QC authorization unexpectedly succeeded';

@@ -13,7 +13,7 @@ interface SelectedPhoto {
 }
 
 /** Lets customer_support capture and preview the product evidence submitted with a new order. */
-export function ProductPhotoPicker() {
+export function ProductPhotoPicker({ name = "product_photos" }: { name?: string }) {
   const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -81,7 +81,7 @@ export function ProductPhotoPicker() {
       <input
         ref={inputRef}
         type="file"
-        name="product_photos"
+        name={name}
         multiple
         required
         accept="image/jpeg,image/png,image/webp"
