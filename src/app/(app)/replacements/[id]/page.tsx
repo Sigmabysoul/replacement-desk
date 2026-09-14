@@ -234,7 +234,7 @@ export default async function ReplacementDetailPage({
               )}
               {replacement.customer_phone ? <div><dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Customer phone</dt><dd className="mt-1 font-semibold text-slate-800">{replacement.customer_phone}</dd></div> : null}
               {replacement.customer_email ? <div><dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Customer email</dt><dd className="mt-1 font-semibold text-slate-800">{replacement.customer_email}</dd></div> : null}
-              {replacement.customer_address ? <div className="sm:col-span-2"><dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Delivery address</dt><dd className="mt-1 whitespace-pre-wrap font-semibold text-slate-800">{replacement.customer_address}</dd></div> : null}
+              {replacement.customer_address ? <div className="sm:col-span-2"><dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Customer address</dt><dd className="mt-1 whitespace-pre-wrap font-semibold text-slate-800">{replacement.customer_address}</dd></div> : null}
               {replacement.reason && (
                 <div>
                   <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Reason</dt>

@@ -136,6 +136,15 @@ $$;
 
 do $$
 begin
+  perform public.admin_update_order_number('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 750);
+  raise exception 'Customer Support unexpectedly changed an Order ID';
+exception when others then
+  if sqlerrm <> 'Administrator access required' then raise; end if;
+end
+$$;
+
+do $$
+begin
   perform public.create_replacement_with_photos(
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
     'ORDER-1', null, null, 'Test Product', 2, null, null, null, '[]'
@@ -374,6 +383,44 @@ where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 set role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
+insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
+  (gen_random_uuid(), 'replacement-files', 'replacements/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/customer_support/13131313-1313-4131-8131-131313131313/photos/admin-offline.jpg', '{"size":1024}', '11111111-1111-1111-1111-111111111111');
+select public.create_order_batch(
+  null,
+  '[{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","requested_order_number":760,"order_type":"OFFLINE","order_reference":"ADMIN-OFFLINE","product_name":"Admin Product","quantity":1,"shipping_speed":"STANDARD"}]',
+  '[{"replacement_id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","storage_path":"replacements/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/customer_support/13131313-1313-4131-8131-131313131313/photos/admin-offline.jpg","file_name":"admin-offline.jpg","mime_type":"image/jpeg"}]'
+);
+do $$
+begin
+  if (select order_number from public.replacements where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') <> 760 then
+    raise exception 'Admin custom Order ID was not saved during creation';
+  end if;
+end
+$$;
+select public.admin_update_order_number('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 750);
+select public.update_replacement_details_with_order_number(
+  'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 751, 'OFFLINE-1', 'Test Customer', null,
+  'Atomic Product', 1, null, 'Atomic edit', null
+);
+do $$
+begin
+  if (select order_number from public.replacements where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd') <> 751 then
+    raise exception 'Atomic Admin Order ID update was not saved';
+  end if;
+  begin
+    perform public.update_replacement_details_with_order_number(
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 760, 'OFFLINE-1', 'Test Customer', null,
+      'Partially Saved Product', 1, null, 'Must roll back', null
+    );
+    raise exception 'Duplicate Order ID unexpectedly succeeded';
+  exception when unique_violation then
+    null;
+  end;
+  if (select product_name from public.replacements where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd') <> 'Atomic Product' then
+    raise exception 'Duplicate Order ID left detail edits partially saved';
+  end if;
+end
+$$;
 select public.archive_completed_replacements();
 
 do $$

@@ -29,7 +29,7 @@ Replacement and offline orders use the same operational workflow. Replacement or
 
 Customer Support and Admin can create, update, and archive dimension presets. Archiving hides a preset from new forms but keeps the captured measurements and reference on older orders.
 
-Multi-order creation is a batch entry experience: each item remains an independent order with its own status, files, audit history, and automatic number. A branch may reuse the same customer details or create a different customer.
+Multi-order creation is a batch entry experience: each item remains an independent order with its own status, files, audit history, and automatic number. A branch may reuse the same customer details or create a different customer. Customer Support can see the proposed numeric Order ID but cannot change it. Admin may assign or correct an Order ID of 501 or higher; that permission is enforced in PostgreSQL and later corrections are written to the audit history.
 
 Existing orders already at `LABEL_PRINTED` continue directly with Packing QC. New orders use the explicit `LABEL_UPLOADED` handoff so uploading and printing cannot be confused.
 

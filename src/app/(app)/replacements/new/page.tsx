@@ -6,10 +6,14 @@ import { createClient } from "@/lib/supabase/server";
 import type { DimensionPreset } from "@/lib/types";
 
 export default async function NewReplacementPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  await requireProfile(["customer_support", "ADMIN"]);
+  const profile = await requireProfile(["customer_support", "ADMIN"]);
   const [{ error }, supabase] = await Promise.all([searchParams, createClient()]);
-  const { data } = await supabase.from("dimension_presets").select("*").eq("active", true).order("name");
-  const presets = (data ?? []) as DimensionPreset[];
+  const [{ data: presetData }, { data: latestOrderData }] = await Promise.all([
+    supabase.from("dimension_presets").select("*").eq("active", true).order("name"),
+    supabase.from("replacements").select("order_number").order("order_number", { ascending: false }).limit(1),
+  ]);
+  const presets = (presetData ?? []) as DimensionPreset[];
+  const startingOrderNumber = Number(latestOrderData?.[0]?.order_number ?? 500) + 1;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -20,7 +24,14 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
         Logistics will add the label and tracking link next.
       </p>
       <div className="mt-5"><Notice>{error}</Notice></div>
-      <div className="mt-6"><OrderBuilder action={createOrderBatchAction} presets={presets} /></div>
+      <div className="mt-6">
+        <OrderBuilder
+          action={createOrderBatchAction}
+          presets={presets}
+          isAdmin={profile.role === "ADMIN"}
+          startingOrderNumber={startingOrderNumber}
+        />
+      </div>
     </div>
   );
 }

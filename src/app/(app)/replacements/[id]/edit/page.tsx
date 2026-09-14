@@ -17,7 +17,7 @@ export default async function EditReplacementPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireProfile(["customer_support", "ADMIN"]);
+  const profile = await requireProfile(["customer_support", "ADMIN"]);
   const { id } = await params;
   const { error } = await searchParams;
   const supabase = await createClient();
@@ -36,6 +36,9 @@ export default async function EditReplacementPage({
         <input type="hidden" name="replacement_id" value={replacement.id} />
         <Notice>{error}</Notice>
         <Card className="grid gap-5 p-5 sm:grid-cols-2">
+          <Field label="Order ID" hint="Only Admin can change this ID.">
+            <Input name="order_number" type="number" min={501} required defaultValue={replacement.order_number} readOnly={profile.role !== "ADMIN"} className={profile.role !== "ADMIN" ? "cursor-not-allowed bg-muted" : undefined} />
+          </Field>
           <Field label="Order reference">
             <Input name="order_reference" required defaultValue={replacement.order_reference} />
           </Field>
@@ -48,9 +51,6 @@ export default async function EditReplacementPage({
           <ReasonSelect defaultValue={replacement.reason} />
           <Field label="Customer name">
             <Input name="customer_name" defaultValue={replacement.customer_name ?? ""} />
-          </Field>
-          <Field label="Customer reference">
-            <Input name="customer_reference" defaultValue={replacement.customer_reference ?? ""} />
           </Field>
           <div className="sm:col-span-2">
             <Field label="Notes">

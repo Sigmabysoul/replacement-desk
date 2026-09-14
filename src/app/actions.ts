@@ -222,6 +222,18 @@ export async function createOrderBatchAction(formData: FormData) {
   if (invalid && !invalid.success) {
     redirect(`/replacements/new?error=${encodeURIComponent(invalid.error.issues[0]?.message ?? "Check every order.")}`);
   }
+  const requestedOrderNumbers = rawOrders.map((raw) => {
+    if (profile.role !== "ADMIN") return null;
+    const value = Number((raw as { requested_order_number?: unknown }).requested_order_number);
+    return Number.isSafeInteger(value) && value >= 501 ? value : null;
+  });
+  if (profile.role === "ADMIN" && requestedOrderNumbers.some((value) => value === null)) {
+    redirect(`/replacements/new?error=${encodeURIComponent("Every Admin order ID must be a whole number of 501 or higher.")}`);
+  }
+  const requestedValues = requestedOrderNumbers.filter((value): value is number => value !== null);
+  if (new Set(requestedValues).size !== requestedValues.length) {
+    redirect(`/replacements/new?error=${encodeURIComponent("Order IDs must be unique within this batch.")}`);
+  }
 
   const localIds = rawOrders.map((raw) => String((raw as { id?: unknown }).id ?? ""));
   if (new Set(localIds).size !== localIds.length || localIds.some((id) => !/^[a-zA-Z0-9:_-]{1,100}$/.test(id))) {
@@ -264,6 +276,7 @@ export async function createOrderBatchAction(formData: FormData) {
     const orders = parsedOrders.map((result, index) => ({
       ...(result.success ? result.data : {}),
       id: idMap.get(localIds[index]),
+      requested_order_number: requestedOrderNumbers[index],
       tracking_url: null,
     }));
     const { data, error } = await supabase.rpc("create_order_batch", {
@@ -291,17 +304,25 @@ export async function createOrderBatchAction(formData: FormData) {
  * to `activity_logs` and enforces edit constraints.
  */
 export async function updateReplacementAction(formData: FormData) {
-  await requireProfile(["customer_support", "ADMIN"]);
+  const profile = await requireProfile(["customer_support", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
   const parsed = replacementEditSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
+  let requestedOrderNumber: number | null = null;
+  if (profile.role === "ADMIN") {
+    requestedOrderNumber = Number(formData.get("order_number"));
+    if (!Number.isSafeInteger(requestedOrderNumber) || requestedOrderNumber < 501) {
+      redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent("Order ID must be a whole number of 501 or higher.")}`);
+    }
+  }
   const supabase = await createClient();
   const { data: current } = await supabase.from("replacements").select("tracking_url").eq("id", replacementId).single();
-  const { error } = await supabase.rpc("update_replacement_details", {
+  const { error } = await supabase.rpc("update_replacement_details_with_order_number", {
     p_replacement_id: replacementId,
+    p_order_number: requestedOrderNumber,
     p_order_reference: parsed.data.order_reference,
     p_customer_name: parsed.data.customer_name,
-    p_customer_reference: parsed.data.customer_reference,
+    p_customer_reference: null,
     p_product_name: parsed.data.product_name,
     p_quantity: parsed.data.quantity,
     p_reason: parsed.data.reason,
