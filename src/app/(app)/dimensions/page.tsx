@@ -18,7 +18,7 @@ export default async function DimensionsPage({ searchParams }: { searchParams: P
       <header>
         <p className="text-sm font-bold text-indigo-700">CATALOGUE</p>
         <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground sm:text-3xl">Product dimensions</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Esha / Customer Support and Admin can register reusable package sizes in centimetres.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Customer Support and Admin can register reusable package sizes in centimetres.</p>
       </header>
       <Notice>{notice.error ?? (error ? "Could not load dimension presets." : undefined)}</Notice>
       <Notice tone="success">{notice.success}</Notice>

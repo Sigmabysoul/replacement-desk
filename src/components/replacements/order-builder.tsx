@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Boxes, CirclePlus, LockKeyhole, Package, Rotate3D, Trash2, UserRound } from "lucide-react";
 import { ProductPhotoPicker } from "@/components/replacements/product-photo-picker";
+import { ReasonSelect } from "@/components/replacements/reason-select";
 import { Card } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -78,7 +79,7 @@ const newOrder = (
   orderReference: "",
   productName: "",
   quantity: "1",
-  reason: "",
+  reason: orderType === "OFFLINE" ? "Offline order" : "",
   notes: "",
   shippingSpeed: "STANDARD",
   presetId: "",
@@ -96,6 +97,7 @@ function OrderTypeSwitch({ order, updateOrder }: Pick<ProductCardProps, "order" 
           type="button"
           onClick={() => updateOrder(order.id, {
             orderType: type,
+            reason: type === "OFFLINE" ? "Offline order" : order.reason === "Offline order" ? "" : order.reason,
             ...(type === "OFFLINE" ? { presetId: "", length: "", breadth: "", height: "" } : {}),
           })}
           className={cn(
@@ -171,13 +173,13 @@ function ProductDetailsSection({
       <OrderTypeSwitch order={order} updateOrder={updateOrder} />
 
       <div className={cn("grid gap-4", compact ? "grid-cols-1" : "sm:grid-cols-[1.3fr_1fr_120px]")}>
-        <Field label="Order reference">
+        <Field label="Courier Partner">
           <Input
             required
             value={order.orderReference}
             onChange={(event) => updateOrder(order.id, { orderReference: event.target.value })}
             maxLength={100}
-            placeholder="Marketplace / invoice reference"
+            placeholder="Courier company or service"
           />
         </Field>
         <Field label="Product">
@@ -189,14 +191,13 @@ function ProductDetailsSection({
       </div>
 
       <div className={cn("grid gap-4", !compact && "sm:grid-cols-2")}>
-        <Field label="Reason">
-          <Input
-            value={order.reason}
-            onChange={(event) => updateOrder(order.id, { reason: event.target.value })}
-            maxLength={200}
-            placeholder={order.orderType === "OFFLINE" ? "Offline sale" : "Damaged, wrong product…"}
-          />
-        </Field>
+        <ReasonSelect
+          key={`${order.id}-${order.orderType}`}
+          name={null}
+          defaultValue={order.reason}
+          presets={order.orderType === "OFFLINE" ? ["Offline order"] : undefined}
+          onValueChange={(reason) => updateOrder(order.id, { reason })}
+        />
         <Field label="Notes">
           <Textarea value={order.notes} onChange={(event) => updateOrder(order.id, { notes: event.target.value })} maxLength={2000} className="min-h-24" />
         </Field>

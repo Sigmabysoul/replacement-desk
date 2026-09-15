@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Input, Textarea } from "@/components/ui/field";
 import { ProductPhotoPicker } from "@/components/replacements/product-photo-picker";
+import { ReasonSelect } from "@/components/replacements/reason-select";
 import {
   OrderBuilder,
   PRODUCT_LIST_CLASS,
@@ -37,6 +38,9 @@ describe("new order form structure", () => {
     }));
     expect(markup).toContain("Customer address");
     expect(markup).not.toContain("Customer reference");
+    expect(markup).toContain("Courier Partner");
+    expect(markup).not.toContain("Order reference");
+    expect(markup).toContain("Select a reason");
     expect(markup).toContain("Product details");
     expect(markup).toContain("Dimensions &amp; fulfilment");
     expect(markup).toContain("value=\"501\"");
@@ -83,6 +87,16 @@ describe("new order form structure", () => {
   it("uses normal page scrolling instead of a nested product scrollbar", () => {
     expect(PRODUCT_LIST_CLASS).not.toContain("overflow-y-auto");
     expect(PRODUCT_LIST_CLASS).not.toContain("max-h-");
+  });
+});
+
+describe("order reasons", () => {
+  it("can show Offline order as the selected default", () => {
+    const markup = renderToStaticMarkup(createElement(ReasonSelect, {
+      defaultValue: "Offline order",
+      presets: ["Offline order"],
+    }));
+    expect(markup).toContain('<option value="Offline order" selected="">Offline order</option>');
   });
 });
 

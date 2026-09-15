@@ -558,7 +558,7 @@ export async function createUserAction(formData: FormData) {
 }
 
 /**
- * Updates a user's operational role and active status.
+ * Updates a user's display name, operational role, and active status.
  *
  * Authorization: ADMIN only
  * Enables or disables account access and updates permissions in the `profiles` table.
@@ -566,13 +566,20 @@ export async function createUserAction(formData: FormData) {
 export async function updateUserAction(formData: FormData) {
   const actor = await requireProfile(["ADMIN"]);
   const id = String(formData.get("id") ?? "");
+  const fullName = String(formData.get("full_name") ?? "").trim();
   const role = String(formData.get("role") ?? "") as Role;
   const active = formData.get("active") === "true";
-  if (!/^[0-9a-f-]{36}$/i.test(id) || !["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Invalid%20user%20update.");
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !fullName || fullName.length > 120 || !["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Invalid%20user%20update.");
   if (id === actor.id && (!active || role !== "ADMIN")) redirect("/admin/users?error=You%20cannot%20remove%20your%20own%20active%20administrator%20access.");
   const admin = createAdminClient();
-  const { error } = await admin.from("profiles").update({ role, active }).eq("id", id);
+  const { data: authRecord, error: authReadError } = await admin.auth.admin.getUserById(id);
+  if (authReadError || !authRecord.user) redirect(`/admin/users?error=${encodeURIComponent(authReadError?.message ?? "Could not load the Auth user.")}`);
+  const { error } = await admin.from("profiles").update({ full_name: fullName, role, active }).eq("id", id);
   if (error) redirect(`/admin/users?error=${encodeURIComponent(error.message)}`);
+  const { error: authError } = await admin.auth.admin.updateUserById(id, {
+    user_metadata: { ...authRecord.user.user_metadata, full_name: fullName },
+  });
+  if (authError) redirect(`/admin/users?error=${encodeURIComponent(`Profile name was saved, but Auth metadata could not be updated: ${authError.message}`)}`);
   revalidatePath("/admin/users");
 }
 

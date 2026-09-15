@@ -39,7 +39,7 @@ export default async function EditReplacementPage({
           <Field label="Order ID" hint="Only Admin can change this ID.">
             <Input name="order_number" type="number" inputMode="numeric" min={1} required defaultValue={replacement.order_number} readOnly={profile.role !== "ADMIN"} className={`order-id-input ${profile.role !== "ADMIN" ? "cursor-not-allowed bg-muted" : ""}`} />
           </Field>
-          <Field label="Order reference">
+          <Field label="Courier Partner">
             <Input name="order_reference" required defaultValue={replacement.order_reference} />
           </Field>
           <Field label="Product">
@@ -48,7 +48,10 @@ export default async function EditReplacementPage({
           <Field label="Quantity">
             <Input name="quantity" type="number" min={1} max={999} required defaultValue={replacement.quantity} />
           </Field>
-          <ReasonSelect defaultValue={replacement.reason} />
+          <ReasonSelect
+            defaultValue={replacement.reason}
+            presets={replacement.order_type === "OFFLINE" ? ["Offline order"] : undefined}
+          />
           <Field label="Customer name">
             <Input name="customer_name" defaultValue={replacement.customer_name ?? ""} />
           </Field>

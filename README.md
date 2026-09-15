@@ -30,13 +30,16 @@ Open `http://localhost:3000`. Before Supabase is configured, the login screen sh
 1. Create a Supabase project.
 2. Copy Project URL and anon/publishable key into `.env.local`.
 3. Copy the service-role key into `SUPABASE_SERVICE_ROLE_KEY`. It is used only on the server for admin invitations and notification records.
-4. Apply every SQL file in `supabase/migrations` in filename order. With the Supabase CLI linked, run:
+4. The Supabase CLI is installed inside this project, so a global `supabase` command is not required. Confirm it works, sign in, link the project once, and apply every SQL file in `supabase/migrations`:
 
    ```bash
-   supabase db push
+   npm run supabase -- --version
+   npm run supabase -- login
+   npm run supabase -- link --project-ref YOUR_PROJECT_REF
+   npm run db:push
    ```
 
-   Alternatively, paste each file into the Supabase SQL editor in order.
+   Replace `YOUR_PROJECT_REF` with the reference shown in Supabase Project Settings. For the optional local Supabase stack, install Docker and use `npm run db:start`, `npm run db:status`, and `npm run db:stop`. Alternatively, paste each migration into the Supabase SQL editor in filename order.
 
 The migrations create the schema, RLS, workflow functions, triggers, indexes, Realtime publication, role hardening, and the private `replacement-files` bucket. No public bucket setup is needed. The bucket accepts JPEG, PNG, WebP, and PDF files up to 25 MB. App and database validation both restrict paths and file types.
 
@@ -56,7 +59,7 @@ To create the first admin:
    where id = '<auth-user-uuid>';
    ```
 
-4. Sign in. Admin → Users can then create email/password users, change roles, and activate/deactivate users.
+4. Sign in. Admin → Users can then create email/password users, rename their displayed full name, change roles, and activate/deactivate users. Renaming there updates both `public.profiles.full_name` and the Auth user's full-name metadata.
 
 Admins assign a temporary password of at least 6 characters and share it through a secure channel. New users should immediately use Profile → Change password. Public registration remains unavailable.
 
@@ -133,7 +136,7 @@ The repository also includes a production `Dockerfile` and `compose.hostinger.ya
 The workflow migration introduces Logistics and the `LABEL_UPLOADED` state while preserving existing Printing and Packing assignments. Use a short maintenance window and complete these steps in order:
 
 1. Confirm the exact Supabase project URL/reference, take a Supabase backup, and export `select id, full_name, role from public.profiles;` for rollback evidence.
-2. Apply every pending SQL migration in filename order with `supabase db push`. Confirm the `LOGISTICS` role, `LABEL_UPLOADED` status, `PROOF_PHOTO` attachment type, `create_replacement_with_photos`, `submit_logistics_label`, and `submit_packing_qc` functions exist before proceeding.
+2. Apply every pending SQL migration in filename order with `npm run db:push`. Confirm the `LOGISTICS` role, `LABEL_UPLOADED` status, `PROOF_PHOTO` attachment type, `create_replacement_with_photos`, `submit_logistics_label`, and `submit_packing_qc` functions exist before proceeding.
 3. Assign at least one active Logistics profile, build and start the new container, verify `/login` and one controlled lifecycle, then switch HTTPS traffic. The old build cannot understand `LABEL_UPLOADED`, so application rollback also requires restoring the pre-migration database backup.
 
 Keep production values in an uncommitted `.env.production` file beside the Compose file. Generate `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` once with `openssl rand -base64 32` and retain the same value across builds. Compose passes that server-only value to the BuildKit builder as a secret and also supplies runtime secrets through the env file; only `NEXT_PUBLIC_*` values are normal build arguments. Deploy with:
@@ -156,7 +159,7 @@ The container runs as an unprivileged user, restarts automatically, and reports 
 
 - Notifications are retried once inline; failed Telegram sends are logged but never block the order workflow.
 - There is no offline mode, bulk dispatch, or courier integration.
-- Search covers replacement number, order reference, and product; usage is intentionally optimized for a few requests per month.
+- Search covers replacement number, courier partner, and product; usage is intentionally optimized for a few requests per month.
 - Admin override changes the replacement status and timestamps but cannot manufacture missing QC submission history. It is an audited recovery tool, not the normal workflow.
 - Uploaded storage objects are removed after known failures where possible; an interrupted network request may leave an orphan object that an admin can clean up from Supabase Storage.
 

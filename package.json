@@ -13,6 +13,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:db": "bash tests/database-integration.sh",
+    "supabase": "supabase",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:status": "supabase status",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run test:db && npm run build"
   },
   "dependencies": {

@@ -23,7 +23,7 @@ const optionalDimension = z.preprocess(
 );
 
 export const replacementSchema = z.object({
-  order_reference: z.string().trim().min(1, "Order reference is required").max(100),
+  order_reference: z.string().trim().min(1, "Courier Partner is required").max(100),
   customer_name: optionalText(120),
   customer_reference: optionalText(100),
   customer_address: optionalText(1000),
@@ -50,7 +50,7 @@ export const replacementSchema = z.object({
 });
 
 export const replacementEditSchema = z.object({
-  order_reference: z.string().trim().min(1, "Order reference is required").max(100),
+  order_reference: z.string().trim().min(1, "Courier Partner is required").max(100),
   customer_name: optionalText(120),
   customer_reference: optionalText(100),
   product_name: z.string().trim().min(1, "Product is required").max(200),

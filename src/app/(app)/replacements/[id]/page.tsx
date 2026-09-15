@@ -184,7 +184,7 @@ export default async function ReplacementDetailPage({
                 <dd className="mt-1 text-base font-bold text-slate-950">{replacement.quantity}</dd>
               </div>
               <div>
-                <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Order Reference</dt>
+                <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Courier Partner</dt>
                 <dd className="mt-1 flex items-center gap-2 font-semibold text-slate-800">
                   <ShoppingBag className="size-4 text-slate-400" />
                   {replacement.order_reference}
