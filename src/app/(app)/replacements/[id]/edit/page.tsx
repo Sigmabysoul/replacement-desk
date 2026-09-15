@@ -17,7 +17,7 @@ export default async function EditReplacementPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  const profile = await requireProfile(["customer_support", "ADMIN"]);
+  const profile = await requireProfile(["CUSTOMER_SUPPORT", "ADMIN"]);
   const { id } = await params;
   const { error } = await searchParams;
   const supabase = await createClient();
@@ -37,7 +37,7 @@ export default async function EditReplacementPage({
         <Notice>{error}</Notice>
         <Card className="grid gap-5 p-5 sm:grid-cols-2">
           <Field label="Order ID" hint="Only Admin can change this ID.">
-            <Input name="order_number" type="number" min={501} required defaultValue={replacement.order_number} readOnly={profile.role !== "ADMIN"} className={profile.role !== "ADMIN" ? "cursor-not-allowed bg-muted" : undefined} />
+            <Input name="order_number" type="number" inputMode="numeric" min={1} required defaultValue={replacement.order_number} readOnly={profile.role !== "ADMIN"} className={`order-id-input ${profile.role !== "ADMIN" ? "cursor-not-allowed bg-muted" : ""}`} />
           </Field>
           <Field label="Order reference">
             <Input name="order_reference" required defaultValue={replacement.order_reference} />

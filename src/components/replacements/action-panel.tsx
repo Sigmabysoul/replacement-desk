@@ -17,8 +17,8 @@ import type { Profile, Replacement } from "@/lib/types";
  * Dynamically presents only legal actions based on user's active role and current status:
  * - LOGISTICS: Uploads the shipping label.
  * - PRINTING: Confirms that the uploaded label was printed.
- * - PACKING: Uploads QC pictures, requests customer_support's review, packs, and dispatches.
- * - customer_support: Reviews QC photos (Approve / Reject with feedback).
+ * - PACKING: Uploads QC pictures, requests CUSTOMER_SUPPORT's review, packs, and dispatches.
+ * - CUSTOMER_SUPPORT: Reviews QC photos (Approve / Reject with feedback).
  * - ADMIN: Performs any standard transition or uses emergency status override with reason logging.
  *
  * @param props.replacement Current replacement order data.

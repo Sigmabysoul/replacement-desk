@@ -65,6 +65,9 @@ button, input, textarea, select, a {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
+.order-id-input { appearance: textfield; -moz-appearance: textfield; }
+.order-id-input::-webkit-inner-spin-button,
+.order-id-input::-webkit-outer-spin-button { margin: 0; appearance: none; }
 ::selection { background: color-mix(in srgb, var(--brand) 22%, white); color: var(--foreground); }
 
 @keyframes order-card-flip {

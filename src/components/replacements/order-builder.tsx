@@ -46,6 +46,21 @@ type ProductCardProps = {
   removeOrder: (order: OrderDraft) => void;
 };
 
+/**
+ * Products are arranged in stable pairs. A newly added odd product starts on
+ * its own full-width row; adding the next product completes that row as a pair.
+ */
+export function groupProductsIntoRows<T>(products: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let index = 0; index < products.length; index += 2) {
+    rows.push(products.slice(index, index + 2));
+  }
+  return rows;
+}
+
+/** Keep product scrolling on the document so a pointer over a card never traps the wheel. */
+export const PRODUCT_LIST_CLASS = "grid gap-5";
+
 const newCustomer = (id = crypto.randomUUID()): CustomerDraft => ({
   id, name: "", address: "", email: "", phone: "",
 });
@@ -107,16 +122,39 @@ function ProductDetailsSection({
   removeOrder,
 }: Omit<ProductCardProps, "presets" | "choosePreset">) {
   return (
-    <section className={cn("grid content-start gap-4 bg-card p-4 sm:p-5", !compact && "rounded-2xl border border-border shadow-sm")}>
-      <div className="flex flex-wrap items-center gap-2">
-        {order.orderType === "REPLACEMENT"
-          ? <Package className="size-5 text-indigo-600" />
-          : <Boxes className="size-5 text-indigo-600" />}
-        <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">Product details</p>
-          <h3 className="font-black text-foreground">
-            {order.orderType === "REPLACEMENT" ? "Replacement" : "Offline"} order {index + 1}
-          </h3>
+    <section className="grid content-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="flex min-w-0 items-center gap-2 pt-1">
+          {order.orderType === "REPLACEMENT"
+            ? <Package className="size-5 shrink-0 text-indigo-600" />
+            : <Boxes className="size-5 shrink-0 text-indigo-600" />}
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">Product details</p>
+            <h3 className="font-black text-foreground">
+              {order.orderType === "REPLACEMENT" ? "Replacement" : "Offline"} order {index + 1}
+            </h3>
+          </div>
+        </div>
+        <div className="ml-auto w-full sm:w-40">
+          <Field
+            label="Order ID"
+            hint={isAdmin ? "Admin can change this ID." : "Only Admin can change this ID."}
+          >
+            <div className="relative">
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                required
+                readOnly={!isAdmin}
+                value={order.orderNumber}
+                onChange={(event) => isAdmin && updateOrder(order.id, { orderNumber: event.target.value })}
+                className={cn("order-id-input pr-10 font-black", !isAdmin && "cursor-not-allowed bg-muted")}
+                aria-label={isAdmin ? "Order ID editable by Admin" : "Order ID locked for Customer Support"}
+              />
+              {!isAdmin ? <LockKeyhole className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /> : null}
+            </div>
+          </Field>
         </div>
         {removable ? (
           <button
@@ -132,26 +170,7 @@ function ProductDetailsSection({
 
       <OrderTypeSwitch order={order} updateOrder={updateOrder} />
 
-      <div className={cn("grid gap-4", compact ? "grid-cols-1" : "sm:grid-cols-[150px_1.3fr_1fr_120px]")}>
-        <Field
-          label="Order ID"
-          hint={isAdmin ? "Admin can change this ID." : "Only Admin can change this ID."}
-        >
-          <div className="relative">
-            <Input
-              type="number"
-              inputMode="numeric"
-              min={501}
-              required
-              readOnly={!isAdmin}
-              value={order.orderNumber}
-              onChange={(event) => isAdmin && updateOrder(order.id, { orderNumber: event.target.value })}
-              className={cn("pr-10 font-black", !isAdmin && "cursor-not-allowed bg-muted")}
-              aria-label={isAdmin ? "Order ID editable by Admin" : "Order ID locked for Customer Support"}
-            />
-            {!isAdmin ? <LockKeyhole className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /> : null}
-          </div>
-        </Field>
+      <div className={cn("grid gap-4", compact ? "grid-cols-1" : "sm:grid-cols-[1.3fr_1fr_120px]")}>
         <Field label="Order reference">
           <Input
             required
@@ -194,7 +213,7 @@ function DimensionSection({
   choosePreset,
 }: Pick<ProductCardProps, "order" | "compact" | "presets" | "updateOrder" | "choosePreset">) {
   return (
-    <section className={cn("grid content-start gap-4 border-t border-border bg-muted/25 p-4 sm:p-5", !compact && "rounded-2xl border shadow-sm")}>
+    <section className="grid content-start gap-4 rounded-2xl border border-border bg-muted/25 p-4 shadow-sm sm:p-5">
       <div>
         <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
           {order.orderType === "REPLACEMENT" ? "Dimensions & fulfilment" : "Fulfilment"}
@@ -245,10 +264,7 @@ function ProductCard(props: ProductCardProps) {
   return (
     <article
       key={`${props.order.id}-${props.order.orderType}`}
-      className={cn(
-        "order-card-flip overflow-hidden",
-        props.compact && "rounded-[1.6rem] border border-border bg-card shadow-sm",
-      )}
+      className="order-card-flip grid h-full grid-rows-[auto_1fr] gap-4"
     >
       <ProductDetailsSection {...props} />
       <DimensionSection {...props} />
@@ -347,7 +363,7 @@ export function OrderBuilder({
 
       {customers.map((customer, customerIndex) => {
         const customerOrders = orders.filter((order) => order.customerId === customer.id);
-        const compact = customerOrders.length > 1;
+        const productRows = groupProductsIntoRows(customerOrders);
         if (!customerOrders.length) return null;
         return (
           <section key={customer.id} className="customer-order-branch grid gap-4">
@@ -382,28 +398,35 @@ export function OrderBuilder({
               </div>
             </Card>
 
-            <div
-              className={cn(
-                "order-layout-transition grid gap-4",
-                compact && "grid-cols-1 md:grid-cols-2",
-                customerOrders.length > 2 && "max-h-[52rem] overflow-y-auto overscroll-contain rounded-2xl pr-2",
-              )}
-              aria-label={`Products for customer ${customerIndex + 1}`}
-            >
-              {customerOrders.map((order, orderIndex) => (
-                <ProductCard
-                  key={`${order.id}-${order.orderType}`}
-                  order={order}
-                  index={orderIndex}
-                  compact={compact}
-                  removable={orders.length > 1}
-                  isAdmin={isAdmin}
-                  presets={presets}
-                  updateOrder={updateOrder}
-                  choosePreset={choosePreset}
-                  removeOrder={removeOrder}
-                />
-              ))}
+            <div className={PRODUCT_LIST_CLASS} aria-label={`Products for customer ${customerIndex + 1}`}>
+              {productRows.map((row, rowIndex) => {
+                const compact = row.length === 2;
+                return (
+                  <div
+                    key={row.map((order) => order.id).join(":")}
+                    className={cn(
+                      "order-layout-transition grid items-stretch gap-5",
+                      compact && "md:grid-cols-2",
+                    )}
+                    data-products-per-row={row.length}
+                  >
+                    {row.map((order, columnIndex) => (
+                      <ProductCard
+                        key={`${order.id}-${order.orderType}`}
+                        order={order}
+                        index={(rowIndex * 2) + columnIndex}
+                        compact={compact}
+                        removable={orders.length > 1}
+                        isAdmin={isAdmin}
+                        presets={presets}
+                        updateOrder={updateOrder}
+                        choosePreset={choosePreset}
+                        removeOrder={removeOrder}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           </section>
         );

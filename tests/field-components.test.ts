@@ -2,7 +2,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Input, Textarea } from "@/components/ui/field";
-import { OrderBuilder } from "@/components/replacements/order-builder";
+import { ProductPhotoPicker } from "@/components/replacements/product-photo-picker";
+import {
+  OrderBuilder,
+  PRODUCT_LIST_CLASS,
+  groupProductsIntoRows,
+} from "@/components/replacements/order-builder";
 
 describe("shared field styling", () => {
   it("preserves base input styling when a caller adds a custom class", () => {
@@ -47,5 +52,45 @@ describe("new order form structure", () => {
     }));
     expect(markup).toContain("Order ID editable by Admin");
     expect(markup).not.toContain("readOnly=\"\"");
+    expect(markup).toContain('min="1"');
+    expect(markup).toContain("order-id-input");
+  });
+
+  it("places the Order ID in the section header before the order-type toggle", () => {
+    const markup = renderToStaticMarkup(createElement(OrderBuilder, {
+      action,
+      presets: [],
+      isAdmin: true,
+      startingOrderNumber: 501,
+    }));
+    expect(markup.indexOf("Order ID")).toBeLessThan(markup.indexOf('aria-label="Order type"'));
+  });
+
+  it("lays out products as complete pairs with a full-width unpaired card", () => {
+    expect(groupProductsIntoRows([1, 2, 3, 4, 5, 6, 7, 8])).toEqual([
+      [1, 2],
+      [3, 4],
+      [5, 6],
+      [7, 8],
+    ]);
+    expect(groupProductsIntoRows([1, 2, 3, 4, 5])).toEqual([
+      [1, 2],
+      [3, 4],
+      [5],
+    ]);
+  });
+
+  it("uses normal page scrolling instead of a nested product scrollbar", () => {
+    expect(PRODUCT_LIST_CLASS).not.toContain("overflow-y-auto");
+    expect(PRODUCT_LIST_CLASS).not.toContain("max-h-");
+  });
+});
+
+describe("product photo picker contrast", () => {
+  it("uses a theme surface on hover and readable foreground text", () => {
+    const markup = renderToStaticMarkup(createElement(ProductPhotoPicker));
+    expect(markup).toContain("hover:bg-muted");
+    expect(markup).not.toContain("hover:bg-indigo-50");
+    expect(markup).toContain("text-foreground");
   });
 });

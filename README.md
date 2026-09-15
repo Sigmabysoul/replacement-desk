@@ -81,7 +81,7 @@ Use a separate chat ID for each operational handoff so the next responsible team
 | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | Server only | Yes for stable self-hosted deployments |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server only | Yes for admin invitations and notification logs |
 | `TELEGRAM_BOT_TOKEN` | Server only | No; required for Telegram |
-| `TELEGRAM_customer_support_CHAT_ID` | Server only | Optional recipient |
+| `TELEGRAM_CUSTOMER_SUPPORT_CHAT_ID` | Server only | Optional recipient |
 | `TELEGRAM_LOGISTICS_CHAT_ID` | Server only | Optional recipient |
 | `TELEGRAM_PRINTING_CHAT_ID` | Server only | Optional recipient |
 | `TELEGRAM_PACKING_CHAT_ID` | Server only | Optional recipient |
@@ -94,11 +94,11 @@ Never expose or prefix the service-role key or bot token with `NEXT_PUBLIC_`.
 
 Create one account for each role on Admin → Users, then test in order:
 
-1. **customer_support:** create a replacement or offline order with one or more product photos. Verify replacement dimensions, multi-order customer branches, and automatic order numbers starting at 501. Create and edit a preset in Dimensions.
+1. **CUSTOMER_SUPPORT:** create a replacement or offline order with one or more product photos. Verify replacement dimensions, multi-order customer branches, and automatic order numbers starting at 501. Create and edit a preset in Dimensions.
 2. **LOGISTICS:** upload one shipping label and optionally add its tracking link. Confirm product-photo, QC, printing, packing, and dispatch controls are absent.
 3. **PRINTING:** mark the uploaded label printed. Confirm file upload and QC controls are absent.
-4. **PACKING:** upload separate QC pictures and request customer_support approval.
-5. **customer_support:** reject with a required reason; sign back in as Packing and resubmit photos without losing the original label; then approve as customer_support.
+4. **PACKING:** upload separate QC pictures and request CUSTOMER_SUPPORT approval.
+5. **CUSTOMER_SUPPORT:** reject with a required reason; sign back in as Packing and resubmit photos without losing the original label; then approve as CUSTOMER_SUPPORT.
 6. **PACKING:** mark the approved replacement packed, then mark it shipped or needs token from Dispatch.
 7. **ADMIN:** verify users, Telegram configuration state, and the audited override control.
 

@@ -12,7 +12,7 @@ interface SelectedPhoto {
   previewUrl: string;
 }
 
-/** Lets customer_support capture and preview the product evidence submitted with a new order. */
+/** Lets CUSTOMER_SUPPORT capture and preview the product evidence submitted with a new order. */
 export function ProductPhotoPicker({ name = "product_photos" }: { name?: string }) {
   const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -90,9 +90,9 @@ export function ProductPhotoPicker({ name = "product_photos" }: { name?: string 
         aria-hidden="true"
       />
 
-      <label className="relative flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/70 p-4 text-center transition hover:border-indigo-500 hover:bg-indigo-50">
+      <label className="relative flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/70 p-4 text-center transition hover:border-indigo-500 hover:bg-muted">
         <Camera className="size-8 text-indigo-600" />
-        <span className="mt-2 text-base font-black text-indigo-950">
+        <span className="mt-2 text-base font-black text-foreground">
           {photos.length ? "ADD MORE PRODUCT PHOTOS" : "TAKE / UPLOAD PRODUCT PHOTOS"}
         </span>
         <span className="mt-1 text-xs text-indigo-700">Required; camera or gallery; 1-12 photos</span>

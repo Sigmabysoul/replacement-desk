@@ -58,7 +58,7 @@ SQL
 
 for migration in supabase/migrations/*.sql; do
   case "$(basename "$migration")" in
-    2026091[34]*) continue ;;
+    2026091[345]*) continue ;;
   esac
   "${psql[@]}" -f "$migration" >/dev/null
 done
@@ -66,7 +66,7 @@ done
 "${psql[@]}" <<'SQL'
 insert into auth.users(id, email, raw_user_meta_data) values
   ('11111111-1111-1111-1111-111111111111', 'admin@example.com', '{"full_name":"Admin","role":"ADMIN"}'),
-  ('22222222-2222-2222-2222-222222222222', 'customer_support@example.com', '{"full_name":"customer_support"}'),
+  ('22222222-2222-2222-2222-222222222222', 'CUSTOMER_SUPPORT@example.com', '{"full_name":"CUSTOMER_SUPPORT"}'),
   ('33333333-3333-3333-3333-333333333333', 'print@example.com', '{"full_name":"Printer"}'),
   ('44444444-4444-4444-4444-444444444444', 'pack@example.com', '{"full_name":"Packer"}'),
   ('55555555-5555-5555-5555-555555555555', 'inactive@example.com', '{"full_name":"Inactive"}');
@@ -80,7 +80,7 @@ end
 $$;
 
 update public.profiles set role = 'ADMIN' where id = '11111111-1111-1111-1111-111111111111';
-update public.profiles set role = 'customer_support' where id = '22222222-2222-2222-2222-222222222222';
+update public.profiles set role = 'CUSTOMER_SUPPORT' where id = '22222222-2222-2222-2222-222222222222';
 update public.profiles set role = 'PRINTING' where id = '33333333-3333-3333-3333-333333333333';
 update public.profiles set role = 'PACKING' where id = '44444444-4444-4444-4444-444444444444';
 update public.profiles set active = false where id = '55555555-5555-5555-5555-555555555555';
@@ -94,7 +94,7 @@ insert into public.attachments(replacement_id, attachment_type, storage_path, fi
 values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'LABEL', 'replacements/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/legacy-label.pdf', 'legacy-label.pdf', 'application/pdf', '33333333-3333-3333-3333-333333333333');
 SQL
 
-for migration in supabase/migrations/2026091[34]*.sql; do
+for migration in supabase/migrations/2026091[345]*.sql; do
   "${psql[@]}" -f "$migration" >/dev/null
 done
 
@@ -149,7 +149,7 @@ begin
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
     'ORDER-1', null, null, 'Test Product', 2, null, null, null, '[]'
   );
-  raise exception 'Replacement without customer_support product photos unexpectedly succeeded';
+  raise exception 'Replacement without CUSTOMER_SUPPORT product photos unexpectedly succeeded';
 exception when others then
   if sqlerrm <> 'Between one and twelve product photos are required' then raise; end if;
 end
@@ -160,28 +160,28 @@ begin
   perform public.create_replacement_with_photos(
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
     'ORDER-1', null, null, 'Test Product', 2, null, null, 'https://tracking.example.test/ORDER-1',
-    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/customer_support/99999999-9999-4999-8999-999999999999/photos/fabricated.jpg","file_name":"fabricated.jpg","mime_type":"image/jpeg"}]'
+    '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/CUSTOMER_SUPPORT/99999999-9999-4999-8999-999999999999/photos/fabricated.jpg","file_name":"fabricated.jpg","mime_type":"image/jpeg"}]'
   );
-  raise exception 'Fabricated customer_support product evidence unexpectedly succeeded';
+  raise exception 'Fabricated CUSTOMER_SUPPORT product evidence unexpectedly succeeded';
 exception when others then
   if sqlerrm <> 'Product photo storage objects were not uploaded by the current user' then raise; end if;
 end
 $$;
 
 insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
-  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/customer_support/99999999-9999-4999-8999-999999999999/photos/product.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
+  (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/CUSTOMER_SUPPORT/99999999-9999-4999-8999-999999999999/photos/product.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
 select public.create_replacement_with_photos(
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
   'ORDER-1', null, null, 'Test Product', 2, null, null, null,
-  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/customer_support/99999999-9999-4999-8999-999999999999/photos/product.jpg","file_name":"product.jpg","mime_type":"image/jpeg"}]'
+  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/CUSTOMER_SUPPORT/99999999-9999-4999-8999-999999999999/photos/product.jpg","file_name":"product.jpg","mime_type":"image/jpeg"}]'
 );
 
 insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
-  (gen_random_uuid(), 'replacement-files', 'replacements/dddddddd-dddd-4ddd-8ddd-dddddddddddd/customer_support/12121212-1212-4121-8121-121212121212/photos/offline.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
+  (gen_random_uuid(), 'replacement-files', 'replacements/dddddddd-dddd-4ddd-8ddd-dddddddddddd/CUSTOMER_SUPPORT/12121212-1212-4121-8121-121212121212/photos/offline.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
 select public.create_order_batch(
   null,
   '[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","order_type":"OFFLINE","order_reference":"OFFLINE-1","customer_name":"Test Customer","customer_email":"TEST@EXAMPLE.COM","product_name":"Counter Product","quantity":1,"shipping_speed":"STANDARD"}]',
-  '[{"replacement_id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","storage_path":"replacements/dddddddd-dddd-4ddd-8ddd-dddddddddddd/customer_support/12121212-1212-4121-8121-121212121212/photos/offline.jpg","file_name":"offline.jpg","mime_type":"image/jpeg"}]'
+  '[{"replacement_id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","storage_path":"replacements/dddddddd-dddd-4ddd-8ddd-dddddddddddd/CUSTOMER_SUPPORT/12121212-1212-4121-8121-121212121212/photos/offline.jpg","file_name":"offline.jpg","mime_type":"image/jpeg"}]'
 );
 do $$
 begin
@@ -206,7 +206,7 @@ $$;
 do $$
 begin
   perform public.submit_logistics_label('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '[]');
-  raise exception 'customer_support Logistics authorization unexpectedly succeeded';
+  raise exception 'CUSTOMER_SUPPORT Logistics authorization unexpectedly succeeded';
 exception when others then
   if sqlerrm <> 'Only Logistics can upload the shipping label' then raise; end if;
 end
@@ -221,7 +221,7 @@ begin
   );
   raise exception 'Logistics replacement creation unexpectedly succeeded';
 exception when others then
-  if sqlerrm <> 'Only customer_support can create replacement orders' then raise; end if;
+  if sqlerrm <> 'Only CUSTOMER_SUPPORT can create replacement orders' then raise; end if;
 end
 $$;
 
@@ -343,7 +343,7 @@ select public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'QC
 do $$
 begin
   perform public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'SHIPPED');
-  raise exception 'customer_support dispatch unexpectedly succeeded';
+  raise exception 'CUSTOMER_SUPPORT dispatch unexpectedly succeeded';
 exception when others then
   if sqlerrm <> 'Only Packing can mark a packed replacement as shipped' then raise; end if;
 end
@@ -369,7 +369,7 @@ begin
     raise exception 'Logistics label was not retained';
   end if;
   if (select count(*) from public.attachments where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and attachment_type = 'PROOF_PHOTO' and uploaded_by = '22222222-2222-2222-2222-222222222222') <> 1 then
-    raise exception 'customer_support product photo was not retained with the order';
+    raise exception 'CUSTOMER_SUPPORT product photo was not retained with the order';
   end if;
   if (select count(*) from public.activity_logs where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') < 10 then
     raise exception 'Workflow audit trail is incomplete';
@@ -384,16 +384,16 @@ where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 set role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
 insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
-  (gen_random_uuid(), 'replacement-files', 'replacements/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/customer_support/13131313-1313-4131-8131-131313131313/photos/admin-offline.jpg', '{"size":1024}', '11111111-1111-1111-1111-111111111111');
+  (gen_random_uuid(), 'replacement-files', 'replacements/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/CUSTOMER_SUPPORT/13131313-1313-4131-8131-131313131313/photos/admin-offline.jpg', '{"size":1024}', '11111111-1111-1111-1111-111111111111');
 select public.create_order_batch(
   null,
-  '[{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","requested_order_number":760,"order_type":"OFFLINE","order_reference":"ADMIN-OFFLINE","product_name":"Admin Product","quantity":1,"shipping_speed":"STANDARD"}]',
-  '[{"replacement_id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","storage_path":"replacements/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/customer_support/13131313-1313-4131-8131-131313131313/photos/admin-offline.jpg","file_name":"admin-offline.jpg","mime_type":"image/jpeg"}]'
+  '[{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","requested_order_number":499,"order_type":"OFFLINE","order_reference":"ADMIN-OFFLINE","product_name":"Admin Product","quantity":1,"shipping_speed":"STANDARD"}]',
+  '[{"replacement_id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","storage_path":"replacements/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/CUSTOMER_SUPPORT/13131313-1313-4131-8131-131313131313/photos/admin-offline.jpg","file_name":"admin-offline.jpg","mime_type":"image/jpeg"}]'
 );
 do $$
 begin
-  if (select order_number from public.replacements where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') <> 760 then
-    raise exception 'Admin custom Order ID was not saved during creation';
+  if (select order_number from public.replacements where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') <> 499 then
+    raise exception 'Admin custom Order ID below 501 was not saved during creation';
   end if;
 end
 $$;
@@ -409,7 +409,7 @@ begin
   end if;
   begin
     perform public.update_replacement_details_with_order_number(
-      'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 760, 'OFFLINE-1', 'Test Customer', null,
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 499, 'OFFLINE-1', 'Test Customer', null,
       'Partially Saved Product', 1, null, 'Must roll back', null
     );
     raise exception 'Duplicate Order ID unexpectedly succeeded';
@@ -453,7 +453,7 @@ begin
     perform public.update_replacement_details('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'ATTACK', null, null, 'Attack', 1, null, null, null);
     raise exception 'Inactive profile edited a replacement';
   exception when others then
-    if sqlerrm <> 'Only customer_support can edit replacement details' then raise; end if;
+    if sqlerrm <> 'Only CUSTOMER_SUPPORT can edit replacement details' then raise; end if;
   end;
   begin
     perform public.admin_override_replacement('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'CANCELLED', 'unauthorized override');

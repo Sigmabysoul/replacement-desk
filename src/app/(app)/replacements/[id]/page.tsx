@@ -141,7 +141,7 @@ export default async function ReplacementDetailPage({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={replacement.status} className="text-sm" />
-                  {["customer_support", "ADMIN"].includes(profile.role) &&
+                  {["CUSTOMER_SUPPORT", "ADMIN"].includes(profile.role) &&
                     !["SHIPPED", "CANCELLED"].includes(replacement.status) && (
                       <Link
                         href={`/replacements/${replacement.id}/edit`}
@@ -152,7 +152,7 @@ export default async function ReplacementDetailPage({
                       </Link>
                     )}
                   {(profile.role === "ADMIN" ||
-                    (profile.role === "customer_support" &&
+                    (profile.role === "CUSTOMER_SUPPORT" &&
                       replacement.created_by === profile.id &&
                       replacement.status === "NEW")) && (
                     <form action={deleteReplacementAction}>
@@ -301,7 +301,7 @@ export default async function ReplacementDetailPage({
                           <p className="mt-1 font-semibold text-rose-950">“{qc.rejection_reason}”</p>
                           {qc.reviewed_at && (
                             <p className="mt-1 text-xs text-slate-500">
-                              Reviewed by {qc.reviewer?.full_name ?? "customer_support"} on {formatDate(qc.reviewed_at)}
+                              Reviewed by {qc.reviewer?.full_name ?? "CUSTOMER_SUPPORT"} on {formatDate(qc.reviewed_at)}
                             </p>
                           )}
                         </div>

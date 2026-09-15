@@ -1,7 +1,7 @@
 -- TBC_KART core schema. Apply with `supabase db push` or in the SQL editor.
 create extension if not exists pgcrypto;
 
-create type public.app_role as enum ('customer_support', 'PRINTING', 'PACKING', 'ADMIN');
+create type public.app_role as enum ('CUSTOMER_SUPPORT', 'PRINTING', 'PACKING', 'ADMIN');
 create type public.replacement_status as enum ('NEW', 'LABEL_PRINTED', 'QC_PENDING', 'QC_REJECTED', 'QC_APPROVED', 'PACKED', 'SHIPPED', 'NEEDS_TOKEN', 'CANCELLED');
 create type public.attachment_type as enum ('CUSTOMER_PHOTO', 'LABEL', 'QC_PHOTO', 'OTHER');
 create type public.qc_decision as enum ('PENDING', 'APPROVED', 'REJECTED');
@@ -176,12 +176,12 @@ $$;
 
 create policy "active users can view profiles" on public.profiles for select to authenticated using (public.current_active_role() is not null);
 create policy "active users can view replacements" on public.replacements for select to authenticated using (public.current_active_role() is not null);
-create policy "customer_support and admin can create replacements" on public.replacements for insert to authenticated with check (public.current_active_role() in ('customer_support', 'ADMIN') and created_by = auth.uid() and status = 'NEW');
+create policy "CUSTOMER_SUPPORT and admin can create replacements" on public.replacements for insert to authenticated with check (public.current_active_role() in ('CUSTOMER_SUPPORT', 'ADMIN') and created_by = auth.uid() and status = 'NEW');
 create policy "active users can view qc" on public.qc_submissions for select to authenticated using (public.current_active_role() is not null);
 create policy "active users can view attachments" on public.attachments for select to authenticated using (public.current_active_role() is not null);
 create policy "authorized users can add request files" on public.attachments for insert to authenticated with check (
   uploaded_by = auth.uid() and qc_submission_id is null and
-  ((public.current_active_role() in ('customer_support', 'ADMIN')) and attachment_type in ('CUSTOMER_PHOTO', 'LABEL', 'OTHER'))
+  ((public.current_active_role() in ('CUSTOMER_SUPPORT', 'ADMIN')) and attachment_type in ('CUSTOMER_PHOTO', 'LABEL', 'OTHER'))
 );
 create policy "active users can view activity" on public.activity_logs for select to authenticated using (public.current_active_role() is not null);
 create policy "admins can view notifications" on public.notifications for select to authenticated using (public.current_active_role() = 'ADMIN');
@@ -199,7 +199,7 @@ on conflict (id) do update set public = excluded.public, file_size_limit = exclu
 create policy "active users can read replacement files" on storage.objects for select to authenticated using (bucket_id = 'replacement-files' and public.current_active_role() is not null);
 create policy "authorized users can upload replacement files" on storage.objects for insert to authenticated with check (
   bucket_id = 'replacement-files' and name like 'replacements/%' and
-  public.current_active_role() in ('customer_support', 'PACKING', 'ADMIN') and
+  public.current_active_role() in ('CUSTOMER_SUPPORT', 'PACKING', 'ADMIN') and
   coalesce((metadata ->> 'size')::bigint, 0) <= 5242880
 );
 create policy "uploaders can remove failed uploads" on storage.objects for delete to authenticated using (bucket_id = 'replacement-files' and owner_id = auth.uid()::text);
@@ -219,10 +219,10 @@ begin
   if actor_role is null then raise exception 'Active account required'; end if;
 
   if p_target_status = 'LABEL_PRINTED' and not (current_row.status = 'NEW' and actor_role in ('PRINTING', 'ADMIN')) then raise exception 'Only Printing can print a new label';
-  elsif p_target_status in ('QC_APPROVED', 'QC_REJECTED') and not (current_row.status = 'QC_PENDING' and actor_role in ('customer_support', 'ADMIN')) then raise exception 'Only customer_support can review pending QC';
+  elsif p_target_status in ('QC_APPROVED', 'QC_REJECTED') and not (current_row.status = 'QC_PENDING' and actor_role in ('CUSTOMER_SUPPORT', 'ADMIN')) then raise exception 'Only CUSTOMER_SUPPORT can review pending QC';
   elsif p_target_status = 'PACKED' and not (current_row.status = 'QC_APPROVED' and actor_role in ('PACKING', 'ADMIN')) then raise exception 'QC must be approved before packing';
-  elsif p_target_status = 'SHIPPED' and not (current_row.status in ('PACKED', 'NEEDS_TOKEN') and actor_role in ('customer_support', 'ADMIN')) then raise exception 'Only packed replacements can be shipped by customer_support';
-  elsif p_target_status = 'NEEDS_TOKEN' and not (current_row.status = 'PACKED' and actor_role in ('customer_support', 'ADMIN')) then raise exception 'Only packed replacements can need a token';
+  elsif p_target_status = 'SHIPPED' and not (current_row.status in ('PACKED', 'NEEDS_TOKEN') and actor_role in ('CUSTOMER_SUPPORT', 'ADMIN')) then raise exception 'Only packed replacements can be shipped by CUSTOMER_SUPPORT';
+  elsif p_target_status = 'NEEDS_TOKEN' and not (current_row.status = 'PACKED' and actor_role in ('CUSTOMER_SUPPORT', 'ADMIN')) then raise exception 'Only packed replacements can need a token';
   elsif p_target_status = 'CANCELLED' and not (current_row.status not in ('SHIPPED', 'CANCELLED') and actor_role = 'ADMIN') then raise exception 'Only Admin can cancel an open replacement';
   elsif p_target_status not in ('LABEL_PRINTED', 'QC_APPROVED', 'QC_REJECTED', 'PACKED', 'SHIPPED', 'NEEDS_TOKEN', 'CANCELLED') then raise exception 'Unsupported transition';
   end if;
@@ -302,7 +302,7 @@ create or replace function public.update_replacement_details(
 declare actor_role public.app_role;
 begin
   select public.current_active_role() into actor_role;
-  if actor_role not in ('customer_support', 'ADMIN') then raise exception 'Only customer_support can edit replacement details'; end if;
+  if actor_role not in ('CUSTOMER_SUPPORT', 'ADMIN') then raise exception 'Only CUSTOMER_SUPPORT can edit replacement details'; end if;
   if nullif(trim(p_order_reference), '') is null or nullif(trim(p_product_name), '') is null or p_quantity not between 1 and 999 then raise exception 'Invalid replacement details'; end if;
   update public.replacements set order_reference = trim(p_order_reference), customer_name = nullif(trim(p_customer_name), ''),
     customer_reference = nullif(trim(p_customer_reference), ''), product_name = trim(p_product_name), quantity = p_quantity,

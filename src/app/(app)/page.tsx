@@ -46,7 +46,7 @@ const metrics: {
     href: "/replacements?scope=all&status=AWAITING_QC",
   },
   {
-    label: "Waiting for customer_support review",
+    label: "Waiting for CUSTOMER_SUPPORT review",
     statuses: ["QC_PENDING"],
     icon: ScanLine,
     tone: "bg-amber-50 text-amber-800",
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
     .limit(40);
   const replacements = (data ?? []) as Replacement[];
   const workShortcut = {
-    customer_support: { href: "/replacements?scope=all&status=QC_PENDING", label: "Open QC reviews", icon: ScanLine },
+    CUSTOMER_SUPPORT: { href: "/replacements?scope=all&status=QC_PENDING", label: "Open QC reviews", icon: ScanLine },
     LOGISTICS: { href: "/replacements?scope=all&status=AWAITING_LOGISTICS", label: "Open orders awaiting Logistics", icon: PackageCheck },
     PRINTING: { href: "/replacements?scope=all&status=LABEL_UPLOADED", label: "Open orders awaiting Printing", icon: Printer },
     PACKING: { href: "/replacements?scope=all&status=AWAITING_QC", label: "Open orders awaiting Packing", icon: Camera },
@@ -118,7 +118,7 @@ export default async function DashboardPage() {
           </h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">See what needs attention across replacement orders.</p>
         </div>
-        {["customer_support", "ADMIN"].includes(profile.role) && (
+        {["CUSTOMER_SUPPORT", "ADMIN"].includes(profile.role) && (
           <Link
             href="/replacements/new"
             className="hidden min-h-12 items-center gap-2 rounded-xl bg-[var(--brand)] px-4 text-sm font-bold text-white shadow-lg shadow-[var(--brand)]/20 transition hover:-translate-y-0.5 hover:brightness-95 sm:flex"

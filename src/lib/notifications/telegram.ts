@@ -11,7 +11,7 @@ export type { NotificationType };
 
 /**
  * Resolves Telegram chat IDs associated with a department role.
- * E.g., `TELEGRAM_customer_support_CHAT_ID`, `TELEGRAM_LOGISTICS_CHAT_ID`.
+ * E.g., `TELEGRAM_CUSTOMER_SUPPORT_CHAT_ID`, `TELEGRAM_LOGISTICS_CHAT_ID`.
  *
  * @param role The target department role.
  * @returns Unique configured chat IDs for the requested department.

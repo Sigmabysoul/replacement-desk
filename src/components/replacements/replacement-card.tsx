@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/utils";
 
 /**
  * Generates an intuitive next-step guidance label customized for the viewer's active role.
- * E.g., for a NEW order, Logistics sees "Upload shipping label" while customer_support waits.
+ * E.g., for a NEW order, Logistics sees "Upload shipping label" while CUSTOMER_SUPPORT waits.
  *
  * @param status Current operational status of the replacement.
  * @param role Active user's department role.
@@ -16,9 +16,9 @@ import { formatDate } from "@/lib/utils";
 function actionHint(status: Replacement["status"], role: Role) {
   if (status === "NEW") return role === "LOGISTICS" || role === "ADMIN" ? "Upload shipping label" : "Waiting for logistics";
   if (status === "LABEL_UPLOADED") return role === "PRINTING" || role === "ADMIN" ? "Print the label" : "Waiting for printing";
-  if (status === "LABEL_PRINTED") return role === "PACKING" || role === "ADMIN" ? "Request customer_support QC" : "Waiting for packing QC";
+  if (status === "LABEL_PRINTED") return role === "PACKING" || role === "ADMIN" ? "Request CUSTOMER_SUPPORT QC" : "Waiting for packing QC";
   if (status === "QC_REJECTED") return role === "PACKING" || role === "ADMIN" ? "Resubmit QC pictures" : "Waiting for packing QC";
-  if (status === "QC_PENDING") return role === "customer_support" || role === "ADMIN" ? "Review QC" : "Waiting for review";
+  if (status === "QC_PENDING") return role === "CUSTOMER_SUPPORT" || role === "ADMIN" ? "Review QC" : "Waiting for review";
   if (status === "QC_APPROVED") return role === "PACKING" || role === "ADMIN" ? "Pack replacement" : "Ready to pack";
   if (status === "PACKED") return role === "PACKING" || role === "ADMIN" ? "Complete dispatch" : "Ready for dispatch";
   if (status === "NEEDS_TOKEN") return "Follow up on token";

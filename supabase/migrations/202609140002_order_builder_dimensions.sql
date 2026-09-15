@@ -63,12 +63,12 @@ for select to authenticated using (public.current_active_role() is not null);
 drop policy if exists "support can create dimension presets" on public.dimension_presets;
 create policy "support can create dimension presets" on public.dimension_presets
 for insert to authenticated with check (
-  public.current_active_role() in ('customer_support', 'ADMIN') and created_by = auth.uid()
+  public.current_active_role() in ('CUSTOMER_SUPPORT', 'ADMIN') and created_by = auth.uid()
 );
 drop policy if exists "support can update dimension presets" on public.dimension_presets;
 create policy "support can update dimension presets" on public.dimension_presets
-for update to authenticated using (public.current_active_role() in ('customer_support', 'ADMIN'))
-with check (public.current_active_role() in ('customer_support', 'ADMIN'));
+for update to authenticated using (public.current_active_role() in ('CUSTOMER_SUPPORT', 'ADMIN'))
+with check (public.current_active_role() in ('CUSTOMER_SUPPORT', 'ADMIN'));
 
 grant select, insert, update on public.dimension_presets to authenticated;
 revoke delete on public.dimension_presets from authenticated;
@@ -121,7 +121,7 @@ declare
   expected_count integer;
 begin
   select public.current_active_role() into actor_role;
-  if actor_role is null or actor_role not in ('customer_support', 'ADMIN') then
+  if actor_role is null or actor_role not in ('CUSTOMER_SUPPORT', 'ADMIN') then
     raise exception 'Only customer support can create orders';
   end if;
   if jsonb_typeof(p_orders) is distinct from 'array'
@@ -192,7 +192,7 @@ begin
     )
     where item.replacement_id = order_id
       and item.mime_type in ('image/jpeg', 'image/png', 'image/webp')
-      and item.storage_path like ('replacements/' || order_id || '/customer_support/%/photos/%');
+      and item.storage_path like ('replacements/' || order_id || '/CUSTOMER_SUPPORT/%/photos/%');
     get diagnostics attachment_count = row_count;
     if attachment_count <> expected_count then raise exception 'Invalid product photo metadata'; end if;
 

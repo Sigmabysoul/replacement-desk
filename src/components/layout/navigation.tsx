@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CirclePlus, ClipboardList, LayoutDashboard, PackageCheck, Ruler, Settings, Truck, Users } from "lucide-react";
+import { CirclePlus, ClipboardList, LayoutDashboard, PackageCheck, Settings, Truck, Users } from "lucide-react";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -15,12 +15,12 @@ interface NavItem {
 }
 
 const mainItems: NavItem[] = [
-  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
-  { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
-  { href: "/replacements/new", label: "New order", short: "New", icon: CirclePlus, roles: ["customer_support", "ADMIN"] },
-  { href: "/dimensions", label: "Dimensions", short: "Sizes", icon: Ruler, roles: ["customer_support", "ADMIN"] },
+  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
+  { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
+  { href: "/replacements/new", label: "New order", short: "New", icon: CirclePlus, roles: ["CUSTOMER_SUPPORT", "ADMIN"] },
+  { href: "/settings", label: "Settings", short: "Settings", icon: Settings, roles: ["CUSTOMER_SUPPORT"] },
   { href: "/dispatch", label: "Dispatch", short: "Dispatch", icon: Truck, roles: ["PACKING", "ADMIN"] },
-  { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ["customer_support", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
+  { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
 ];
 
 export function Navigation({ role }: { role: Role }) {
@@ -28,7 +28,7 @@ export function Navigation({ role }: { role: Role }) {
   const operationalItems = mainItems.filter((item) => item.roles.includes(role));
   const adminItems = role === "ADMIN" ? [
     { href: "/admin/users", label: "Users", icon: Users },
-    { href: "/admin/settings", label: "Settings", icon: Settings },
+    { href: "/settings", label: "Settings", icon: Settings },
   ] : [];
 
   const mobileItems = role === "ADMIN"
@@ -36,7 +36,7 @@ export function Navigation({ role }: { role: Role }) {
         { href: "/", short: "Home", icon: LayoutDashboard },
         { href: "/replacements", short: "Orders", icon: ClipboardList },
         { href: "/replacements/new", short: "New", icon: CirclePlus },
-        { href: "/dimensions", short: "Sizes", icon: Ruler },
+        { href: "/settings", short: "Settings", icon: Settings },
         { href: "/admin/users", short: "Users", icon: Users },
       ]
     : operationalItems.map((item) => ({
@@ -59,7 +59,9 @@ export function Navigation({ role }: { role: Role }) {
         </Link>
         <nav className="grid gap-1" aria-label="Main navigation">
           {operationalItems.map(({ href, label, icon: Icon }) => {
-            const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+            const active = href === "/"
+              ? pathname === "/"
+              : pathname.startsWith(href) || (href === "/settings" && pathname.startsWith("/dimensions"));
             return (
               <Link
                 key={href}
@@ -82,7 +84,8 @@ export function Navigation({ role }: { role: Role }) {
               Admin
             </p>
             {adminItems.map(({ href, label, icon: Icon }) => {
-              const active = pathname.startsWith(href);
+              const active = pathname.startsWith(href)
+                || (href === "/settings" && (pathname.startsWith("/admin/settings") || pathname.startsWith("/dimensions")));
               return (
                 <Link
                   key={href}
@@ -108,7 +111,9 @@ export function Navigation({ role }: { role: Role }) {
         aria-label="Mobile navigation"
       >
         {mobileItems.map(({ href, short, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+          const active = href === "/"
+            ? pathname === "/"
+            : pathname.startsWith(href) || (href === "/settings" && pathname.startsWith("/dimensions"));
           return (
             <Link
               key={href}

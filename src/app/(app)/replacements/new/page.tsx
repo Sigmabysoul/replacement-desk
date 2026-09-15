@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { DimensionPreset } from "@/lib/types";
 
 export default async function NewReplacementPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const profile = await requireProfile(["customer_support", "ADMIN"]);
+  const profile = await requireProfile(["CUSTOMER_SUPPORT", "ADMIN"]);
   const [{ error }, supabase] = await Promise.all([searchParams, createClient()]);
   const [{ data: presetData }, { data: latestOrderData }] = await Promise.all([
     supabase.from("dimension_presets").select("*").eq("active", true).order("name"),

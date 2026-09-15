@@ -1,5 +1,5 @@
 -- Split the replacement handoff into four explicit departments:
--- customer_support creates/reviews, Logistics uploads the label, Printing prints it, and
+-- CUSTOMER_SUPPORT creates/reviews, Logistics uploads the label, Printing prints it, and
 -- Packing supplies QC evidence, packs, and completes dispatch.
 
 alter table public.profiles alter column role set default 'PRINTING';
@@ -124,8 +124,8 @@ begin
     and not (current_row.status = 'LABEL_UPLOADED' and actor_role in ('PRINTING', 'ADMIN'))
     then raise exception 'Only Printing can mark an uploaded label as printed';
   elsif p_target_status in ('QC_APPROVED', 'QC_REJECTED')
-    and not (current_row.status = 'QC_PENDING' and actor_role in ('customer_support', 'ADMIN'))
-    then raise exception 'Only customer_support can review pending QC';
+    and not (current_row.status = 'QC_PENDING' and actor_role in ('CUSTOMER_SUPPORT', 'ADMIN'))
+    then raise exception 'Only CUSTOMER_SUPPORT can review pending QC';
   elsif p_target_status = 'PACKED'
     and not (current_row.status = 'QC_APPROVED' and actor_role in ('PACKING', 'ADMIN'))
     then raise exception 'QC must be approved before Packing packs the order';
@@ -398,8 +398,8 @@ declare
   clean_tracking_url text := nullif(trim(p_tracking_url), '');
 begin
   select public.current_active_role() into actor_role;
-  if actor_role is null or actor_role not in ('customer_support', 'ADMIN') then
-    raise exception 'Only customer_support can edit replacement details';
+  if actor_role is null or actor_role not in ('CUSTOMER_SUPPORT', 'ADMIN') then
+    raise exception 'Only CUSTOMER_SUPPORT can edit replacement details';
   end if;
   if nullif(trim(p_order_reference), '') is null
     or nullif(trim(p_product_name), '') is null

@@ -16,7 +16,7 @@ export const statusLabel: Record<ReplacementStatus, string> = {
   NEW: "Awaiting logistics",
   LABEL_UPLOADED: "Awaiting printing",
   LABEL_PRINTED: "Label printed",
-  QC_PENDING: "Waiting for customer_support",
+  QC_PENDING: "Waiting for CUSTOMER_SUPPORT",
   QC_REJECTED: "QC rejected",
   QC_APPROVED: "QC approved",
   PACKED: "Packed",

@@ -21,7 +21,7 @@ export function LogisticsUploadForm({
 
       <div className="rounded-xl bg-indigo-50 p-4">
         <p className="font-bold text-indigo-950">Add the shipping label</p>
-        <p className="mt-1 text-sm text-indigo-800">customer_support already attached the product photos when creating this order.</p>
+        <p className="mt-1 text-sm text-indigo-800">CUSTOMER_SUPPORT already attached the product photos when creating this order.</p>
       </div>
 
       <Field label="Tracking link (optional)" hint="Logistics owns this field. Paste the courier or marketplace tracking URL.">

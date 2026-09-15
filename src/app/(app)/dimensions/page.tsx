@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { DimensionPreset } from "@/lib/types";
 
 export default async function DimensionsPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string }> }) {
-  await requireProfile(["customer_support", "ADMIN"]);
+  await requireProfile(["CUSTOMER_SUPPORT", "ADMIN"]);
   const [notice, supabase] = await Promise.all([searchParams, createClient()]);
   const { data, error } = await supabase.from("dimension_presets").select("*").order("active", { ascending: false }).order("name");
   const presets = (data ?? []) as DimensionPreset[];

@@ -64,7 +64,7 @@ export default async function SettingsPage() {
           </div>
         </div>
         <Setting label="Telegram Bot Token" configured={bot} />
-        <Setting label="customer_support Chat ID" configured={Boolean(process.env.TELEGRAM_customer_support_CHAT_ID)} />
+        <Setting label="CUSTOMER_SUPPORT Chat ID" configured={Boolean(process.env.TELEGRAM_CUSTOMER_SUPPORT_CHAT_ID)} />
         <Setting
           label="Logistics Chat ID"
           configured={Boolean(process.env.TELEGRAM_LOGISTICS_CHAT_ID)}

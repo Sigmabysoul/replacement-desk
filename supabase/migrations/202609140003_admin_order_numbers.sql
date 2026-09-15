@@ -19,7 +19,7 @@ declare
   expected_count integer;
 begin
   select public.current_active_role() into actor_role;
-  if actor_role is null or actor_role not in ('customer_support', 'ADMIN') then
+  if actor_role is null or actor_role not in ('CUSTOMER_SUPPORT', 'ADMIN') then
     raise exception 'Only customer support can create orders';
   end if;
   if jsonb_typeof(p_orders) is distinct from 'array'
@@ -109,7 +109,7 @@ begin
     )
     where item.replacement_id = order_id
       and item.mime_type in ('image/jpeg', 'image/png', 'image/webp')
-      and item.storage_path like ('replacements/' || order_id || '/customer_support/%/photos/%');
+      and item.storage_path like ('replacements/' || order_id || '/CUSTOMER_SUPPORT/%/photos/%');
     get diagnostics attachment_count = row_count;
     if attachment_count <> expected_count then raise exception 'Invalid product photo metadata'; end if;
 
@@ -187,8 +187,8 @@ declare
   previous_number bigint;
 begin
   select public.current_active_role() into actor_role;
-  if actor_role is null or actor_role not in ('customer_support', 'ADMIN') then
-    raise exception 'Only customer_support can edit replacement details';
+  if actor_role is null or actor_role not in ('CUSTOMER_SUPPORT', 'ADMIN') then
+    raise exception 'Only CUSTOMER_SUPPORT can edit replacement details';
   end if;
   if actor_role <> 'ADMIN' and p_order_number is not null then
     raise exception 'Only Admin can change the Order ID';
