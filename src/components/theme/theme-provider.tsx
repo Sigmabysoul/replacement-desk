@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import {
   DEFAULT_THEME_ID,
   getTheme,
@@ -17,11 +17,13 @@ type ThemeContextValue = {
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
+const THEME_STORAGE_KEY = "replacement-desk-theme";
+const THEME_CHANGE_EVENT = "replacement-desk-theme-change";
 
 function getInitialThemeId(): ThemeId {
   if (typeof window === "undefined") return DEFAULT_THEME_ID;
   try {
-    const saved = window.localStorage.getItem("replacement-desk-theme");
+    const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (!saved) return DEFAULT_THEME_ID;
     const parsed = JSON.parse(saved) as { themeId?: unknown; primary?: string; background?: string };
     if (isThemeId(parsed.themeId)) return parsed.themeId;
@@ -39,9 +41,29 @@ function getInitialThemeId(): ThemeId {
   return DEFAULT_THEME_ID;
 }
 
+function subscribeToTheme(onStoreChange: () => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === THEME_STORAGE_KEY) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(THEME_CHANGE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(THEME_CHANGE_EVENT, onStoreChange);
+  };
+}
+
+function saveThemeId(themeId: ThemeId) {
+  window.localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ version: 2, themeId }));
+  window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeId, setTheme] = useState<ThemeId>(getInitialThemeId);
+  // getServerSnapshot keeps SSR and hydration identical. React reads the
+  // browser snapshot immediately afterwards and updates to the saved theme.
+  const themeId = useSyncExternalStore(subscribeToTheme, getInitialThemeId, () => DEFAULT_THEME_ID);
   const theme = useMemo(() => getTheme(themeId), [themeId]);
+  const setTheme = useCallback((nextThemeId: ThemeId) => saveThemeId(nextThemeId), []);
 
   useEffect(() => {
     const { colors } = theme;
@@ -57,14 +79,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.style.setProperty("--muted", colors.muted);
     document.documentElement.style.setProperty("--muted-foreground", colors.mutedForeground);
     document.documentElement.dataset.themeMode = theme.mode;
-    window.localStorage.setItem("replacement-desk-theme", JSON.stringify({ version: 2, themeId }));
-  }, [theme, themeId]);
+  }, [theme]);
 
   const value = useMemo(() => ({
     theme,
     setTheme,
     resetTheme: () => setTheme(DEFAULT_THEME_ID),
-  }), [theme]);
+  }), [setTheme, theme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

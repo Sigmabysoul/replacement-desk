@@ -6,16 +6,21 @@ import { z } from "zod";
  *
  * @param max Maximum character length allowed.
  */
-const optionalText = (max: number) => z.string().trim().max(max).optional().transform((value) => value || null);
-const optionalTrackingUrl = z
-  .string()
-  .trim()
-  .max(2000, "Tracking link is too long")
-  .optional()
+const optionalText = (max: number) => z.preprocess(
+  (value) => value == null ? "" : value,
+  z.string().trim().max(max),
+).transform((value) => value || null);
+const optionalTrackingUrl = z.preprocess(
+  (value) => value == null ? "" : value,
+  z.string().trim().max(2000, "Tracking link is too long"),
+)
   .transform((value) => value || null)
   .refine((value) => value === null || /^https?:\/\/[^\s]+$/i.test(value), "Tracking link must begin with http:// or https://");
 
-const optionalEmail = z.string().trim().max(254).optional().transform((value) => value?.toLowerCase() || null)
+const optionalEmail = z.preprocess(
+  (value) => value == null ? "" : value,
+  z.string().trim().max(254),
+).transform((value) => value.toLowerCase() || null)
   .refine((value) => value === null || z.email().safeParse(value).success, "Enter a valid customer email");
 const optionalDimension = z.preprocess(
   (value) => value === "" || value == null ? null : value,

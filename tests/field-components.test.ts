@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Input, Textarea } from "@/components/ui/field";
 import { ProductPhotoPicker } from "@/components/replacements/product-photo-picker";
 import { ReasonSelect } from "@/components/replacements/reason-select";
+import { ThemeProvider, useTheme } from "@/components/theme/theme-provider";
 import {
   OrderBuilder,
   PRODUCT_LIST_CLASS,
@@ -97,6 +98,34 @@ describe("order reasons", () => {
       presets: ["Offline order"],
     }));
     expect(markup).toContain('<option value="Offline order" selected="">Offline order</option>');
+  });
+});
+
+describe("theme hydration", () => {
+  function CurrentThemeName() {
+    return createElement("span", null, useTheme().theme.name);
+  }
+
+  it("renders the same initial theme on the server and in the browser", () => {
+    const serverMarkup = renderToStaticMarkup(
+      createElement(ThemeProvider, null, createElement(CurrentThemeName)),
+    );
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage: {
+          getItem: () => JSON.stringify({ version: 2, themeId: "warm-sand" }),
+        },
+      },
+    });
+    try {
+      const browserMarkup = renderToStaticMarkup(
+        createElement(ThemeProvider, null, createElement(CurrentThemeName)),
+      );
+      expect(browserMarkup).toBe(serverMarkup);
+    } finally {
+      Reflect.deleteProperty(globalThis, "window");
+    }
   });
 });
 

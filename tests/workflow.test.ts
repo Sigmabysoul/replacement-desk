@@ -163,6 +163,19 @@ describe("schema validation", () => {
     }
   });
 
+  it("accepts null for optional batch fields", () => {
+    const result = replacementSchema.safeParse({
+      order_reference: "Courier",
+      product_name: "Test product",
+      quantity: 1,
+      customer_reference: null,
+      reason: null,
+      notes: null,
+      order_type: "OFFLINE",
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("rejects empty order reference and invalid quantity", () => {
     const dimensions = { order_type: "REPLACEMENT", length_cm: 30, breadth_cm: 20, height_cm: 10 };
     expect(replacementSchema.safeParse({ order_reference: "", product_name: "Test", quantity: 1, ...dimensions }).success).toBe(false);
