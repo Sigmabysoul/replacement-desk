@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { ReplacementStatus } from "@/lib/types";
+import type { OfflineOrderStatus, ReplacementStatus } from "@/lib/types";
 
 /**
  * Merges and deduplicates Tailwind CSS class names cleanly using `clsx` and `twMerge`.
@@ -36,6 +36,28 @@ export const statusTone: Record<ReplacementStatus, string> = {
   SHIPPED: "bg-slate-100 text-slate-700 ring-slate-200",
   NEEDS_TOKEN: "bg-orange-50 text-orange-900 ring-orange-200",
   CANCELLED: "bg-slate-100 text-slate-500 ring-slate-200",
+};
+
+export const offlineStatusLabel: Record<OfflineOrderStatus, string> = {
+  CREATED: "New Order",
+  PRINTING_ASSIGNED: "Awaiting Packing",
+  PACKING_CONFIRMED: "Awaiting Dispatch",
+  DISPATCHED: "In Transit",
+  PICKED_UP: "Picked Up",
+  DELIVERED: "Delivered",
+  ACKNOWLEDGED: "Acknowledged",
+  CANCELLED: "Cancelled",
+};
+
+export const offlineStatusTone: Record<OfflineOrderStatus, string> = {
+  CREATED: "bg-blue-50 text-blue-800 ring-blue-200",
+  PRINTING_ASSIGNED: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200",
+  PACKING_CONFIRMED: "bg-violet-50 text-violet-800 ring-violet-200",
+  DISPATCHED: "bg-amber-50 text-amber-900 ring-amber-200",
+  PICKED_UP: "bg-cyan-50 text-cyan-900 ring-cyan-200",
+  DELIVERED: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  ACKNOWLEDGED: "bg-slate-100 text-slate-700 ring-slate-200",
+  CANCELLED: "bg-rose-50 text-rose-800 ring-rose-200",
 };
 
 /**

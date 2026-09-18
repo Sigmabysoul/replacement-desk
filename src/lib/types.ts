@@ -1,4 +1,4 @@
-export const ROLES = ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] as const;
+export const ROLES = ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN", "BOSS", "HR", "CONSIGNMENT"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const STATUSES = [
@@ -109,6 +109,81 @@ export interface QcSubmission {
 export interface ActivityLog {
   id: string;
   replacement_id: string;
+  actor_id: string | null;
+  action: string;
+  message: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  actor?: Pick<Profile, "full_name" | "role"> | null;
+}
+
+export const OFFLINE_ORDER_STATUSES = [
+  "CREATED",
+  "PRINTING_ASSIGNED",
+  "PACKING_CONFIRMED",
+  "DISPATCHED",
+  "PICKED_UP",
+  "DELIVERED",
+  "ACKNOWLEDGED",
+  "CANCELLED",
+] as const;
+export type OfflineOrderStatus = (typeof OFFLINE_ORDER_STATUSES)[number];
+
+export type OfflineOrderAttachmentType = "DISPATCH_DOC" | "POD" | "OTHER";
+
+export interface OfflineOrder {
+  id: string;
+  so_number: string;
+  order_number: number;
+  brand: string | null;
+  product_name: string;
+  quantity: number;
+  unit: string;
+  logistics_partner: string | null;
+  dispatch_date: string | null;
+  notes: string | null;
+  status: OfflineOrderStatus;
+  carton_count: number | null;
+  carton_dimensions: string | null;
+  carton_weight_kg: number | null;
+  lr_number: string | null;
+  tracking_url: string | null;
+  pod_notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  printing_confirmed_at: string | null;
+  printing_confirmed_by: string | null;
+  packing_confirmed_at: string | null;
+  packing_confirmed_by: string | null;
+  dispatched_at: string | null;
+  dispatched_by: string | null;
+  picked_up_at: string | null;
+  picked_up_by: string | null;
+  delivered_at: string | null;
+  delivered_by: string | null;
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  creator?: Pick<Profile, "full_name"> | null;
+}
+
+export interface OfflineOrderAttachment {
+  id: string;
+  offline_order_id: string;
+  attachment_type: OfflineOrderAttachmentType;
+  storage_path: string;
+  file_name: string;
+  mime_type: string;
+  uploaded_by: string;
+  created_at: string;
+  signed_url?: string;
+}
+
+export interface OfflineOrderActivityLog {
+  id: string;
+  offline_order_id: string;
   actor_id: string | null;
   action: string;
   message: string | null;

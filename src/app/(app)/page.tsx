@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   AlertTriangle,
+  Boxes,
   CheckCircle2,
   ClipboardList,
   CirclePlus,
@@ -13,9 +14,10 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ReplacementCard } from "@/components/replacements/replacement-card";
+import { OfflineOrderCard } from "@/components/offline-orders/offline-order-card";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import type { Replacement, ReplacementStatus } from "@/lib/types";
+import type { OfflineOrder, Replacement, ReplacementStatus } from "@/lib/types";
 
 const metrics: {
   label: string;
@@ -92,20 +94,38 @@ const metrics: {
 export default async function DashboardPage() {
   const profile = await requireProfile();
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("replacements")
-    .select("*")
-    .is("archived_at", null)
-    .order("created_at", { ascending: false })
-    .limit(40);
-  const replacements = (data ?? []) as Replacement[];
+
+  const [
+    { data: replacementData, error: replacementError },
+    { data: offlineData },
+  ] = await Promise.all([
+    supabase
+      .from("replacements")
+      .select("*")
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(40),
+    supabase
+      .from("offline_orders")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(6),
+  ]);
+
+  const replacements = (replacementData ?? []) as Replacement[];
+  const offlineOrders = (offlineData ?? []) as OfflineOrder[];
+
   const workShortcut = {
     CUSTOMER_SUPPORT: { href: "/replacements?scope=all&status=QC_PENDING", label: "Open QC reviews", icon: ScanLine },
     LOGISTICS: { href: "/replacements?scope=all&status=AWAITING_LOGISTICS", label: "Open orders awaiting Logistics", icon: PackageCheck },
     PRINTING: { href: "/replacements?scope=all&status=LABEL_UPLOADED", label: "Open orders awaiting Printing", icon: Printer },
     PACKING: { href: "/replacements?scope=all&status=AWAITING_QC", label: "Open orders awaiting Packing", icon: Camera },
     ADMIN: { href: "/replacements?scope=all", label: "Open all operational work", icon: ClipboardList },
+    BOSS: { href: "/offline-orders", label: "Open offline orders", icon: Boxes },
+    HR: { href: "/offline-orders?status=PACKING_CONFIRMED", label: "Offline orders awaiting dispatch", icon: Truck },
+    CONSIGNMENT: { href: "/offline-orders?status=PRINTING_ASSIGNED", label: "Offline orders awaiting packing", icon: PackageCheck },
   }[profile.role];
+
   const WorkIcon = workShortcut.icon;
 
   return (
@@ -116,25 +136,41 @@ export default async function DashboardPage() {
           <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
             Good {new Date().getHours() < 12 ? "morning" : "afternoon"}, {profile.full_name.split(" ")[0]}
           </h1>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">See what needs attention across replacement orders.</p>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            See what needs attention across replacement and offline orders.
+          </p>
         </div>
-        {["CUSTOMER_SUPPORT", "ADMIN"].includes(profile.role) && (
-          <Link
-            href="/replacements/new"
-            className="hidden min-h-12 items-center gap-2 rounded-xl bg-[var(--brand)] px-4 text-sm font-bold text-white shadow-lg shadow-[var(--brand)]/20 transition hover:-translate-y-0.5 hover:brightness-95 sm:flex"
-          >
-            <CirclePlus className="size-5" />
-            New replacement
-          </Link>
-        )}
+
+        <div className="flex flex-wrap gap-2">
+          {["BOSS", "ADMIN"].includes(profile.role) && (
+            <Link
+              href="/offline-orders/new"
+              className="flex min-h-12 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:bg-slate-800"
+            >
+              <Boxes className="size-5" />
+              New offline order
+            </Link>
+          )}
+
+          {["CUSTOMER_SUPPORT", "ADMIN"].includes(profile.role) && (
+            <Link
+              href="/replacements/new"
+              className="flex min-h-12 items-center gap-2 rounded-xl bg-[var(--brand)] px-4 text-sm font-bold text-white shadow-lg shadow-[var(--brand)]/20 transition hover:-translate-y-0.5 hover:brightness-95"
+            >
+              <CirclePlus className="size-5" />
+              New replacement
+            </Link>
+          )}
+        </div>
       </section>
 
-      {error && (
+      {replacementError && (
         <Card className="border-rose-200 bg-rose-50 p-4 text-rose-900">
-          Could not load the dashboard. Try refreshing.
+          Could not load replacement orders. Try refreshing.
         </Card>
       )}
 
+      {/* Replacement metrics */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {metrics.map(({ label, statuses, icon: Icon, tone, href }) => {
           const count = replacements.filter((item) => statuses.includes(item.status)).length;
@@ -161,11 +197,32 @@ export default async function DashboardPage() {
         })}
       </section>
 
+      {/* Recent offline orders section */}
+      {offlineOrders.length > 0 && (
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Boxes className="size-5 text-indigo-600" />
+              <h2 className="text-lg font-black text-slate-950">Recent offline orders</h2>
+            </div>
+            <Link href="/offline-orders" className="text-sm font-bold text-indigo-700 hover:text-indigo-900">
+              View all offline
+            </Link>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {offlineOrders.slice(0, 4).map((order) => (
+              <OfflineOrderCard key={order.id} order={order} role={profile.role} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Recent replacements */}
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-black text-slate-950">Recent orders</h2>
+          <h2 className="text-lg font-black text-slate-950">Recent replacement orders</h2>
           <Link href="/replacements" className="text-sm font-bold text-indigo-700 hover:text-indigo-900">
-            View all
+            View all replacements
           </Link>
         </div>
         {replacements.length ? (
@@ -177,7 +234,7 @@ export default async function DashboardPage() {
         ) : (
           <Card className="grid place-items-center p-10 text-center">
             <Truck className="size-10 text-slate-300" />
-            <h3 className="mt-3 font-bold text-slate-800">No orders yet</h3>
+            <h3 className="mt-3 font-bold text-slate-800">No replacement orders yet</h3>
             <p className="mt-1 text-sm text-slate-500">New requests will appear here.</p>
           </Card>
         )}

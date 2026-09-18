@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CirclePlus, ClipboardList, LayoutDashboard, PackageCheck, Settings, Truck, Users } from "lucide-react";
+import { Boxes, CirclePlus, ClipboardList, LayoutDashboard, PackageCheck, Settings, Truck, Users } from "lucide-react";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -14,13 +14,16 @@ interface NavItem {
   roles: Role[];
 }
 
+const ALL_ROLES: Role[] = ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN", "BOSS", "HR", "CONSIGNMENT"];
+
 const mainItems: NavItem[] = [
-  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
-  { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
+  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ALL_ROLES },
+  { href: "/offline-orders", label: "Offline orders", short: "Offline", icon: Boxes, roles: ALL_ROLES },
+  { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN", "BOSS"] },
   { href: "/replacements/new", label: "New order", short: "New", icon: CirclePlus, roles: ["CUSTOMER_SUPPORT", "ADMIN"] },
   { href: "/settings", label: "Settings", short: "Settings", icon: Settings, roles: ["CUSTOMER_SUPPORT"] },
   { href: "/dispatch", label: "Dispatch", short: "Dispatch", icon: Truck, roles: ["PACKING", "ADMIN"] },
-  { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"] },
+  { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ALL_ROLES },
 ];
 
 export function Navigation({ role }: { role: Role }) {
@@ -34,10 +37,10 @@ export function Navigation({ role }: { role: Role }) {
   const mobileItems = role === "ADMIN"
     ? [
         { href: "/", short: "Home", icon: LayoutDashboard },
+        { href: "/offline-orders", short: "Offline", icon: Boxes },
         { href: "/replacements", short: "Orders", icon: ClipboardList },
-        { href: "/replacements/new", short: "New", icon: CirclePlus },
-        { href: "/settings", short: "Settings", icon: Settings },
         { href: "/admin/users", short: "Users", icon: Users },
+        { href: "/settings", short: "Settings", icon: Settings },
       ]
     : operationalItems.map((item) => ({
         href: item.href,

@@ -12,7 +12,7 @@ import { safeFileName } from "@/lib/utils";
 import { notifyTelegram } from "@/lib/notifications/telegram";
 import { verifyFileSignature } from "@/lib/security/magic-bytes";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rate-limit";
-import type { AttachmentType, Replacement, Role } from "@/lib/types";
+import { ROLES, type AttachmentType, type Replacement, type Role } from "@/lib/types";
 
 /**
  * Extracts a user-friendly error message string from an unknown caught error.
@@ -539,7 +539,7 @@ export async function createUserAction(formData: FormData) {
   const fullName = String(formData.get("full_name") ?? "").trim();
   const temporaryPassword = String(formData.get("temporary_password") ?? "");
   const role = String(formData.get("role") ?? "") as Role;
-  if (!email || !fullName || temporaryPassword.length < 6 || !["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Use%20a%20valid%20lowercase%20email%20and%20a%20temporary%20password%20of%20at%20least%206%20characters.");
+  if (!email || !fullName || temporaryPassword.length < 6 || !(ROLES as readonly string[]).includes(role)) redirect("/admin/users?error=Use%20a%20valid%20lowercase%20email%20and%20a%20temporary%20password%20of%20at%20least%206%20characters.");
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -569,7 +569,7 @@ export async function updateUserAction(formData: FormData) {
   const fullName = String(formData.get("full_name") ?? "").trim();
   const role = String(formData.get("role") ?? "") as Role;
   const active = formData.get("active") === "true";
-  if (!/^[0-9a-f-]{36}$/i.test(id) || !fullName || fullName.length > 120 || !["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"].includes(role)) redirect("/admin/users?error=Invalid%20user%20update.");
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !fullName || fullName.length > 120 || !(ROLES as readonly string[]).includes(role)) redirect("/admin/users?error=Invalid%20user%20update.");
   if (id === actor.id && (!active || role !== "ADMIN")) redirect("/admin/users?error=You%20cannot%20remove%20your%20own%20active%20administrator%20access.");
   const admin = createAdminClient();
   const { data: authRecord, error: authReadError } = await admin.auth.admin.getUserById(id);

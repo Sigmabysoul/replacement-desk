@@ -58,7 +58,7 @@ SQL
 
 for migration in supabase/migrations/*.sql; do
   case "$(basename "$migration")" in
-    2026091[345]*) continue ;;
+    2026091[3458]*) continue ;;
   esac
   "${psql[@]}" -f "$migration" >/dev/null
 done
@@ -94,7 +94,7 @@ insert into public.attachments(replacement_id, attachment_type, storage_path, fi
 values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'LABEL', 'replacements/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/legacy-label.pdf', 'legacy-label.pdf', 'application/pdf', '33333333-3333-3333-3333-333333333333');
 SQL
 
-for migration in supabase/migrations/2026091[345]*.sql; do
+for migration in supabase/migrations/2026091[3458]*.sql; do
   "${psql[@]}" -f "$migration" >/dev/null
 done
 
@@ -467,6 +467,113 @@ begin
   exception when others then
     if sqlerrm <> 'Administrator access required' then raise; end if;
   end;
+end
+$$;
+
+reset role;
+insert into auth.users(id, email, raw_user_meta_data) values
+  ('88888888-8888-4888-8888-888888888888', 'boss@example.com', '{"full_name":"Boss"}'),
+  ('99999999-9999-4999-8999-999999999999', 'hr@example.com', '{"full_name":"Nainisha HR"}'),
+  ('aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa', 'consignment@example.com', '{"full_name":"Ali Consignment"}');
+update public.profiles set role = 'BOSS' where id = '88888888-8888-4888-8888-888888888888';
+update public.profiles set role = 'HR' where id = '99999999-9999-4999-8999-999999999999';
+update public.profiles set role = 'CONSIGNMENT' where id = 'aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+set role authenticated;
+-- 1. Boss creates offline order
+select set_config('request.jwt.claim.sub', '88888888-8888-4888-8888-888888888888', false);
+select public.create_offline_order(
+  'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  'SO - OFLN115',
+  'averX',
+  'GARBAGE BAG ROLL - 24X32 - BLACK',
+  400,
+  'Rolls',
+  'Delhivery',
+  '2026-09-04'::date,
+  'Carton count pending with Kartik Da'
+);
+
+do $$
+begin
+  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'CREATED' then
+    raise exception 'Offline order was not created in CREATED status';
+  end if;
+end
+$$;
+
+-- 2. Printing confirms printing
+select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', false);
+select public.confirm_offline_printing('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+
+do $$
+begin
+  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'PRINTING_ASSIGNED' then
+    raise exception 'Printing confirmation failed';
+  end if;
+end
+$$;
+
+-- 3. Consignment confirms packing
+select set_config('request.jwt.claim.sub', 'aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa', false);
+select public.confirm_offline_packing('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 3, '56X32X38', 57);
+
+do $$
+begin
+  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'PACKING_CONFIRMED' then
+    raise exception 'Packing confirmation failed';
+  end if;
+  if (select carton_count from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 3 then
+    raise exception 'Carton count was not recorded';
+  end if;
+end
+$$;
+
+-- 4. HR dispatches order
+select set_config('request.jwt.claim.sub', '99999999-9999-4999-8999-999999999999', false);
+select public.dispatch_offline_order('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'DEL123456', 'https://delhivery.com/track/123', 'Delhivery', '[]');
+
+do $$
+begin
+  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'DISPATCHED' then
+    raise exception 'Dispatch confirmation failed';
+  end if;
+end
+$$;
+
+-- 5. Consignment confirms pickup
+select set_config('request.jwt.claim.sub', 'aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa', false);
+select public.confirm_offline_pickup('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+
+do $$
+begin
+  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'PICKED_UP' then
+    raise exception 'Pickup confirmation failed';
+  end if;
+end
+$$;
+
+-- 6. HR confirms delivery
+select set_config('request.jwt.claim.sub', '99999999-9999-4999-8999-999999999999', false);
+select public.confirm_offline_delivery('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Received with stamp and signature', '[]');
+
+do $$
+begin
+  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'DELIVERED' then
+    raise exception 'Delivery confirmation failed';
+  end if;
+end
+$$;
+
+-- 7. Boss acknowledges order
+select set_config('request.jwt.claim.sub', '88888888-8888-4888-8888-888888888888', false);
+select public.acknowledge_offline_order('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+
+do $$
+begin
+  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'ACKNOWLEDGED' then
+    raise exception 'Acknowledgment failed';
+  end if;
 end
 $$;
 SQL
