@@ -5,24 +5,22 @@ import { OfflineStatusBadge } from "@/components/ui/badge";
 import type { OfflineOrder, Role } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
-function actionHint(status: OfflineOrder["status"], role: Role): string {
+function actionHint(status: OfflineOrder["status"], roles: readonly Role[]): string {
+  const hasRole = (role: Role) => roles.includes("ADMIN") || roles.includes(role);
+
   switch (status) {
     case "CREATED":
-      return role === "PRINTING" || role === "ADMIN" ? "Confirm printing" : "Waiting for printing";
-    case "PRINTING_ASSIGNED":
-      return role === "CONSIGNMENT" || role === "ADMIN"
-        ? "Confirm packing & dimensions"
-        : "Waiting for packing confirmation";
+      return hasRole("CONSIGNMENT") ? "Confirm packing & dimensions" : "Waiting for packing confirmation";
     case "PACKING_CONFIRMED":
-      return role === "HR" || role === "ADMIN"
-        ? "Dispatch & attach LR / tracking"
-        : "Waiting for dispatch";
-    case "DISPATCHED":
-      return role === "CONSIGNMENT" || role === "ADMIN" ? "Confirm pickup done" : "Waiting for pickup";
+      return hasRole("HR") ? "Prepare dispatch & attach photos" : "Waiting for dispatch details";
+    case "DISPATCH_PREPARED":
+      return hasRole("PRINTING") ? "Confirm printing done" : "Waiting for printing";
+    case "PRINTED":
+      return hasRole("CONSIGNMENT") ? "Confirm pickup done" : "Waiting for courier pickup";
     case "PICKED_UP":
-      return role === "HR" || role === "ADMIN" ? "Confirm delivery & attach POD" : "In transit";
+      return hasRole("HR") ? "Confirm delivery & attach POD" : "In transit";
     case "DELIVERED":
-      return role === "BOSS" || role === "ADMIN" ? "Acknowledge delivery" : "Delivered";
+      return hasRole("BOSS") ? "Acknowledge delivery" : "Delivered";
     case "ACKNOWLEDGED":
       return "Completed & noted";
     case "CANCELLED":
@@ -32,7 +30,17 @@ function actionHint(status: OfflineOrder["status"], role: Role): string {
   }
 }
 
-export function OfflineOrderCard({ order, role }: { order: OfflineOrder; role: Role }) {
+export function OfflineOrderCard({
+  order,
+  role,
+  roles,
+}: {
+  order: OfflineOrder;
+  role?: Role;
+  roles?: Role[];
+}) {
+  const userRoles = roles?.length ? roles : role ? [role] : [];
+
   return (
     <Link
       href={`/offline-orders/${order.id}`}
@@ -75,7 +83,7 @@ export function OfflineOrderCard({ order, role }: { order: OfflineOrder; role: R
 
         <div className="mt-4 flex items-end justify-between gap-4 border-t border-slate-100 pt-3">
           <div>
-            <p className="text-sm font-bold text-indigo-700">{actionHint(order.status, role)}</p>
+            <p className="text-sm font-bold text-indigo-700">{actionHint(order.status, userRoles)}</p>
             <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
               <CalendarDays className="size-3.5" />
               {formatDate(order.created_at)}

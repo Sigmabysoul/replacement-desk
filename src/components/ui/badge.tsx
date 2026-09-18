@@ -14,3 +14,5 @@ export function OfflineStatusBadge({ status, className }: { status: OfflineOrder
     </span>
   );
 }
+
+export { StatusBadge as ReplacementStatusBadge };

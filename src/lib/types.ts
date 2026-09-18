@@ -10,6 +10,7 @@ export const STATUSES = [
   "QC_APPROVED",
   "PACKED",
   "SHIPPED",
+  "DELIVERED",
   "NEEDS_TOKEN",
   "CANCELLED",
 ] as const;
@@ -36,6 +37,7 @@ export interface Profile {
   id: string;
   full_name: string;
   role: Role;
+  roles: Role[];
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -57,6 +59,8 @@ export interface Replacement {
   quantity: number;
   reason: string | null;
   notes: string | null;
+  courier_partner: string | null;
+  tracking_id: string | null;
   tracking_url: string | null;
   shipping_speed: ShippingSpeed;
   dimension_preset_id: string | null;
@@ -72,6 +76,9 @@ export interface Replacement {
   qc_approved_at: string | null;
   packed_at: string | null;
   shipped_at: string | null;
+  delivered_at: string | null;
+  delivered_by: string | null;
+  delivery_notes: string | null;
   needs_token_at: string | null;
   archived_at: string | null;
   archived_by: string | null;
@@ -119,9 +126,9 @@ export interface ActivityLog {
 
 export const OFFLINE_ORDER_STATUSES = [
   "CREATED",
-  "PRINTING_ASSIGNED",
   "PACKING_CONFIRMED",
-  "DISPATCHED",
+  "DISPATCH_PREPARED",
+  "PRINTED",
   "PICKED_UP",
   "DELIVERED",
   "ACKNOWLEDGED",
@@ -189,5 +196,5 @@ export interface OfflineOrderActivityLog {
   message: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
-  actor?: Pick<Profile, "full_name" | "role"> | null;
+  actor?: Pick<Profile, "full_name" | "role" | "roles"> | null;
 }

@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Archive, Search, SlidersHorizontal } from "lucide-react";
+import { Archive, CirclePlus, Search, SlidersHorizontal } from "lucide-react";
 import { archiveCompletedReplacementsAction } from "@/app/actions";
 import { ReplacementCard } from "@/components/replacements/replacement-card";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
-import { requireProfile } from "@/lib/auth/session";
+import { hasAnyRole, hasRole, requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { STATUSES, type Replacement, type ReplacementStatus } from "@/lib/types";
 import { statusLabel } from "@/lib/utils";
@@ -53,11 +53,25 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
   const { data, error } = await query.limit(100);
   const replacements = (data ?? []) as Replacement[];
 
+  const canCreate = hasAnyRole(profile, ["CUSTOMER_SUPPORT", "ADMIN"]);
+
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-700">All work</p>
-        <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Orders</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-700">Replacements Pipeline</p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Replacement Orders</h1>
+        </div>
+
+        {canCreate && (
+          <Link
+            href="/replacements/new"
+            className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--brand)] px-4 text-sm font-bold text-white shadow-lg shadow-[var(--brand)]/20 transition hover:-translate-y-0.5 hover:brightness-95"
+          >
+            <CirclePlus className="size-5" />
+            New Replacement
+          </Link>
+        )}
       </div>
 
       <Card className="p-4 sm:p-5">
@@ -80,7 +94,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
               );
             })}
           </div>
-          {profile.role === "ADMIN" && (
+          {hasRole(profile, "ADMIN") && (
             <form action={archiveCompletedReplacementsAction}>
               <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50">
                 <Archive className="size-4" /> Archive completed 30+ day orders

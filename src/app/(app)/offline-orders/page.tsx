@@ -3,7 +3,7 @@ import { Boxes, CirclePlus, Search } from "lucide-react";
 import { OfflineOrderCard } from "@/components/offline-orders/offline-order-card";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
-import { requireProfile } from "@/lib/auth/session";
+import { hasAnyRole, requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { OFFLINE_ORDER_STATUSES, type OfflineOrder, type OfflineOrderStatus } from "@/lib/types";
 import { offlineStatusLabel } from "@/lib/utils";
@@ -34,7 +34,7 @@ export default async function OfflineOrdersPage({
   const { data, error } = await query.limit(100);
   const orders = (data ?? []) as OfflineOrder[];
 
-  const canCreate = ["BOSS", "ADMIN"].includes(profile.role);
+  const canCreate = hasAnyRole(profile, ["BOSS", "ADMIN"]);
 
   return (
     <div className="grid gap-6">
@@ -99,7 +99,12 @@ export default async function OfflineOrdersPage({
       {orders.length ? (
         <div className="grid gap-3 md:grid-cols-2">
           {orders.map((order) => (
-            <OfflineOrderCard key={order.id} order={order} role={profile.role} />
+            <OfflineOrderCard
+              key={order.id}
+              order={order}
+              role={profile.role}
+              roles={profile.roles ?? [profile.role]}
+            />
           ))}
         </div>
       ) : (

@@ -16,7 +16,7 @@ begin
   if not exists (select 1 from pg_type where typname = 'replacement_status') then
     create type public.replacement_status as enum (
       'NEW', 'LABEL_UPLOADED', 'LABEL_PRINTED', 'QC_PENDING',
-      'QC_REJECTED', 'QC_APPROVED', 'PACKED', 'SHIPPED', 'NEEDS_TOKEN', 'CANCELLED'
+      'QC_REJECTED', 'QC_APPROVED', 'PACKED', 'SHIPPED', 'DELIVERED', 'NEEDS_TOKEN', 'CANCELLED'
     );
   end if;
   if not exists (select 1 from pg_type where typname = 'attachment_type') then
@@ -34,6 +34,7 @@ $$;
 -- Ensure enum values exist if type was created previously with older subset
 alter type public.app_role add value if not exists 'LOGISTICS' after 'PACKING';
 alter type public.replacement_status add value if not exists 'LABEL_UPLOADED' after 'NEW';
+alter type public.replacement_status add value if not exists 'DELIVERED' after 'SHIPPED';
 alter type public.attachment_type add value if not exists 'PROOF_PHOTO' after 'LABEL';
 
 -- -----------------------------------------------------------------------------
@@ -56,7 +57,7 @@ create table if not exists public.replacement_sequences (
 create table if not exists public.replacements (
   id uuid primary key default gen_random_uuid(),
   replacement_number text not null unique,
-  order_reference text not null check (char_length(order_reference) between 1 and 100),
+  order_reference text check (order_reference is null or char_length(order_reference) <= 100),
   customer_name text check (customer_name is null or char_length(customer_name) <= 120),
   customer_reference text check (customer_reference is null or char_length(customer_reference) <= 100),
   product_name text not null check (char_length(product_name) between 1 and 200),
@@ -64,6 +65,8 @@ create table if not exists public.replacements (
   reason text check (reason is null or char_length(reason) <= 200),
   notes text check (notes is null or char_length(notes) <= 2000),
   tracking_url text check (tracking_url is null or tracking_url ~* '^https?://[^[:space:]]+$'),
+  courier_partner text,
+  tracking_id text,
   status public.replacement_status not null default 'NEW',
   created_by uuid not null references public.profiles(id),
   created_at timestamptz not null default now(),
@@ -74,6 +77,9 @@ create table if not exists public.replacements (
   packed_at timestamptz,
   shipped_at timestamptz,
   needs_token_at timestamptz,
+  delivered_at timestamptz,
+  delivered_by uuid references public.profiles(id),
+  delivery_notes text,
   archived_at timestamptz,
   archived_by uuid references public.profiles(id)
 );
@@ -1987,5 +1993,934 @@ $$;
 -- -----------------------------------------------------------------------------
 -- 11. Refresh PostgREST Schema Cache
 -- -----------------------------------------------------------------------------
+notify pgrst, 'reload schema';
+
+-- =============================================================================
+-- Multi-Role Support for Profiles
+-- Allows users to possess multiple roles simultaneously (e.g. Packer + Printer,
+-- CS + HR) while maintaining backward compatibility with the single role column.
+-- =============================================================================
+
+alter table public.profiles
+  add column if not exists roles public.app_role[] not null default array['PRINTING'::public.app_role];
+
+-- Populate existing rows with their current single role
+update public.profiles
+set roles = array[role]
+where roles is null or roles = array['PRINTING'::public.app_role];
+
+-- Trigger to keep role (primary) and roles (array) synchronized
+create or replace function public.sync_profile_roles()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.roles is null or cardinality(new.roles) = 0 then
+      new.roles := array[coalesce(new.role, 'PRINTING'::public.app_role)];
+    end if;
+    new.role := new.roles[1];
+  elsif tg_op = 'UPDATE' then
+    if new.roles is distinct from old.roles then
+      if new.roles is null or cardinality(new.roles) = 0 then
+        new.roles := array[coalesce(new.role, 'PRINTING'::public.app_role)];
+      end if;
+      new.role := new.roles[1];
+    elsif new.role is distinct from old.role then
+      new.roles := array[new.role];
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists sync_profile_roles_trigger on public.profiles;
+create trigger sync_profile_roles_trigger
+before insert or update on public.profiles
+for each row execute function public.sync_profile_roles();
+
+-- -----------------------------------------------------------------------------
+-- Helper Functions for Multi-Role Authorization
+-- -----------------------------------------------------------------------------
+
+create or replace function public.current_active_roles()
+returns public.app_role[] language sql stable security definer set search_path = '' as $$
+  select coalesce(roles, array[role]) from public.profiles where id = auth.uid() and active = true;
+$$;
+
+create or replace function public.has_role(p_role public.app_role)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and active = true
+      and ('ADMIN' = any(coalesce(roles, array[role])) or p_role = any(coalesce(roles, array[role])))
+  );
+$$;
+
+create or replace function public.has_any_role(variadic p_roles public.app_role[])
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and active = true
+      and (
+        'ADMIN' = any(coalesce(roles, array[role]))
+        or coalesce(roles, array[role]) && p_roles
+      )
+  );
+$$;
+
+revoke all on function public.current_active_roles() from public, anon;
+grant execute on function public.current_active_roles() to authenticated;
+
+revoke all on function public.has_role(public.app_role) from public, anon;
+grant execute on function public.has_role(public.app_role) to authenticated;
+
+revoke all on function public.has_any_role(public.app_role[]) from public, anon;
+grant execute on function public.has_any_role(public.app_role[]) to authenticated;
+-- =============================================================================
+-- Add revised offline order status enum values
+-- Must be committed before functions referencing them can compile.
+-- =============================================================================
+
+alter type public.offline_order_status add value if not exists 'DISPATCH_PREPARED' after 'PACKING_CONFIRMED';
+alter type public.offline_order_status add value if not exists 'PRINTED' after 'DISPATCH_PREPARED';
+-- =============================================================================
+-- Revised Offline Order Workflow
+-- Reorders the lifecycle to:
+-- 1. CREATED (Boss creates order)
+-- 2. PACKING_CONFIRMED (Consignment sets box count, dimensions, weight)
+-- 3. DISPATCH_PREPARED (HR adds courier, LR, tracking + uploads multiple photos)
+-- 4. PRINTED (Print team prints photos/materials and marks printed)
+-- 5. PICKED_UP (Consignment confirms courier pickup done)
+-- 6. DELIVERED (HR confirms delivery with POD notes & attachments)
+-- 7. ACKNOWLEDGED (Boss acknowledges delivery)
+-- Also updates authorization checks to use multi-role public.has_any_role().
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- 1. Storage Policies with Multi-Role Checks
+-- -----------------------------------------------------------------------------
+drop policy if exists "authorized users can upload offline order files" on storage.objects;
+create policy "authorized users can upload offline order files" on storage.objects
+for insert to authenticated with check (
+  bucket_id = 'offline-order-files'
+  and name like 'offline-orders/%'
+  and public.has_any_role('HR')
+  and coalesce((metadata ->> 'size')::bigint, 0) <= 26214400
+);
+
+-- -----------------------------------------------------------------------------
+-- 2. Step 1: Create Offline Order (BOSS, ADMIN)
+-- -----------------------------------------------------------------------------
+create or replace function public.create_offline_order(
+  p_id uuid,
+  p_so_number text,
+  p_brand text,
+  p_product_name text,
+  p_quantity integer,
+  p_unit text,
+  p_logistics_partner text,
+  p_dispatch_date date,
+  p_notes text
+)
+returns public.offline_orders
+language plpgsql security definer set search_path = '' as $$
+declare
+  created_row public.offline_orders;
+begin
+  if not public.has_any_role('BOSS') then
+    raise exception 'Only Boss or Admin can create offline orders';
+  end if;
+
+  if nullif(trim(p_so_number), '') is null then
+    raise exception 'SO number is required';
+  end if;
+  if nullif(trim(p_product_name), '') is null then
+    raise exception 'Product name is required';
+  end if;
+  if p_quantity not between 1 and 999999 then
+    raise exception 'Invalid quantity';
+  end if;
+
+  insert into public.offline_orders(
+    id, so_number, brand, product_name, quantity, unit,
+    logistics_partner, dispatch_date, notes, status, created_by
+  ) values (
+    p_id,
+    trim(p_so_number),
+    nullif(trim(p_brand), ''),
+    trim(p_product_name),
+    p_quantity,
+    coalesce(nullif(trim(p_unit), ''), 'Pieces'),
+    nullif(trim(p_logistics_partner), ''),
+    p_dispatch_date,
+    nullif(trim(p_notes), ''),
+    'CREATED',
+    auth.uid()
+  ) returning * into created_row;
+
+  insert into public.offline_order_activity_logs(offline_order_id, actor_id, action, metadata)
+  values (
+    p_id, auth.uid(), 'ORDER_CREATED',
+    jsonb_build_object('so_number', trim(p_so_number), 'product', trim(p_product_name), 'quantity', p_quantity)
+  );
+
+  return created_row;
+end;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 3. Step 2: Confirm Packing (CONSIGNMENT, ADMIN) - sets boxes, dimensions, weight
+-- -----------------------------------------------------------------------------
+create or replace function public.confirm_offline_packing(
+  p_order_id uuid,
+  p_carton_count integer,
+  p_carton_dimensions text,
+  p_carton_weight_kg numeric
+)
+returns public.offline_orders
+language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.offline_orders;
+begin
+  select * into current_row from public.offline_orders where id = p_order_id for update;
+  if not found then raise exception 'Offline order not found'; end if;
+
+  if not public.has_any_role('CONSIGNMENT') then
+    raise exception 'Only Consignment or Admin can confirm packing';
+  end if;
+  if current_row.status <> 'CREATED' then
+    raise exception 'Packing can only be confirmed for newly created orders';
+  end if;
+  if p_carton_count is null or p_carton_count < 1 then
+    raise exception 'Carton count is required';
+  end if;
+
+  update public.offline_orders set
+    status = 'PACKING_CONFIRMED',
+    carton_count = p_carton_count,
+    carton_dimensions = nullif(trim(p_carton_dimensions), ''),
+    carton_weight_kg = p_carton_weight_kg,
+    packing_confirmed_at = now(),
+    packing_confirmed_by = auth.uid()
+  where id = p_order_id
+  returning * into current_row;
+
+  insert into public.offline_order_activity_logs(offline_order_id, actor_id, action, metadata)
+  values (
+    p_order_id, auth.uid(), 'PACKING_CONFIRMED',
+    jsonb_build_object(
+      'carton_count', p_carton_count,
+      'carton_dimensions', nullif(trim(p_carton_dimensions), ''),
+      'carton_weight_kg', p_carton_weight_kg
+    )
+  );
+
+  return current_row;
+end;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 4. Step 3: Prepare Dispatch with Photos (HR, ADMIN)
+-- -----------------------------------------------------------------------------
+create or replace function public.dispatch_prepare_offline_order(
+  p_order_id uuid,
+  p_lr_number text,
+  p_tracking_url text,
+  p_logistics_partner text,
+  p_attachments jsonb default '[]'::jsonb
+)
+returns public.offline_orders
+language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.offline_orders;
+  attachment_count integer := 0;
+  clean_tracking_url text := nullif(trim(p_tracking_url), '');
+begin
+  select * into current_row from public.offline_orders where id = p_order_id for update;
+  if not found then raise exception 'Offline order not found'; end if;
+
+  if not public.has_any_role('HR') then
+    raise exception 'Only HR or Admin can prepare dispatch details and photos';
+  end if;
+  if current_row.status <> 'PACKING_CONFIRMED' then
+    raise exception 'Dispatch details can only be added after packing is confirmed';
+  end if;
+  if clean_tracking_url is not null and clean_tracking_url !~* '^https?://[^[:space:]]+$' then
+    raise exception 'Tracking link must begin with http:// or https://';
+  end if;
+
+  -- Insert document / photo attachments
+  if jsonb_typeof(p_attachments) = 'array' and jsonb_array_length(p_attachments) > 0 then
+    if jsonb_array_length(p_attachments) > 20 then
+      raise exception 'Maximum 20 photos / documents allowed';
+    end if;
+
+    insert into public.offline_order_attachments(
+      offline_order_id, attachment_type, storage_path, file_name, mime_type, uploaded_by
+    )
+    select
+      p_order_id, 'DISPATCH_DOC', item.storage_path, item.file_name, item.mime_type, auth.uid()
+    from jsonb_to_recordset(p_attachments) as item(storage_path text, file_name text, mime_type text)
+    where item.mime_type in ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')
+      and item.storage_path like ('offline-orders/' || p_order_id || '/dispatch/%');
+    get diagnostics attachment_count = row_count;
+    if attachment_count <> jsonb_array_length(p_attachments) then
+      raise exception 'Invalid photo / document metadata';
+    end if;
+  end if;
+
+  update public.offline_orders set
+    status = 'DISPATCH_PREPARED',
+    lr_number = nullif(trim(p_lr_number), ''),
+    tracking_url = clean_tracking_url,
+    logistics_partner = coalesce(nullif(trim(p_logistics_partner), ''), logistics_partner),
+    dispatched_at = now(),
+    dispatched_by = auth.uid()
+  where id = p_order_id
+  returning * into current_row;
+
+  insert into public.offline_order_activity_logs(offline_order_id, actor_id, action, metadata)
+  values (
+    p_order_id, auth.uid(), 'DISPATCH_PREPARED',
+    jsonb_build_object(
+      'lr_number', nullif(trim(p_lr_number), ''),
+      'has_tracking_link', clean_tracking_url is not null,
+      'attachment_count', attachment_count
+    )
+  );
+
+  return current_row;
+end;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 5. Step 4: Confirm Printing (PRINTING, ADMIN) - prints photos and marks printed
+-- -----------------------------------------------------------------------------
+create or replace function public.confirm_offline_printed(
+  p_order_id uuid
+)
+returns public.offline_orders
+language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.offline_orders;
+begin
+  select * into current_row from public.offline_orders where id = p_order_id for update;
+  if not found then raise exception 'Offline order not found'; end if;
+
+  if not public.has_any_role('PRINTING') then
+    raise exception 'Only Printing or Admin can confirm printing';
+  end if;
+  if current_row.status <> 'DISPATCH_PREPARED' then
+    raise exception 'Printing can only be confirmed after HR adds dispatch details and photos';
+  end if;
+
+  update public.offline_orders set
+    status = 'PRINTED',
+    printing_confirmed_at = now(),
+    printing_confirmed_by = auth.uid()
+  where id = p_order_id
+  returning * into current_row;
+
+  insert into public.offline_order_activity_logs(offline_order_id, actor_id, action)
+  values (p_order_id, auth.uid(), 'PRINTING_CONFIRMED');
+
+  return current_row;
+end;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 6. Step 5: Confirm Pickup (CONSIGNMENT, ADMIN)
+-- -----------------------------------------------------------------------------
+create or replace function public.confirm_offline_pickup(
+  p_order_id uuid
+)
+returns public.offline_orders
+language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.offline_orders;
+begin
+  select * into current_row from public.offline_orders where id = p_order_id for update;
+  if not found then raise exception 'Offline order not found'; end if;
+
+  if not public.has_any_role('CONSIGNMENT') then
+    raise exception 'Only Consignment or Admin can confirm pickup';
+  end if;
+  if current_row.status <> 'PRINTED' then
+    raise exception 'Pickup can only be confirmed after labels/materials are printed';
+  end if;
+
+  update public.offline_orders set
+    status = 'PICKED_UP',
+    picked_up_at = now(),
+    picked_up_by = auth.uid()
+  where id = p_order_id
+  returning * into current_row;
+
+  insert into public.offline_order_activity_logs(offline_order_id, actor_id, action)
+  values (p_order_id, auth.uid(), 'PICKUP_CONFIRMED');
+
+  return current_row;
+end;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 7. Step 6: Confirm Delivery (HR, ADMIN) - attaches POD
+-- -----------------------------------------------------------------------------
+create or replace function public.confirm_offline_delivery(
+  p_order_id uuid,
+  p_pod_notes text,
+  p_attachments jsonb default '[]'::jsonb
+)
+returns public.offline_orders
+language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.offline_orders;
+  attachment_count integer := 0;
+begin
+  select * into current_row from public.offline_orders where id = p_order_id for update;
+  if not found then raise exception 'Offline order not found'; end if;
+
+  if not public.has_any_role('HR') then
+    raise exception 'Only HR or Admin can confirm delivery';
+  end if;
+  if current_row.status <> 'PICKED_UP' then
+    raise exception 'Delivery can only be confirmed after pickup';
+  end if;
+
+  -- Insert POD attachments if provided
+  if jsonb_typeof(p_attachments) = 'array' and jsonb_array_length(p_attachments) > 0 then
+    if jsonb_array_length(p_attachments) > 10 then
+      raise exception 'Maximum 10 POD documents allowed';
+    end if;
+
+    insert into public.offline_order_attachments(
+      offline_order_id, attachment_type, storage_path, file_name, mime_type, uploaded_by
+    )
+    select
+      p_order_id, 'POD', item.storage_path, item.file_name, item.mime_type, auth.uid()
+    from jsonb_to_recordset(p_attachments) as item(storage_path text, file_name text, mime_type text)
+    where item.mime_type in ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')
+      and item.storage_path like ('offline-orders/' || p_order_id || '/pod/%');
+    get diagnostics attachment_count = row_count;
+    if attachment_count <> jsonb_array_length(p_attachments) then
+      raise exception 'Invalid POD document metadata';
+    end if;
+  end if;
+
+  update public.offline_orders set
+    status = 'DELIVERED',
+    pod_notes = nullif(trim(p_pod_notes), ''),
+    delivered_at = now(),
+    delivered_by = auth.uid()
+  where id = p_order_id
+  returning * into current_row;
+
+  insert into public.offline_order_activity_logs(offline_order_id, actor_id, action, metadata)
+  values (
+    p_order_id, auth.uid(), 'DELIVERY_CONFIRMED',
+    jsonb_build_object('pod_notes', nullif(trim(p_pod_notes), ''), 'attachment_count', attachment_count)
+  );
+
+  return current_row;
+end;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 8. Step 7: Acknowledge Order (BOSS, ADMIN)
+-- -----------------------------------------------------------------------------
+create or replace function public.acknowledge_offline_order(
+  p_order_id uuid
+)
+returns public.offline_orders
+language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.offline_orders;
+begin
+  select * into current_row from public.offline_orders where id = p_order_id for update;
+  if not found then raise exception 'Offline order not found'; end if;
+
+  if not public.has_any_role('BOSS') then
+    raise exception 'Only Boss or Admin can acknowledge delivery';
+  end if;
+  if current_row.status <> 'DELIVERED' then
+    raise exception 'Only delivered orders can be acknowledged';
+  end if;
+
+  update public.offline_orders set
+    status = 'ACKNOWLEDGED',
+    acknowledged_at = now(),
+    acknowledged_by = auth.uid()
+  where id = p_order_id
+  returning * into current_row;
+
+  insert into public.offline_order_activity_logs(offline_order_id, actor_id, action)
+  values (p_order_id, auth.uid(), 'ORDER_ACKNOWLEDGED');
+
+  return current_row;
+end;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 9. Cancel Offline Order (BOSS, ADMIN)
+-- -----------------------------------------------------------------------------
+create or replace function public.cancel_offline_order(
+  p_order_id uuid,
+  p_reason text
+)
+returns public.offline_orders
+language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.offline_orders;
+  previous_status public.offline_order_status;
+begin
+  select * into current_row from public.offline_orders where id = p_order_id for update;
+  if not found then raise exception 'Offline order not found'; end if;
+
+  if not public.has_any_role('BOSS') then
+    raise exception 'Only Boss or Admin can cancel offline orders';
+  end if;
+  if current_row.status in ('ACKNOWLEDGED', 'CANCELLED') then
+    raise exception 'This order cannot be cancelled';
+  end if;
+  if nullif(trim(p_reason), '') is null then
+    raise exception 'A cancellation reason is required';
+  end if;
+
+  previous_status := current_row.status;
+
+  update public.offline_orders set
+    status = 'CANCELLED',
+    cancelled_at = now(),
+    cancelled_by = auth.uid()
+  where id = p_order_id
+  returning * into current_row;
+
+  insert into public.offline_order_activity_logs(offline_order_id, actor_id, action, message, metadata)
+  values (
+    p_order_id, auth.uid(), 'ORDER_CANCELLED', trim(p_reason),
+    jsonb_build_object('from_status', previous_status::text)
+  );
+
+  return current_row;
+end;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 10. Function Grants
+-- -----------------------------------------------------------------------------
+revoke all on function public.dispatch_prepare_offline_order(uuid, text, text, text, jsonb) from public, anon;
+grant execute on function public.dispatch_prepare_offline_order(uuid, text, text, text, jsonb) to authenticated;
+
+revoke all on function public.confirm_offline_printed(uuid) from public, anon;
+grant execute on function public.confirm_offline_printed(uuid) to authenticated;
+
+-- =============================================================================
+-- Replacement Delivery Tracking & Courier Updates
+-- =============================================================================
+
+create or replace function public.create_order_batch(
+  p_group_id uuid,
+  p_orders jsonb,
+  p_attachments jsonb
+)
+returns setof public.replacements
+language plpgsql security definer set search_path = '' as $$
+declare
+  actor_role public.app_role;
+  order_item jsonb;
+  order_id uuid;
+  order_type text;
+  requested_order_number bigint;
+  created_row public.replacements;
+  attachment_count integer;
+  expected_count integer;
+  assigned_ref text;
+begin
+  select public.current_active_role() into actor_role;
+  if actor_role is null or not (actor_role in ('CUSTOMER_SUPPORT', 'ADMIN') or public.has_any_role('CUSTOMER_SUPPORT', 'ADMIN')) then
+    raise exception 'Only customer support can create orders';
+  end if;
+  if jsonb_typeof(p_orders) is distinct from 'array'
+    or jsonb_array_length(p_orders) not between 1 and 20 then
+    raise exception 'Create between one and twenty orders at a time';
+  end if;
+  if jsonb_typeof(p_attachments) is distinct from 'array' then
+    raise exception 'Invalid product photo metadata';
+  end if;
+
+  for order_item in select value from jsonb_array_elements(p_orders)
+  loop
+    order_id := (order_item ->> 'id')::uuid;
+    order_type := coalesce(order_item ->> 'order_type', 'REPLACEMENT');
+    requested_order_number := null;
+    if (actor_role = 'ADMIN' or public.has_role('ADMIN')) and nullif(order_item ->> 'requested_order_number', '') is not null then
+      requested_order_number := (order_item ->> 'requested_order_number')::bigint;
+      if requested_order_number < 1 then raise exception 'Order ID must be a positive whole number'; end if;
+    end if;
+    if order_type not in ('REPLACEMENT', 'OFFLINE') then raise exception 'Invalid order type'; end if;
+    if nullif(trim(order_item ->> 'product_name'), '') is null then raise exception 'Product is required'; end if;
+    if coalesce((order_item ->> 'quantity')::integer, 0) not between 1 and 999 then raise exception 'Invalid quantity'; end if;
+    if order_type = 'REPLACEMENT' and (
+      coalesce((order_item ->> 'length_cm')::numeric, 0) <= 0 or
+      coalesce((order_item ->> 'breadth_cm')::numeric, 0) <= 0 or
+      coalesce((order_item ->> 'height_cm')::numeric, 0) <= 0
+    ) then raise exception 'Replacement dimensions are required'; end if;
+
+    assigned_ref := coalesce(nullif(trim(order_item ->> 'order_reference'), ''), 'REF-AUTO');
+
+    expected_count := (
+      select count(*) from jsonb_array_elements(p_attachments) attachment
+      where attachment ->> 'replacement_id' = order_id::text
+    );
+    if expected_count not between 1 and 12 then
+      raise exception 'Between one and twelve product photos are required for every order';
+    end if;
+    if (
+      select count(*) from jsonb_to_recordset(p_attachments) item(replacement_id uuid, storage_path text)
+      join storage.objects stored on stored.bucket_id = 'replacement-files' and stored.name = item.storage_path and stored.owner_id = auth.uid()::text
+      where item.replacement_id = order_id
+    ) <> expected_count then
+      raise exception 'One or more photo storage objects are missing or not owned by the current user';
+    end if;
+
+    insert into public.replacements (
+      id,
+      replacement_number,
+      order_number,
+      order_type,
+      order_group_id,
+      order_reference,
+      customer_name,
+      customer_reference,
+      customer_address,
+      customer_email,
+      customer_phone,
+      product_name,
+      quantity,
+      reason,
+      notes,
+      shipping_speed,
+      dimension_preset_id,
+      length_cm,
+      breadth_cm,
+      height_cm,
+      status,
+      created_by
+    ) values (
+      order_id,
+      'assigned-by-trigger',
+      coalesce(requested_order_number, nextval('public.order_number_sequence')),
+      order_type,
+      p_group_id,
+      assigned_ref,
+      nullif(trim(order_item ->> 'customer_name'), ''),
+      nullif(trim(order_item ->> 'customer_reference'), ''),
+      nullif(trim(order_item ->> 'customer_address'), ''),
+      lower(nullif(trim(order_item ->> 'customer_email'), '')),
+      nullif(trim(order_item ->> 'customer_phone'), ''),
+      trim(order_item ->> 'product_name'),
+      (order_item ->> 'quantity')::integer,
+      nullif(trim(order_item ->> 'reason'), ''),
+      nullif(trim(order_item ->> 'notes'), ''),
+      coalesce(nullif(order_item ->> 'shipping_speed', ''), 'STANDARD'),
+      nullif(order_item ->> 'dimension_preset_id', '')::uuid,
+      case when order_type = 'REPLACEMENT' then (order_item ->> 'length_cm')::numeric else null end,
+      case when order_type = 'REPLACEMENT' then (order_item ->> 'breadth_cm')::numeric else null end,
+      case when order_type = 'REPLACEMENT' then (order_item ->> 'height_cm')::numeric else null end,
+      'NEW',
+      auth.uid()
+    )
+    returning * into created_row;
+
+    if requested_order_number is not null then
+      perform setval(
+        'public.order_number_sequence',
+        greatest(
+          requested_order_number,
+          (select last_value from public.order_number_sequence),
+          (select max(order_number) from public.replacements)
+        ),
+        true
+      );
+    end if;
+
+    insert into public.attachments(replacement_id, qc_submission_id, attachment_type, storage_path, file_name, mime_type, uploaded_by)
+    select order_id, null, 'PROOF_PHOTO', item.storage_path, item.file_name, item.mime_type, auth.uid()
+    from jsonb_to_recordset(p_attachments) as item(replacement_id uuid, storage_path text, file_name text, mime_type text)
+    where item.replacement_id = order_id
+      and item.mime_type in ('image/jpeg', 'image/png', 'image/webp')
+      and (
+        item.storage_path ilike ('replacements/' || order_id || '/customer_support/%/photos/%')
+        or item.storage_path like ('replacements/' || order_id || '/products/%')
+      );
+    get diagnostics attachment_count = row_count;
+    if attachment_count <> expected_count then
+      raise exception 'Invalid product photo metadata';
+    end if;
+
+    insert into public.activity_logs(replacement_id, actor_id, action, metadata)
+    values (order_id, auth.uid(), 'ORDER_CREATED', jsonb_build_object('attachment_count', attachment_count, 'order_type', order_type));
+
+    return next created_row;
+  end loop;
+end;
+$$;
+
+revoke all on function public.create_order_batch(uuid, jsonb, jsonb) from public, anon;
+grant execute on function public.create_order_batch(uuid, jsonb, jsonb) to authenticated;
+
+drop function if exists public.submit_logistics_label(uuid, uuid, text, jsonb);
+drop function if exists public.submit_logistics_label(uuid, uuid, jsonb);
+create or replace function public.submit_logistics_label(
+  p_replacement_id uuid,
+  p_upload_id uuid,
+  p_tracking_url text,
+  p_attachments jsonb,
+  p_courier_partner text default null,
+  p_tracking_id text default null
+)
+returns public.replacements language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.replacements;
+  actor_role public.app_role;
+  attachment_count integer := 0;
+  clean_tracking_url text := nullif(trim(p_tracking_url), '');
+  clean_courier text := nullif(trim(p_courier_partner), '');
+  clean_tracking_id text := nullif(trim(p_tracking_id), '');
+begin
+  select * into current_row from public.replacements where id = p_replacement_id for update;
+  if not found then raise exception 'Order not found'; end if;
+  select public.current_active_role() into actor_role;
+  if actor_role is null or not (actor_role in ('LOGISTICS', 'ADMIN') or public.has_any_role('LOGISTICS', 'ADMIN')) then
+    raise exception 'Only Logistics can upload the shipping label';
+  end if;
+  if current_row.status <> 'NEW' then raise exception 'A label can only be uploaded for a new order'; end if;
+  if clean_tracking_url is not null and clean_tracking_url !~* '^https?://[^[:space:]]+$' then
+    raise exception 'Tracking link must begin with http:// or https://';
+  end if;
+  if jsonb_typeof(p_attachments) is distinct from 'array' or jsonb_array_length(p_attachments) <> 1 then
+    raise exception 'Exactly one shipping label is required';
+  end if;
+  if (select count(*) from jsonb_to_recordset(p_attachments) item(storage_path text)
+      join storage.objects stored on stored.bucket_id = 'replacement-files' and stored.name = item.storage_path and stored.owner_id = auth.uid()::text) <> 1
+  then raise exception 'The label storage object was not uploaded by the current user'; end if;
+
+  insert into public.attachments(replacement_id, qc_submission_id, attachment_type, storage_path, file_name, mime_type, uploaded_by)
+  select p_replacement_id, null, 'LABEL', item.storage_path, item.file_name, item.mime_type, auth.uid()
+  from jsonb_to_recordset(p_attachments) item(storage_path text, file_name text, mime_type text)
+  where item.mime_type in ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')
+    and item.storage_path like ('replacements/' || p_replacement_id || '/logistics/' || p_upload_id || '/labels/%');
+  get diagnostics attachment_count = row_count;
+  if attachment_count <> 1 then raise exception 'Invalid label metadata'; end if;
+
+  update public.replacements set
+    status = 'LABEL_UPLOADED',
+    tracking_url = clean_tracking_url,
+    courier_partner = clean_courier,
+    tracking_id = clean_tracking_id,
+    order_reference = coalesce(clean_courier, order_reference)
+  where id = p_replacement_id returning * into current_row;
+
+  insert into public.activity_logs(replacement_id, actor_id, action, metadata)
+  values (p_replacement_id, auth.uid(), 'LOGISTICS_SUBMITTED', jsonb_build_object(
+    'upload_id', p_upload_id,
+    'attachment_count', attachment_count,
+    'has_tracking_link', clean_tracking_url is not null,
+    'courier_partner', clean_courier,
+    'tracking_id', clean_tracking_id
+  ));
+  return current_row;
+end;
+$$;
+
+revoke all on function public.submit_logistics_label(uuid, uuid, text, jsonb, text, text) from public, anon;
+grant execute on function public.submit_logistics_label(uuid, uuid, text, jsonb, text, text) to authenticated;
+
+-- Backward compatibility overload for legacy 3-parameter callers
+create or replace function public.submit_logistics_label(
+  p_replacement_id uuid,
+  p_upload_id uuid,
+  p_attachments jsonb
+)
+returns public.replacements language sql security definer set search_path = '' as $$
+  select public.submit_logistics_label(p_replacement_id, p_upload_id, null, p_attachments, null, null);
+$$;
+
+revoke all on function public.submit_logistics_label(uuid, uuid, jsonb) from public, anon;
+grant execute on function public.submit_logistics_label(uuid, uuid, jsonb) to authenticated;
+
+-- Update transition_replacement to support DELIVERED status
+create or replace function public.transition_replacement(
+  p_replacement_id uuid,
+  p_target_status public.replacement_status,
+  p_message text default null
+)
+returns public.replacements language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.replacements;
+  actor_role public.app_role;
+  action_name text;
+  previous_status public.replacement_status;
+begin
+  select * into current_row from public.replacements where id = p_replacement_id for update;
+  if not found then raise exception 'Replacement not found'; end if;
+  previous_status := current_row.status;
+  select public.current_active_role() into actor_role;
+  if actor_role is null then raise exception 'Active account required'; end if;
+
+  if p_target_status = 'LABEL_PRINTED' then
+    if not (current_row.status = 'LABEL_UPLOADED' and (actor_role in ('PRINTING', 'ADMIN') or public.has_any_role('PRINTING', 'ADMIN'))) then
+      raise exception 'Only Printing can mark an uploaded label as printed';
+    end if;
+  elsif p_target_status in ('QC_APPROVED', 'QC_REJECTED') then
+    if not (current_row.status = 'QC_PENDING' and (actor_role in ('CUSTOMER_SUPPORT', 'ADMIN') or public.has_any_role('CUSTOMER_SUPPORT', 'ADMIN'))) then
+      raise exception 'Only CUSTOMER_SUPPORT can review pending QC';
+    end if;
+  elsif p_target_status = 'PACKED' then
+    if not (current_row.status = 'QC_APPROVED' and (actor_role in ('PACKING', 'ADMIN') or public.has_any_role('PACKING', 'ADMIN'))) then
+      raise exception 'QC must be approved before Packing packs the order';
+    end if;
+  elsif p_target_status = 'SHIPPED' then
+    if not (current_row.status in ('PACKED', 'NEEDS_TOKEN') and (actor_role in ('PACKING', 'ADMIN') or public.has_any_role('PACKING', 'ADMIN'))) then
+      raise exception 'Only Packing can mark a packed replacement as shipped';
+    end if;
+  elsif p_target_status = 'NEEDS_TOKEN' then
+    if not (current_row.status = 'PACKED' and (actor_role in ('PACKING', 'ADMIN') or public.has_any_role('PACKING', 'ADMIN'))) then
+      raise exception 'Only Packing can mark a packed replacement as needing a token';
+    end if;
+  elsif p_target_status = 'DELIVERED' then
+    if not (current_row.status = 'SHIPPED' and (actor_role in ('LOGISTICS', 'ADMIN') or public.has_any_role('LOGISTICS', 'ADMIN'))) then
+      raise exception 'Only Logistics can mark a shipped replacement as delivered';
+    end if;
+  elsif p_target_status = 'CANCELLED' then
+    if not (current_row.status not in ('SHIPPED', 'DELIVERED', 'CANCELLED') and (actor_role = 'ADMIN' or public.has_role('ADMIN'))) then
+      raise exception 'Only Admin can cancel an open replacement';
+    end if;
+  else
+    raise exception 'Unsupported transition';
+  end if;
+
+  if p_target_status = 'QC_REJECTED' and nullif(trim(p_message), '') is null then
+    raise exception 'A rejection reason is required';
+  end if;
+
+  if p_target_status in ('QC_APPROVED', 'QC_REJECTED') then
+    update public.qc_submissions set
+      decision = case when p_target_status = 'QC_APPROVED' then 'APPROVED'::public.qc_decision else 'REJECTED'::public.qc_decision end,
+      reviewed_by = auth.uid(),
+      reviewed_at = now(),
+      rejection_reason = case when p_target_status = 'QC_REJECTED' then trim(p_message) else null end
+    where id = (
+      select id from public.qc_submissions
+      where replacement_id = p_replacement_id and decision = 'PENDING'
+      order by submission_number desc limit 1
+    );
+    if not found then raise exception 'Pending QC submission not found'; end if;
+  end if;
+
+  update public.replacements set
+    status = p_target_status,
+    label_printed_at = case when p_target_status = 'LABEL_PRINTED' then now() else label_printed_at end,
+    qc_approved_at = case when p_target_status = 'QC_APPROVED' then now() else qc_approved_at end,
+    packed_at = case when p_target_status = 'PACKED' then now() else packed_at end,
+    shipped_at = case when p_target_status = 'SHIPPED' then now() else shipped_at end,
+    needs_token_at = case when p_target_status = 'NEEDS_TOKEN' then now() else needs_token_at end,
+    delivered_at = case when p_target_status = 'DELIVERED' then now() else delivered_at end,
+    delivered_by = case when p_target_status = 'DELIVERED' then auth.uid() else delivered_by end,
+    delivery_notes = case when p_target_status = 'DELIVERED' and nullif(trim(p_message), '') is not null then trim(p_message) else delivery_notes end
+  where id = p_replacement_id
+  returning * into current_row;
+
+  action_name := case p_target_status when 'CANCELLED' then 'CANCELLED' else p_target_status::text end;
+  insert into public.activity_logs(replacement_id, actor_id, action, message, metadata)
+  values (
+    p_replacement_id,
+    auth.uid(),
+    action_name,
+    nullif(trim(p_message), ''),
+    jsonb_build_object('from_status', previous_status, 'to_status', p_target_status)
+  );
+
+  return current_row;
+end;
+$$;
+
+-- Update admin_override_replacement to support DELIVERED
+create or replace function public.admin_override_replacement(
+  p_replacement_id uuid,
+  p_target_status public.replacement_status,
+  p_reason text
+)
+returns public.replacements language plpgsql security definer set search_path = '' as $$
+declare
+  current_row public.replacements;
+  previous_status public.replacement_status;
+  actor_role public.app_role;
+  trimmed_reason text := trim(p_reason);
+begin
+  select public.current_active_role() into actor_role;
+  if actor_role is null or (actor_role is distinct from 'ADMIN'::public.app_role and not public.has_role('ADMIN')) then
+    raise exception 'Admin access required';
+  end if;
+  if nullif(trimmed_reason, '') is null then
+    raise exception 'An override reason is required';
+  end if;
+
+  select * into current_row from public.replacements where id = p_replacement_id for update;
+  if not found then raise exception 'Replacement not found'; end if;
+  previous_status := current_row.status;
+
+  update public.replacements set
+    status = p_target_status,
+    label_printed_at = case when p_target_status = 'LABEL_PRINTED' and label_printed_at is null then now() else label_printed_at end,
+    qc_approved_at = case when p_target_status = 'QC_APPROVED' and qc_approved_at is null then now() else qc_approved_at end,
+    packed_at = case when p_target_status = 'PACKED' and packed_at is null then now() else packed_at end,
+    shipped_at = case when p_target_status = 'SHIPPED' and shipped_at is null then now() else shipped_at end,
+    delivered_at = case when p_target_status = 'DELIVERED' and delivered_at is null then now() else delivered_at end,
+    delivered_by = case when p_target_status = 'DELIVERED' and delivered_by is null then auth.uid() else delivered_by end
+  where id = p_replacement_id
+  returning * into current_row;
+
+  insert into public.activity_logs(replacement_id, actor_id, action, message, metadata)
+  values (
+    p_replacement_id,
+    auth.uid(),
+    'ADMIN_OVERRIDE',
+    trimmed_reason,
+    jsonb_build_object('from_status', previous_status, 'to_status', p_target_status)
+  );
+
+  return current_row;
+end;
+$$;
+
+-- Update archive_completed_replacements to support archiving DELIVERED replacements older than 30 days
+create or replace function public.archive_completed_replacements()
+returns integer language plpgsql security definer set search_path = '' as $$
+declare
+  archived_count integer;
+  actor_role public.app_role;
+begin
+  select public.current_active_role() into actor_role;
+  if actor_role is null or (actor_role is distinct from 'ADMIN'::public.app_role and not public.has_role('ADMIN')) then
+    raise exception 'Administrator access required';
+  end if;
+
+  with archived as (
+    update public.replacements
+    set archived_at = now(), archived_by = auth.uid()
+    where archived_at is null
+      and status in ('SHIPPED', 'DELIVERED', 'CANCELLED')
+      and created_at < now() - interval '30 days'
+    returning id
+  )
+  insert into public.activity_logs(replacement_id, actor_id, action, message)
+  select id, auth.uid(), 'ORDER_ARCHIVED', 'Archived after 30 days in a completed status'
+  from archived;
+
+  get diagnostics archived_count = row_count;
+  return archived_count;
+end;
+$$;
+
 notify pgrst, 'reload schema';
 

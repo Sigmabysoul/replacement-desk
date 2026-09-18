@@ -20,25 +20,25 @@ describe("offline workflow permissions", () => {
     expect(canPerformOffline("BOSS", "CANCEL_ORDER")).toBe(true);
     expect(canPerformOffline("BOSS", "CONFIRM_PRINTING")).toBe(false);
     expect(canPerformOffline("BOSS", "CONFIRM_PACKING")).toBe(false);
-    expect(canPerformOffline("BOSS", "DISPATCH_ORDER")).toBe(false);
+    expect(canPerformOffline("BOSS", "DISPATCH_PREPARE")).toBe(false);
   });
 
   it("allows Print team to confirm printing only", () => {
     expect(canPerformOffline("PRINTING", "CONFIRM_PRINTING")).toBe(true);
     expect(canPerformOffline("PRINTING", "CONFIRM_PACKING")).toBe(false);
-    expect(canPerformOffline("PRINTING", "DISPATCH_ORDER")).toBe(false);
+    expect(canPerformOffline("PRINTING", "DISPATCH_PREPARE")).toBe(false);
     expect(canPerformOffline("PRINTING", "ACKNOWLEDGE_ORDER")).toBe(false);
   });
 
   it("allows Consignment team to confirm packing and courier pickup", () => {
     expect(canPerformOffline("CONSIGNMENT", "CONFIRM_PACKING")).toBe(true);
     expect(canPerformOffline("CONSIGNMENT", "CONFIRM_PICKUP")).toBe(true);
-    expect(canPerformOffline("CONSIGNMENT", "DISPATCH_ORDER")).toBe(false);
+    expect(canPerformOffline("CONSIGNMENT", "DISPATCH_PREPARE")).toBe(false);
     expect(canPerformOffline("CONSIGNMENT", "CONFIRM_DELIVERY")).toBe(false);
   });
 
-  it("allows HR team to dispatch and confirm delivery with POD", () => {
-    expect(canPerformOffline("HR", "DISPATCH_ORDER")).toBe(true);
+  it("allows HR team to prepare dispatch and confirm delivery with POD", () => {
+    expect(canPerformOffline("HR", "DISPATCH_PREPARE")).toBe(true);
     expect(canPerformOffline("HR", "CONFIRM_DELIVERY")).toBe(true);
     expect(canPerformOffline("HR", "CONFIRM_PACKING")).toBe(false);
     expect(canPerformOffline("HR", "CONFIRM_PICKUP")).toBe(false);
@@ -46,22 +46,36 @@ describe("offline workflow permissions", () => {
 
   it("allows Admin to perform all operational actions", () => {
     expect(canPerformOffline("ADMIN", "CREATE_OFFLINE_ORDER")).toBe(true);
-    expect(canPerformOffline("ADMIN", "CONFIRM_PRINTING")).toBe(true);
     expect(canPerformOffline("ADMIN", "CONFIRM_PACKING")).toBe(true);
-    expect(canPerformOffline("ADMIN", "DISPATCH_ORDER")).toBe(true);
+    expect(canPerformOffline("ADMIN", "DISPATCH_PREPARE")).toBe(true);
+    expect(canPerformOffline("ADMIN", "CONFIRM_PRINTING")).toBe(true);
     expect(canPerformOffline("ADMIN", "CONFIRM_PICKUP")).toBe(true);
     expect(canPerformOffline("ADMIN", "CONFIRM_DELIVERY")).toBe(true);
     expect(canPerformOffline("ADMIN", "ACKNOWLEDGE_ORDER")).toBe(true);
     expect(canPerformOffline("ADMIN", "CANCEL_ORDER")).toBe(true);
   });
+
+  it("supports users holding multiple roles", () => {
+    // Abid as PACKING + PRINTING
+    const abidRoles = ["PACKING", "PRINTING"] as const;
+    expect(canPerformOffline(abidRoles, "CONFIRM_PRINTING")).toBe(true);
+    expect(canPerformOffline(abidRoles, "CONFIRM_PACKING")).toBe(false); // only CONSIGNMENT/ADMIN confirms offline packing
+    expect(canPerformOffline(abidRoles, "DISPATCH_PREPARE")).toBe(false);
+
+    // Esha as CUSTOMER_SUPPORT + HR
+    const eshaRoles = ["CUSTOMER_SUPPORT", "HR"] as const;
+    expect(canPerformOffline(eshaRoles, "DISPATCH_PREPARE")).toBe(true);
+    expect(canPerformOffline(eshaRoles, "CONFIRM_DELIVERY")).toBe(true);
+    expect(canPerformOffline(eshaRoles, "CONFIRM_PRINTING")).toBe(false);
+  });
 });
 
 describe("offline workflow status transitions", () => {
-  it("enforces the real-world sequence: CREATED -> PRINTING_ASSIGNED -> PACKING_CONFIRMED -> DISPATCHED -> PICKED_UP -> DELIVERED -> ACKNOWLEDGED", () => {
-    expect(canOfflineTransition("CREATED", "PRINTING_ASSIGNED")).toBe(true);
-    expect(canOfflineTransition("PRINTING_ASSIGNED", "PACKING_CONFIRMED")).toBe(true);
-    expect(canOfflineTransition("PACKING_CONFIRMED", "DISPATCHED")).toBe(true);
-    expect(canOfflineTransition("DISPATCHED", "PICKED_UP")).toBe(true);
+  it("enforces the revised sequence: CREATED -> PACKING_CONFIRMED -> DISPATCH_PREPARED -> PRINTED -> PICKED_UP -> DELIVERED -> ACKNOWLEDGED", () => {
+    expect(canOfflineTransition("CREATED", "PACKING_CONFIRMED")).toBe(true);
+    expect(canOfflineTransition("PACKING_CONFIRMED", "DISPATCH_PREPARED")).toBe(true);
+    expect(canOfflineTransition("DISPATCH_PREPARED", "PRINTED")).toBe(true);
+    expect(canOfflineTransition("PRINTED", "PICKED_UP")).toBe(true);
     expect(canOfflineTransition("PICKED_UP", "DELIVERED")).toBe(true);
     expect(canOfflineTransition("DELIVERED", "ACKNOWLEDGED")).toBe(true);
 
@@ -71,18 +85,20 @@ describe("offline workflow status transitions", () => {
   });
 
   it("prevents skipping steps in the pipeline", () => {
-    expect(canOfflineTransition("CREATED", "DISPATCHED")).toBe(false);
-    expect(canOfflineTransition("CREATED", "PACKING_CONFIRMED")).toBe(false);
-    expect(canOfflineTransition("PRINTING_ASSIGNED", "DELIVERED")).toBe(false);
-    expect(canOfflineTransition("PACKING_CONFIRMED", "PICKED_UP")).toBe(false);
+    expect(canOfflineTransition("CREATED", "DISPATCH_PREPARED")).toBe(false);
+    expect(canOfflineTransition("CREATED", "PRINTED")).toBe(false);
+    expect(canOfflineTransition("PACKING_CONFIRMED", "PRINTED")).toBe(false);
+    expect(canOfflineTransition("DISPATCH_PREPARED", "PICKED_UP")).toBe(false);
+    expect(canOfflineTransition("PRINTED", "DELIVERED")).toBe(false);
   });
 
   it("allows cancellation from open statuses", () => {
     expect(canOfflineTransition("CREATED", "CANCELLED")).toBe(true);
-    expect(canOfflineTransition("PRINTING_ASSIGNED", "CANCELLED")).toBe(true);
     expect(canOfflineTransition("PACKING_CONFIRMED", "CANCELLED")).toBe(true);
-    expect(canOfflineTransition("DISPATCHED", "CANCELLED")).toBe(true);
+    expect(canOfflineTransition("DISPATCH_PREPARED", "CANCELLED")).toBe(true);
+    expect(canOfflineTransition("PRINTED", "CANCELLED")).toBe(true);
     expect(canOfflineTransition("PICKED_UP", "CANCELLED")).toBe(true);
+    expect(canOfflineTransition("DELIVERED", "CANCELLED")).toBe(false);
     expect(canOfflineTransition("ACKNOWLEDGED", "CANCELLED")).toBe(false);
   });
 });
@@ -94,7 +110,7 @@ describe("offline workflow assertions & available actions", () => {
     ).not.toThrow();
 
     expect(() =>
-      assertOfflineWorkflowAction("PRINTING", "CONFIRM_PRINTING", "CREATED", "PRINTING_ASSIGNED"),
+      assertOfflineWorkflowAction("CONSIGNMENT", "CONFIRM_PACKING", "CREATED", "PACKING_CONFIRMED"),
     ).not.toThrow();
 
     expect(() =>
@@ -102,26 +118,37 @@ describe("offline workflow assertions & available actions", () => {
     ).toThrow(/HR cannot perform CONFIRM_PRINTING/);
 
     expect(() =>
-      assertOfflineWorkflowAction("CONSIGNMENT", "CONFIRM_PACKING", "CREATED", "PACKING_CONFIRMED"),
+      assertOfflineWorkflowAction("PRINTING", "CONFIRM_PRINTING", "CREATED", "PRINTED"),
     ).toThrow(/Invalid status transition/);
   });
 
   it("computes correct available actions based on role and status", () => {
-    expect(availableOfflineActions("PRINTING", "CREATED")).toContain("CONFIRM_PRINTING");
-    expect(availableOfflineActions("HR", "CREATED")).not.toContain("CONFIRM_PRINTING");
+    expect(availableOfflineActions("CONSIGNMENT", "CREATED")).toContain("CONFIRM_PACKING");
+    expect(availableOfflineActions("HR", "CREATED")).not.toContain("CONFIRM_PACKING");
 
-    expect(availableOfflineActions("CONSIGNMENT", "PRINTING_ASSIGNED")).toContain("CONFIRM_PACKING");
-    expect(availableOfflineActions("HR", "PACKING_CONFIRMED")).toContain("DISPATCH_ORDER");
-    expect(availableOfflineActions("CONSIGNMENT", "DISPATCHED")).toContain("CONFIRM_PICKUP");
+    expect(availableOfflineActions("HR", "PACKING_CONFIRMED")).toContain("DISPATCH_PREPARE");
+    expect(availableOfflineActions("PRINTING", "DISPATCH_PREPARED")).toContain("CONFIRM_PRINTING");
+    expect(availableOfflineActions("CONSIGNMENT", "PRINTED")).toContain("CONFIRM_PICKUP");
     expect(availableOfflineActions("HR", "PICKED_UP")).toContain("CONFIRM_DELIVERY");
     expect(availableOfflineActions("BOSS", "DELIVERED")).toContain("ACKNOWLEDGE_ORDER");
+  });
+
+  it("computes available actions for users with multiple roles", () => {
+    const multiRole = ["CONSIGNMENT", "HR"] as const;
+    expect(availableOfflineActions(multiRole, "CREATED")).toContain("CONFIRM_PACKING");
+    expect(availableOfflineActions(multiRole, "PACKING_CONFIRMED")).toContain("DISPATCH_PREPARE");
+    expect(availableOfflineActions(multiRole, "PRINTED")).toContain("CONFIRM_PICKUP");
+    expect(availableOfflineActions(multiRole, "PICKED_UP")).toContain("CONFIRM_DELIVERY");
   });
 
   it("formats status labels nicely", () => {
     expect(formatOfflineStatus("CREATED")).toBe("New Order");
     expect(formatOfflineStatus("PACKING_CONFIRMED")).toBe("Packing Confirmed");
-    expect(formatOfflineStatus("DISPATCHED")).toBe("Dispatched");
+    expect(formatOfflineStatus("DISPATCH_PREPARED")).toBe("Dispatch Prepared");
+    expect(formatOfflineStatus("PRINTED")).toBe("Materials Printed");
+    expect(formatOfflineStatus("PICKED_UP")).toBe("Picked Up");
     expect(formatOfflineStatus("DELIVERED")).toBe("Delivered");
+    expect(formatOfflineStatus("ACKNOWLEDGED")).toBe("Acknowledged");
   });
 });
 

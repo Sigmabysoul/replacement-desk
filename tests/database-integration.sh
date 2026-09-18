@@ -58,7 +58,7 @@ SQL
 
 for migration in supabase/migrations/*.sql; do
   case "$(basename "$migration")" in
-    2026091[3458]*) continue ;;
+    2026091[3-9]*) continue ;;
   esac
   "${psql[@]}" -f "$migration" >/dev/null
 done
@@ -94,7 +94,7 @@ insert into public.attachments(replacement_id, attachment_type, storage_path, fi
 values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'LABEL', 'replacements/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/legacy-label.pdf', 'legacy-label.pdf', 'application/pdf', '33333333-3333-3333-3333-333333333333');
 SQL
 
-for migration in supabase/migrations/2026091[3458]*.sql; do
+for migration in supabase/migrations/2026091[3-9]*.sql; do
   "${psql[@]}" -f "$migration" >/dev/null
 done
 
@@ -244,7 +244,9 @@ select public.submit_logistics_label(
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   'https://tracking.example.test/ORDER-1',
-  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/label.pdf","file_name":"label.pdf","mime_type":"application/pdf"}]'
+  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/logistics/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/labels/label.pdf","file_name":"label.pdf","mime_type":"application/pdf"}]',
+  'Delhivery',
+  'DEL-778899'
 );
 
 do $$
@@ -254,6 +256,12 @@ begin
   end if;
   if (select tracking_url from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'https://tracking.example.test/ORDER-1' then
     raise exception 'Logistics tracking link was not saved';
+  end if;
+  if (select courier_partner from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'Delhivery' then
+    raise exception 'Logistics courier partner was not saved';
+  end if;
+  if (select tracking_id from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'DEL-778899' then
+    raise exception 'Logistics tracking ID was not saved';
   end if;
   perform public.submit_packing_qc('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', '[]');
   raise exception 'Logistics QC authorization unexpectedly succeeded';
@@ -377,6 +385,47 @@ begin
 end
 $$;
 
+-- Test DELIVERED status transition and permissions
+do $$
+begin
+  -- Packing cannot mark as DELIVERED
+  begin
+    perform public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'DELIVERED', 'Attempted by packing');
+    raise exception 'Packing unexpectedly marked replacement as delivered';
+  exception when others then
+    if sqlerrm <> 'Only Logistics can mark a shipped replacement as delivered' then raise; end if;
+  end;
+end
+$$;
+
+-- Logistics marks as DELIVERED
+select set_config('request.jwt.claim.sub', '66666666-6666-4666-8666-666666666666', false);
+select public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'DELIVERED', 'Delivered with proof of delivery signature');
+
+do $$
+begin
+  if (select status from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'DELIVERED' then
+    raise exception 'Workflow did not reach DELIVERED';
+  end if;
+  if (select delivered_at from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') is null then
+    raise exception 'Delivered timestamp was not set';
+  end if;
+  if (select delivered_by from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> '66666666-6666-4666-8666-666666666666' then
+    raise exception 'Delivered by user was not recorded';
+  end if;
+  if (select delivery_notes from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'Delivered with proof of delivery signature' then
+    raise exception 'Delivery notes were not recorded';
+  end if;
+  -- Cannot cancel a DELIVERED order
+  begin
+    perform public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'CANCELLED', 'Cannot cancel');
+    raise exception 'Delivered replacement was unexpectedly cancelled';
+  exception when others then
+    if sqlerrm <> 'Only Admin can cancel an open replacement' then raise; end if;
+  end;
+end
+$$;
+
 reset role;
 update public.replacements set created_at = now() - interval '31 days'
 where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -474,13 +523,34 @@ reset role;
 insert into auth.users(id, email, raw_user_meta_data) values
   ('88888888-8888-4888-8888-888888888888', 'boss@example.com', '{"full_name":"Boss"}'),
   ('99999999-9999-4999-8999-999999999999', 'hr@example.com', '{"full_name":"Nainisha HR"}'),
-  ('aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa', 'consignment@example.com', '{"full_name":"Ali Consignment"}');
-update public.profiles set role = 'BOSS' where id = '88888888-8888-4888-8888-888888888888';
-update public.profiles set role = 'HR' where id = '99999999-9999-4999-8999-999999999999';
-update public.profiles set role = 'CONSIGNMENT' where id = 'aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa';
+  ('aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa', 'consignment@example.com', '{"full_name":"Ali Consignment"}'),
+  ('77777777-7777-4777-7777-777777777777', 'abid@example.com', '{"full_name":"Abid Multi"}');
+update public.profiles set role = 'BOSS', roles = array['BOSS'::public.app_role] where id = '88888888-8888-4888-8888-888888888888';
+update public.profiles set role = 'HR', roles = array['HR'::public.app_role] where id = '99999999-9999-4999-8999-999999999999';
+update public.profiles set role = 'CONSIGNMENT', roles = array['CONSIGNMENT'::public.app_role] where id = 'aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa';
+update public.profiles set role = 'PACKING', roles = array['PACKING'::public.app_role, 'PRINTING'::public.app_role] where id = '77777777-7777-4777-7777-777777777777';
+
+-- Verify multi-role functions
+select set_config('request.jwt.claim.sub', '77777777-7777-4777-7777-777777777777', false);
+do $$
+begin
+  if not public.has_role('PACKING') then
+    raise exception 'Abid has_role(PACKING) failed';
+  end if;
+  if not public.has_role('PRINTING') then
+    raise exception 'Abid has_role(PRINTING) failed';
+  end if;
+  if not public.has_any_role('PRINTING', 'BOSS') then
+    raise exception 'Abid has_any_role(PRINTING, BOSS) failed';
+  end if;
+  if public.has_role('BOSS') then
+    raise exception 'Abid has_role(BOSS) unexpectedly succeeded';
+  end if;
+end
+$$;
 
 set role authenticated;
--- 1. Boss creates offline order
+-- 1. Step 1: Boss creates offline order (CREATED)
 select set_config('request.jwt.claim.sub', '88888888-8888-4888-8888-888888888888', false);
 select public.create_offline_order(
   'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
@@ -502,19 +572,7 @@ begin
 end
 $$;
 
--- 2. Printing confirms printing
-select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', false);
-select public.confirm_offline_printing('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
-
-do $$
-begin
-  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'PRINTING_ASSIGNED' then
-    raise exception 'Printing confirmation failed';
-  end if;
-end
-$$;
-
--- 3. Consignment confirms packing
+-- 2. Step 2: Consignment confirms packing (PACKING_CONFIRMED)
 select set_config('request.jwt.claim.sub', 'aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa', false);
 select public.confirm_offline_packing('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 3, '56X32X38', 57);
 
@@ -529,19 +587,31 @@ begin
 end
 $$;
 
--- 4. HR dispatches order
+-- 3. Step 3: HR prepares dispatch & photos (DISPATCH_PREPARED)
 select set_config('request.jwt.claim.sub', '99999999-9999-4999-8999-999999999999', false);
-select public.dispatch_offline_order('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'DEL123456', 'https://delhivery.com/track/123', 'Delhivery', '[]');
+select public.dispatch_prepare_offline_order('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'DEL123456', 'https://delhivery.com/track/123', 'Delhivery', '[]');
 
 do $$
 begin
-  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'DISPATCHED' then
-    raise exception 'Dispatch confirmation failed';
+  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'DISPATCH_PREPARED' then
+    raise exception 'Dispatch preparation failed';
   end if;
 end
 $$;
 
--- 5. Consignment confirms pickup
+-- 4. Step 4: Printing team (tested via multi-role user Abid with PRINTING in roles) confirms printing (PRINTED)
+select set_config('request.jwt.claim.sub', '77777777-7777-4777-7777-777777777777', false);
+select public.confirm_offline_printed('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+
+do $$
+begin
+  if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'PRINTED' then
+    raise exception 'Printing confirmation failed';
+  end if;
+end
+$$;
+
+-- 5. Step 5: Consignment confirms pickup (PICKED_UP)
 select set_config('request.jwt.claim.sub', 'aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa', false);
 select public.confirm_offline_pickup('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 
@@ -553,7 +623,7 @@ begin
 end
 $$;
 
--- 6. HR confirms delivery
+-- 6. Step 6: HR confirms delivery with POD (DELIVERED)
 select set_config('request.jwt.claim.sub', '99999999-9999-4999-8999-999999999999', false);
 select public.confirm_offline_delivery('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Received with stamp and signature', '[]');
 
@@ -565,7 +635,7 @@ begin
 end
 $$;
 
--- 7. Boss acknowledges order
+-- 7. Step 7: Boss acknowledges order (ACKNOWLEDGED)
 select set_config('request.jwt.claim.sub', '88888888-8888-4888-8888-888888888888', false);
 select public.acknowledge_offline_order('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 

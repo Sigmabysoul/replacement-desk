@@ -39,7 +39,7 @@ describe("new order form structure", () => {
     }));
     expect(markup).toContain("Customer address");
     expect(markup).not.toContain("Customer reference");
-    expect(markup).toContain("Courier Partner");
+    expect(markup).not.toContain("Courier Partner");
     expect(markup).not.toContain("Order reference");
     expect(markup).toContain("Select a reason");
     expect(markup).toContain("Product details");
@@ -56,19 +56,19 @@ describe("new order form structure", () => {
       startingOrderNumber: 501,
     }));
     expect(markup).toContain("Order ID editable by Admin");
-    expect(markup).not.toContain("readOnly=\"\"");
+    expect(markup).not.toContain('readOnly=""');
     expect(markup).toContain('min="1"');
     expect(markup).toContain("order-id-input");
   });
 
-  it("places the Order ID in the section header before the order-type toggle", () => {
+  it("places the Order ID in the section header before product input fields", () => {
     const markup = renderToStaticMarkup(createElement(OrderBuilder, {
       action,
       presets: [],
       isAdmin: true,
       startingOrderNumber: 501,
     }));
-    expect(markup.indexOf("Order ID")).toBeLessThan(markup.indexOf('aria-label="Order type"'));
+    expect(markup.indexOf("Order ID")).toBeLessThan(markup.indexOf("Product name or description"));
   });
 
   it("lays out products as complete pairs with a full-width unpaired card", () => {

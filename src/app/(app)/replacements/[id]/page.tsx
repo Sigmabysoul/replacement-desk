@@ -187,9 +187,21 @@ export default async function ReplacementDetailPage({
                 <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Courier Partner</dt>
                 <dd className="mt-1 flex items-center gap-2 font-semibold text-slate-800">
                   <ShoppingBag className="size-4 text-slate-400" />
-                  {replacement.order_reference}
+                  {replacement.courier_partner || replacement.order_reference || "Pending Logistics"}
                 </dd>
               </div>
+              {replacement.tracking_id && (
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Tracking ID / AWB</dt>
+                  <dd className="mt-1 font-mono font-semibold text-slate-800">{replacement.tracking_id}</dd>
+                </div>
+              )}
+              {replacement.delivered_at && (
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wider text-emerald-700">Delivered</dt>
+                  <dd className="mt-1 font-semibold text-emerald-900">{formatDate(replacement.delivered_at)}</dd>
+                </div>
+              )}
               <div>
                 <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Shipping speed</dt>
                 <dd className="mt-1 font-semibold text-slate-800">{replacement.shipping_speed === "EXPRESS" ? "Express" : "Standard"}</dd>

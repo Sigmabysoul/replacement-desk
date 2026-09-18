@@ -9,6 +9,7 @@ export type NotificationType =
   | "QC_APPROVED"
   | "PACKED"
   | "SHIPPED"
+  | "DELIVERED"
   | "NEEDS_TOKEN";
 
 export const NOTIFICATION_RECIPIENTS: Record<NotificationType, readonly Role[]> = {
@@ -20,6 +21,7 @@ export const NOTIFICATION_RECIPIENTS: Record<NotificationType, readonly Role[]> 
   QC_APPROVED: ["PACKING"],
   PACKED: ["CUSTOMER_SUPPORT", "ADMIN"],
   SHIPPED: ["CUSTOMER_SUPPORT", "ADMIN"],
+  DELIVERED: ["CUSTOMER_SUPPORT", "ADMIN", "LOGISTICS"],
   NEEDS_TOKEN: ["CUSTOMER_SUPPORT", "ADMIN"],
 };
 
@@ -133,7 +135,17 @@ export function formatTelegramMessage(
         "",
         replacement.replacement_number,
         "",
-        "Replacement completed.",
+        "Dispatched with courier.",
+      );
+      break;
+
+    case "DELIVERED":
+      lines.push(
+        "✅ REPLACEMENT DELIVERED",
+        "",
+        replacement.replacement_number,
+        "",
+        detail ? `Delivery Notes: ${detail}` : "Delivered to customer successfully.",
       );
       break;
   }

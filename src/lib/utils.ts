@@ -21,6 +21,7 @@ export const statusLabel: Record<ReplacementStatus, string> = {
   QC_APPROVED: "QC approved",
   PACKED: "Packed",
   SHIPPED: "Shipped",
+  DELIVERED: "Delivered",
   NEEDS_TOKEN: "Needs token",
   CANCELLED: "Cancelled",
 };
@@ -33,16 +34,17 @@ export const statusTone: Record<ReplacementStatus, string> = {
   QC_REJECTED: "bg-rose-50 text-rose-800 ring-rose-200",
   QC_APPROVED: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   PACKED: "bg-cyan-50 text-cyan-900 ring-cyan-200",
-  SHIPPED: "bg-slate-100 text-slate-700 ring-slate-200",
+  SHIPPED: "bg-sky-50 text-sky-800 ring-sky-200",
+  DELIVERED: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   NEEDS_TOKEN: "bg-orange-50 text-orange-900 ring-orange-200",
   CANCELLED: "bg-slate-100 text-slate-500 ring-slate-200",
 };
 
 export const offlineStatusLabel: Record<OfflineOrderStatus, string> = {
   CREATED: "New Order",
-  PRINTING_ASSIGNED: "Awaiting Packing",
-  PACKING_CONFIRMED: "Awaiting Dispatch",
-  DISPATCHED: "In Transit",
+  PACKING_CONFIRMED: "Packing Confirmed",
+  DISPATCH_PREPARED: "Awaiting Printing",
+  PRINTED: "Materials Printed",
   PICKED_UP: "Picked Up",
   DELIVERED: "Delivered",
   ACKNOWLEDGED: "Acknowledged",
@@ -51,9 +53,9 @@ export const offlineStatusLabel: Record<OfflineOrderStatus, string> = {
 
 export const offlineStatusTone: Record<OfflineOrderStatus, string> = {
   CREATED: "bg-blue-50 text-blue-800 ring-blue-200",
-  PRINTING_ASSIGNED: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200",
   PACKING_CONFIRMED: "bg-violet-50 text-violet-800 ring-violet-200",
-  DISPATCHED: "bg-amber-50 text-amber-900 ring-amber-200",
+  DISPATCH_PREPARED: "bg-amber-50 text-amber-900 ring-amber-200",
+  PRINTED: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200",
   PICKED_UP: "bg-cyan-50 text-cyan-900 ring-cyan-200",
   DELIVERED: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   ACKNOWLEDGED: "bg-slate-100 text-slate-700 ring-slate-200",

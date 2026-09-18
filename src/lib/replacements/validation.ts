@@ -79,7 +79,7 @@ export const commentSchema = z.object({
 
 export const transitionSchema = z.object({
   replacement_id: z.string().uuid(),
-  target_status: z.enum(["LABEL_PRINTED", "QC_APPROVED", "QC_REJECTED", "PACKED", "SHIPPED", "NEEDS_TOKEN", "CANCELLED"]),
+  target_status: z.enum(["LABEL_PRINTED", "QC_APPROVED", "QC_REJECTED", "PACKED", "SHIPPED", "DELIVERED", "NEEDS_TOKEN", "CANCELLED"]),
   message: z.string().trim().max(1000).optional(),
 });
 

@@ -24,6 +24,15 @@ describe("replacement workflow permissions", () => {
     expect(canPerform("LOGISTICS", "MARK_SHIPPED")).toBe(false);
   });
 
+  it("allows Logistics and Admin to mark shipped replacements as delivered", () => {
+    expect(canPerform("LOGISTICS", "MARK_DELIVERED")).toBe(true);
+    expect(canPerform("ADMIN", "MARK_DELIVERED")).toBe(true);
+    expect(canPerform("CUSTOMER_SUPPORT", "MARK_DELIVERED")).toBe(false);
+    expect(canPerform("PRINTING", "MARK_DELIVERED")).toBe(false);
+    expect(canPerform("PACKING", "MARK_DELIVERED")).toBe(false);
+    expect(canPerform(["CUSTOMER_SUPPORT", "LOGISTICS"], "MARK_DELIVERED")).toBe(true);
+  });
+
   it("keeps Printing limited to print confirmation", () => {
     expect(canPerform("PRINTING", "MARK_LABEL_PRINTED")).toBe(true);
     expect(canPerform("PRINTING", "SUBMIT_QC")).toBe(false);
@@ -85,6 +94,13 @@ describe("replacement workflow status transitions", () => {
     expect(canTransition("NEEDS_TOKEN", "SHIPPED")).toBe(true);
   });
 
+  it("allows shipped to become delivered", () => {
+    expect(canTransition("SHIPPED", "DELIVERED")).toBe(true);
+    expect(canTransition("SHIPPED", "CANCELLED")).toBe(true);
+    expect(canTransition("DELIVERED", "SHIPPED")).toBe(false);
+    expect(canTransition("DELIVERED", "CANCELLED")).toBe(false);
+  });
+
   it("rejects invalid transitions", () => {
     expect(canTransition("NEW", "SHIPPED")).toBe(false);
     expect(canTransition("SHIPPED", "PACKED")).toBe(false);
@@ -98,6 +114,9 @@ describe("replacement workflow status transitions", () => {
   it("determines available actions accurately", () => {
     expect(availableActions("LOGISTICS", "NEW")).toContain("SUBMIT_LOGISTICS");
     expect(availableActions("LOGISTICS", "QC_REJECTED")).not.toContain("SUBMIT_LOGISTICS");
+    expect(availableActions("LOGISTICS", "SHIPPED")).toContain("MARK_DELIVERED");
+    expect(availableActions("ADMIN", "SHIPPED")).toContain("MARK_DELIVERED");
+    expect(availableActions("PACKING", "SHIPPED")).not.toContain("MARK_DELIVERED");
     expect(availableActions("PRINTING", "LABEL_UPLOADED")).toContain("MARK_LABEL_PRINTED");
     expect(availableActions("PACKING", "LABEL_PRINTED")).toContain("SUBMIT_QC");
     expect(availableActions("PACKING", "QC_REJECTED")).toContain("SUBMIT_QC");
@@ -282,7 +301,13 @@ describe("telegram notification formatting", () => {
   it("formats SHIPPED according to Section 10", () => {
     const msg = formatTelegramMessage("SHIPPED", mockRep, appUrl);
     expect(msg).toContain("🚚 REPLACEMENT SHIPPED");
-    expect(msg).toContain("Replacement completed.");
+    expect(msg).toContain("Dispatched with courier.");
+  });
+
+  it("formats DELIVERED according to Section 10", () => {
+    const msg = formatTelegramMessage("DELIVERED", mockRep, appUrl, "Delivered to customer");
+    expect(msg).toContain("✅ REPLACEMENT DELIVERED");
+    expect(msg).toContain("Delivery Notes: Delivered to customer");
   });
 });
 

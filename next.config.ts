@@ -1,9 +1,35 @@
 import type { NextConfig } from "next";
 
+const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? (() => {
+      try {
+        return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname;
+      } catch {
+        return undefined;
+      }
+    })()
+  : undefined;
+
 const nextConfig: NextConfig = {
   // Hostinger's Docker image uses the minimal standalone server. Other hosts
   // retain their native Next.js output and deployment adapter behavior.
   output: process.env.DOCKER_BUILD === "true" ? "standalone" : undefined,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+      },
+      ...(supabaseHost
+        ? [
+            {
+              protocol: (process.env.NEXT_PUBLIC_SUPABASE_URL?.startsWith("http://") ? "http" : "https") as "http" | "https",
+              hostname: supabaseHost,
+            },
+          ]
+        : []),
+    ],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "100mb",

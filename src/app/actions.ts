@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireProfile } from "@/lib/auth/session";
+import { hasRole, requireProfile } from "@/lib/auth/session";
 import { ALLOWED_MIME_TYPES, commentSchema, dimensionPresetSchema, MAX_FILE_SIZE, replacementEditSchema, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
 import { safeFileName } from "@/lib/utils";
 import { notifyTelegram } from "@/lib/notifications/telegram";
@@ -222,12 +222,13 @@ export async function createOrderBatchAction(formData: FormData) {
   if (invalid && !invalid.success) {
     redirect(`/replacements/new?error=${encodeURIComponent(invalid.error.issues[0]?.message ?? "Check every order.")}`);
   }
+  const isAdmin = hasRole(profile, "ADMIN");
   const requestedOrderNumbers = rawOrders.map((raw) => {
-    if (profile.role !== "ADMIN") return null;
+    if (!isAdmin) return null;
     const value = Number((raw as { requested_order_number?: unknown }).requested_order_number);
     return Number.isSafeInteger(value) && value >= 1 ? value : null;
   });
-  if (profile.role === "ADMIN" && requestedOrderNumbers.some((value) => value === null)) {
+  if (isAdmin && requestedOrderNumbers.some((value) => value === null)) {
     redirect(`/replacements/new?error=${encodeURIComponent("Every Admin order ID must be a positive whole number.")}`);
   }
   const requestedValues = requestedOrderNumbers.filter((value): value is number => value !== null);
@@ -309,7 +310,7 @@ export async function updateReplacementAction(formData: FormData) {
   const parsed = replacementEditSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
   let requestedOrderNumber: number | null = null;
-  if (profile.role === "ADMIN") {
+  if (hasRole(profile, "ADMIN")) {
     requestedOrderNumber = Number(formData.get("order_number"));
     if (!Number.isSafeInteger(requestedOrderNumber) || requestedOrderNumber < 1) {
       redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent("Order ID must be a positive whole number.")}`);
@@ -352,6 +353,7 @@ const notificationForStatus = {
   QC_REJECTED: "QC_REJECTED",
   PACKED: "PACKED",
   SHIPPED: "SHIPPED",
+  DELIVERED: "DELIVERED",
   NEEDS_TOKEN: "NEEDS_TOKEN",
 } as const;
 
@@ -386,6 +388,7 @@ export async function transitionAction(formData: FormData) {
   const sent = type ? await notifyTelegram(type, replacement, parsed.data.message) : { ok: true };
   revalidatePath("/");
   revalidatePath("/replacements");
+  revalidatePath("/tracking");
   revalidatePath(`/replacements/${parsed.data.replacement_id}`);
   redirect(`/replacements/${parsed.data.replacement_id}${!sent.ok ? "?warning=Updated%2C%20but%20Telegram%20notification%20failed." : ""}`);
 }
@@ -402,6 +405,8 @@ export async function submitLogisticsAction(formData: FormData) {
   await requireProfile(["LOGISTICS", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
   const labels = formFiles(formData, "labels");
+  const courierPartner = String(formData.get("courier_partner") ?? "").trim();
+  const trackingId = String(formData.get("tracking_id") ?? "").trim();
   const trackingUrl = String(formData.get("tracking_url") ?? "").trim();
   if (!/^[0-9a-f-]{36}$/i.test(replacementId)) redirect("/replacements?error=Invalid%20replacement.");
   if (labels.length !== 1) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add exactly one shipping label.")}`);
@@ -423,6 +428,8 @@ export async function submitLogisticsAction(formData: FormData) {
       p_upload_id: uploadId,
       p_tracking_url: trackingUrl || null,
       p_attachments: labelUpload.rows,
+      p_courier_partner: courierPartner || null,
+      p_tracking_id: trackingId || null,
     });
     if (error) throw error;
     replacement = data as Replacement;
@@ -538,8 +545,21 @@ export async function createUserAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const fullName = String(formData.get("full_name") ?? "").trim();
   const temporaryPassword = String(formData.get("temporary_password") ?? "");
-  const role = String(formData.get("role") ?? "") as Role;
-  if (!email || !fullName || temporaryPassword.length < 6 || !(ROLES as readonly string[]).includes(role)) redirect("/admin/users?error=Use%20a%20valid%20lowercase%20email%20and%20a%20temporary%20password%20of%20at%20least%206%20characters.");
+  const rawRoles = formData
+    .getAll("roles")
+    .map(String)
+    .filter((r): r is Role => (ROLES as readonly string[]).includes(r));
+  const fallbackRole = String(formData.get("role") ?? "") as Role;
+  const roles = rawRoles.length > 0
+    ? rawRoles
+    : (ROLES as readonly string[]).includes(fallbackRole)
+      ? [fallbackRole]
+      : [];
+  const primaryRole = roles[0] ?? fallbackRole;
+
+  if (!email || !fullName || temporaryPassword.length < 6 || roles.length === 0) {
+    redirect("/admin/users?error=Use%20a%20valid%20lowercase%20email%2C%20select%20at%20least%20one%20role%2C%20and%20use%20a%20temporary%20password%20of%20at%20least%206%20characters.");
+  }
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -548,7 +568,10 @@ export async function createUserAction(formData: FormData) {
     user_metadata: { full_name: fullName },
   });
   if (error || !data.user) redirect(`/admin/users?error=${encodeURIComponent(error?.message ?? "Could not create user.")}`);
-  const { error: profileError } = await admin.from("profiles").update({ role, active: true }).eq("id", data.user.id);
+  const { error: profileError } = await admin
+    .from("profiles")
+    .update({ role: primaryRole, roles, active: true })
+    .eq("id", data.user.id);
   if (profileError) {
     await admin.auth.admin.deleteUser(data.user.id);
     redirect(`/admin/users?error=${encodeURIComponent(profileError.message)}`);
@@ -567,14 +590,32 @@ export async function updateUserAction(formData: FormData) {
   const actor = await requireProfile(["ADMIN"]);
   const id = String(formData.get("id") ?? "");
   const fullName = String(formData.get("full_name") ?? "").trim();
-  const role = String(formData.get("role") ?? "") as Role;
+  const rawRoles = formData
+    .getAll("roles")
+    .map(String)
+    .filter((r): r is Role => (ROLES as readonly string[]).includes(r));
+  const fallbackRole = String(formData.get("role") ?? "") as Role;
+  const roles = rawRoles.length > 0
+    ? rawRoles
+    : (ROLES as readonly string[]).includes(fallbackRole)
+      ? [fallbackRole]
+      : [];
+  const primaryRole = roles[0] ?? fallbackRole;
   const active = formData.get("active") === "true";
-  if (!/^[0-9a-f-]{36}$/i.test(id) || !fullName || fullName.length > 120 || !(ROLES as readonly string[]).includes(role)) redirect("/admin/users?error=Invalid%20user%20update.");
-  if (id === actor.id && (!active || role !== "ADMIN")) redirect("/admin/users?error=You%20cannot%20remove%20your%20own%20active%20administrator%20access.");
+
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !fullName || fullName.length > 120 || roles.length === 0) {
+    redirect("/admin/users?error=Invalid%20user%20update.");
+  }
+  if (id === actor.id && (!active || !roles.includes("ADMIN"))) {
+    redirect("/admin/users?error=You%20cannot%20remove%20your%20own%20active%20administrator%20access.");
+  }
   const admin = createAdminClient();
   const { data: authRecord, error: authReadError } = await admin.auth.admin.getUserById(id);
   if (authReadError || !authRecord.user) redirect(`/admin/users?error=${encodeURIComponent(authReadError?.message ?? "Could not load the Auth user.")}`);
-  const { error } = await admin.from("profiles").update({ full_name: fullName, role, active }).eq("id", id);
+  const { error } = await admin
+    .from("profiles")
+    .update({ full_name: fullName, role: primaryRole, roles, active })
+    .eq("id", id);
   if (error) redirect(`/admin/users?error=${encodeURIComponent(error.message)}`);
   const { error: authError } = await admin.auth.admin.updateUserById(id, {
     user_metadata: { ...authRecord.user.user_metadata, full_name: fullName },
@@ -663,7 +704,7 @@ export async function deleteReplacementAction(formData: FormData) {
     redirect("/replacements?error=Replacement%20not%20found.");
   }
 
-  if (profile.role !== "ADMIN" && (replacement.created_by !== profile.id || replacement.status !== "NEW")) {
+  if (!hasRole(profile, "ADMIN") && (replacement.created_by !== profile.id || replacement.status !== "NEW")) {
     redirect(`/replacements/${replacementId}?error=You%20can%20only%20delete%20new%20orders%20you%20created.`);
   }
 

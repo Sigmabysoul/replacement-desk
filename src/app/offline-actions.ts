@@ -126,13 +126,13 @@ export async function confirmPrintingAction(formData: FormData) {
   if (!orderId) redirect("/offline-orders?error=Invalid%20order.");
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("confirm_offline_printing", { p_order_id: orderId });
+  const { error } = await supabase.rpc("confirm_offline_printed", { p_order_id: orderId });
   if (error) redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(error.message)}`);
 
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
-  redirect(`/offline-orders/${orderId}?success=${encodeURIComponent("Printing confirmed.")}`);
+  redirect(`/offline-orders/${orderId}?success=${encodeURIComponent("Materials and photos confirmed as printed.")}`);
 }
 
 /**
@@ -159,13 +159,13 @@ export async function confirmPackingAction(formData: FormData) {
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
-  redirect(`/offline-orders/${orderId}?success=${encodeURIComponent("Packing confirmed.")}`);
+  redirect(`/offline-orders/${orderId}?success=${encodeURIComponent("Packing details confirmed. Ready for HR dispatch details.")}`);
 }
 
 /**
- * HR dispatches order with LR number, tracking URL, and optional documents.
+ * HR prepares dispatch details with LR number, tracking URL, and compressed photos.
  */
-export async function dispatchOfflineOrderAction(formData: FormData) {
+export async function dispatchPrepareOfflineOrderAction(formData: FormData) {
   await requireProfile(["HR", "ADMIN"]);
   const orderId = String(formData.get("order_id") ?? "");
   const parsed = dispatchOrderSchema.safeParse(Object.fromEntries(formData));
@@ -174,8 +174,8 @@ export async function dispatchOfflineOrderAction(formData: FormData) {
   }
 
   const files = formFiles(formData, "dispatch_documents");
-  if (files.length > 10) {
-    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent("Maximum 10 documents allowed.")}`);
+  if (files.length > 20) {
+    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent("Maximum 20 documents and photos allowed.")}`);
   }
 
   try {
@@ -194,7 +194,7 @@ export async function dispatchOfflineOrderAction(formData: FormData) {
       attachmentRows = uploadResult.rows;
     }
 
-    const { error } = await supabase.rpc("dispatch_offline_order", {
+    const { error } = await supabase.rpc("dispatch_prepare_offline_order", {
       p_order_id: parsed.data.order_id,
       p_lr_number: parsed.data.lr_number ?? null,
       p_tracking_url: parsed.data.tracking_url ?? null,
@@ -211,8 +211,10 @@ export async function dispatchOfflineOrderAction(formData: FormData) {
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
-  redirect(`/offline-orders/${orderId}?success=${encodeURIComponent("Order marked as dispatched.")}`);
+  redirect(`/offline-orders/${orderId}?success=${encodeURIComponent("Dispatch details & photos saved. Sent to Print team.")}`);
 }
+
+export const dispatchOfflineOrderAction = dispatchPrepareOfflineOrderAction;
 
 /**
  * Consignment Team confirms pickup by the courier.

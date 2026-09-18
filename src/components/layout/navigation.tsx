@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Boxes, CirclePlus, ClipboardList, LayoutDashboard, PackageCheck, Settings, Truck, Users } from "lucide-react";
+import {
+  Boxes,
+  ClipboardList,
+  LayoutDashboard,
+  PackageCheck,
+  Radar,
+  Settings,
+  Truck,
+  Users,
+} from "lucide-react";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -20,33 +29,47 @@ const mainItems: NavItem[] = [
   { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ALL_ROLES },
   { href: "/offline-orders", label: "Offline orders", short: "Offline", icon: Boxes, roles: ALL_ROLES },
   { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN", "BOSS"] },
-  { href: "/replacements/new", label: "New order", short: "New", icon: CirclePlus, roles: ["CUSTOMER_SUPPORT", "ADMIN"] },
-  { href: "/settings", label: "Settings", short: "Settings", icon: Settings, roles: ["CUSTOMER_SUPPORT"] },
+  { href: "/tracking", label: "Shipment Tracking", short: "Tracking", icon: Radar, roles: ["LOGISTICS", "ADMIN"] },
   { href: "/dispatch", label: "Dispatch", short: "Dispatch", icon: Truck, roles: ["PACKING", "ADMIN"] },
+  { href: "/settings", label: "Settings", short: "Settings", icon: Settings, roles: ["CUSTOMER_SUPPORT", "ADMIN"] },
   { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ALL_ROLES },
 ];
 
-export function Navigation({ role }: { role: Role }) {
+export function Navigation({
+  role,
+  roles,
+}: {
+  role?: Role;
+  roles?: Role[];
+}) {
   const pathname = usePathname();
-  const operationalItems = mainItems.filter((item) => item.roles.includes(role));
-  const adminItems = role === "ADMIN" ? [
+  const userRoles = roles?.length ? roles : role ? [role] : [];
+  const isAdmin = userRoles.includes("ADMIN");
+  
+  // Deduplicate and filter items based on user roles
+  const operationalItems = mainItems.filter((item) =>
+    isAdmin || item.roles.some((r) => userRoles.includes(r))
+  );
+
+  const adminItems = isAdmin ? [
     { href: "/admin/users", label: "Users", icon: Users },
-    { href: "/settings", label: "Settings", icon: Settings },
   ] : [];
 
-  const mobileItems = role === "ADMIN"
-    ? [
-        { href: "/", short: "Home", icon: LayoutDashboard },
-        { href: "/offline-orders", short: "Offline", icon: Boxes },
-        { href: "/replacements", short: "Orders", icon: ClipboardList },
-        { href: "/admin/users", short: "Users", icon: Users },
-        { href: "/settings", short: "Settings", icon: Settings },
-      ]
-    : operationalItems.map((item) => ({
-        href: item.href,
-        short: item.short,
-        icon: item.icon,
-      }));
+  const mobileItems = (
+    isAdmin
+      ? [
+          { href: "/", short: "Home", icon: LayoutDashboard },
+          { href: "/offline-orders", short: "Offline", icon: Boxes },
+          { href: "/replacements", short: "Orders", icon: ClipboardList },
+          { href: "/tracking", short: "Tracking", icon: Radar },
+          { href: "/admin/users", short: "Users", icon: Users },
+        ]
+      : operationalItems.map((item) => ({
+          href: item.href,
+          short: item.short,
+          icon: item.icon,
+        }))
+  ).filter((item, index, self) => index === self.findIndex((t) => t.href === item.href));
 
   return (
     <>
@@ -64,7 +87,7 @@ export function Navigation({ role }: { role: Role }) {
           {operationalItems.map(({ href, label, icon: Icon }) => {
             const active = href === "/"
               ? pathname === "/"
-              : pathname.startsWith(href) || (href === "/settings" && pathname.startsWith("/dimensions"));
+              : pathname.startsWith(href) || (href === "/settings" && (pathname.startsWith("/settings") || pathname.startsWith("/dimensions") || pathname.startsWith("/admin/settings")));
             return (
               <Link
                 key={href}
@@ -81,14 +104,13 @@ export function Navigation({ role }: { role: Role }) {
           })}
         </nav>
 
-        {role === "ADMIN" && (
+        {isAdmin && (
           <div className="mt-auto grid gap-1 border-t border-slate-800 pt-3">
             <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">
               Admin
             </p>
             {adminItems.map(({ href, label, icon: Icon }) => {
-              const active = pathname.startsWith(href)
-                || (href === "/settings" && (pathname.startsWith("/admin/settings") || pathname.startsWith("/dimensions")));
+              const active = pathname.startsWith(href);
               return (
                 <Link
                   key={href}
@@ -116,7 +138,7 @@ export function Navigation({ role }: { role: Role }) {
         {mobileItems.map(({ href, short, icon: Icon }) => {
           const active = href === "/"
             ? pathname === "/"
-            : pathname.startsWith(href) || (href === "/settings" && pathname.startsWith("/dimensions"));
+            : pathname.startsWith(href) || (href === "/settings" && (pathname.startsWith("/settings") || pathname.startsWith("/dimensions")));
           return (
             <Link
               key={href}

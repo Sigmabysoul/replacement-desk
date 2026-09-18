@@ -14,8 +14,9 @@ import { formatDate } from "@/lib/utils";
 
 const actionCopy: Record<string, string> = {
   ORDER_CREATED: "Created offline order",
-  PRINTING_CONFIRMED: "Confirmed materials / labels printed",
   PACKING_CONFIRMED: "Confirmed packing & carton dimensions",
+  DISPATCH_PREPARED: "Prepared dispatch details & uploaded photos",
+  PRINTING_CONFIRMED: "Confirmed materials / labels printed",
   ORDER_DISPATCHED: "Dispatched shipment with LR & tracking",
   PICKUP_CONFIRMED: "Confirmed courier pickup",
   DELIVERY_CONFIRMED: "Confirmed delivery & Proof of Delivery (POD)",
@@ -28,10 +29,12 @@ function ActivityIcon({ action }: { action: string }) {
   switch (action) {
     case "ORDER_CREATED":
       return <Boxes className="size-4 text-indigo-600" />;
-    case "PRINTING_CONFIRMED":
-      return <Printer className="size-4 text-fuchsia-600" />;
     case "PACKING_CONFIRMED":
       return <PackageCheck className="size-4 text-violet-600" />;
+    case "DISPATCH_PREPARED":
+      return <Truck className="size-4 text-amber-600" />;
+    case "PRINTING_CONFIRMED":
+      return <Printer className="size-4 text-fuchsia-600" />;
     case "ORDER_DISPATCHED":
       return <Truck className="size-4 text-amber-600" />;
     case "PICKUP_CONFIRMED":
@@ -62,9 +65,49 @@ export function OfflineActivityTimeline({ activities }: { activities: OfflineOrd
         const isDelivered = activity.action === "DELIVERY_CONFIRMED";
         const isAcknowledged = activity.action === "ORDER_ACKNOWLEDGED";
 
+        const actorRoleLabel = activity.actor?.roles?.length
+          ? activity.actor.roles.join(" + ")
+          : activity.actor?.role;
+        const actorName = activity.actor?.full_name ?? "System";
+        const actorInitial = actorName.charAt(0).toUpperCase();
+
+        if (isComment) {
+          return (
+            <div key={activity.id} className="relative flex gap-3 pb-5">
+              {index < activities.length - 1 && (
+                <span
+                  className="absolute bottom-0 left-[17px] top-9 w-px bg-slate-200"
+                  aria-hidden="true"
+                />
+              )}
+              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-indigo-600 text-xs font-black text-white shadow-xs">
+                {actorInitial}
+              </span>
+              <div className="min-w-0 flex-1 rounded-2xl border border-indigo-100 bg-white p-4 shadow-xs">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                  <div className="flex items-center gap-1.5">
+                    <strong className="text-sm font-black text-slate-900">{actorName}</strong>
+                    {actorRoleLabel && (
+                      <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+                        {actorRoleLabel}
+                      </span>
+                    )}
+                  </div>
+                  <time className="text-xs text-slate-400">
+                    {formatDate(activity.created_at)}
+                  </time>
+                </div>
+
+                <div className="mt-2 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap">
+                  {activity.message}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
         let bubbleStyle = "bg-slate-50 border-slate-100";
-        if (isComment) bubbleStyle = "bg-white border-indigo-200 shadow-xs";
-        else if (isCancellation) bubbleStyle = "bg-rose-50/60 border-rose-200";
+        if (isCancellation) bubbleStyle = "bg-rose-50/60 border-rose-200";
         else if (isDelivered || isAcknowledged) bubbleStyle = "bg-emerald-50/50 border-emerald-200";
 
         return (
@@ -82,11 +125,11 @@ export function OfflineActivityTimeline({ activities }: { activities: OfflineOrd
               <div className="flex flex-wrap items-baseline justify-between gap-x-2">
                 <div className="flex items-center gap-1.5">
                   <strong className="text-sm font-bold text-slate-950">
-                    {activity.actor?.full_name ?? "System"}
+                    {actorName}
                   </strong>
-                  {activity.actor?.role && (
+                  {actorRoleLabel && (
                     <span className="rounded-md bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-700">
-                      {activity.actor.role}
+                      {actorRoleLabel}
                     </span>
                   )}
                 </div>
@@ -125,6 +168,11 @@ export function OfflineActivityTimeline({ activities }: { activities: OfflineOrd
                   {activity.metadata.lr_number != null && (
                     <span className="rounded-md bg-white px-2 py-0.5 ring-1 ring-slate-200">
                       LR: <strong>{String(activity.metadata.lr_number)}</strong>
+                    </span>
+                  )}
+                  {activity.metadata.attachment_count != null && Number(activity.metadata.attachment_count) > 0 && (
+                    <span className="rounded-md bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                      Photos/Docs: <strong>{String(activity.metadata.attachment_count)}</strong>
                     </span>
                   )}
                 </div>

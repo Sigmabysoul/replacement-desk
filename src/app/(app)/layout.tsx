@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <ThemeProvider>
       <div className="min-h-screen">
         <RealtimeListener />
-        <Navigation role={profile.role} />
+        <Navigation role={profile.role} roles={profile.roles} />
         <div className="lg:pl-64">
           <AppHeader profile={profile} />
           <main className="mx-auto max-w-6xl px-4 pb-32 pt-6 sm:px-6 sm:pb-36 lg:pb-10 lg:pt-8">

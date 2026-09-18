@@ -6,18 +6,15 @@ import {
   Download,
   ExternalLink,
   FileText,
-  Send,
   Truck,
 } from "lucide-react";
 import { notFound } from "next/navigation";
-import { addOfflineCommentAction } from "@/app/offline-actions";
 import { OfflineActionPanel } from "@/components/offline-orders/offline-action-panel";
 import { OfflineActivityTimeline } from "@/components/offline-orders/offline-activity-timeline";
+import { OfflineCommentComposer } from "@/components/offline-orders/offline-comment-composer";
 import { OfflineStatusBadge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { SubmitButton } from "@/components/ui/submit-button";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -83,11 +80,11 @@ export default async function OfflineOrderDetailPage({
   ] as string[];
 
   const { data: profileRows } = actorIds.length
-    ? await supabase.from("profiles").select("id,full_name,role").in("id", actorIds)
+    ? await supabase.from("profiles").select("id,full_name,role,roles").in("id", actorIds)
     : { data: [] };
 
   const names = new Map(
-    (profileRows ?? []).map((item) => [item.id, item as Pick<Profile, "full_name" | "role">]),
+    (profileRows ?? []).map((item) => [item.id, item as Pick<Profile, "full_name" | "role" | "roles">]),
   );
 
   // Generate signed URLs for attachments
@@ -156,7 +153,7 @@ export default async function OfflineOrderDetailPage({
       </Card>
 
       {/* Action panel */}
-      <OfflineActionPanel order={order} profile={profile} />
+      <OfflineActionPanel order={order} profile={profile} attachments={dispatchDocs} />
 
       {/* Order info details */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -281,7 +278,7 @@ export default async function OfflineOrderDetailPage({
                   <div key={doc.id} className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3">
                     {doc.signed_url && isImageAttachment(doc) ? (
                       <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-slate-100">
-                        <Image src={doc.signed_url} alt={doc.file_name} fill className="object-cover" />
+                        <Image src={doc.signed_url} alt={doc.file_name} fill unoptimized className="object-cover" />
                       </div>
                     ) : (
                       <div className="flex aspect-video w-full items-center justify-center rounded-lg bg-slate-200">
@@ -315,7 +312,7 @@ export default async function OfflineOrderDetailPage({
                   <div key={doc.id} className="group relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
                     {doc.signed_url && isImageAttachment(doc) ? (
                       <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-slate-100">
-                        <Image src={doc.signed_url} alt={doc.file_name} fill className="object-cover" />
+                        <Image src={doc.signed_url} alt={doc.file_name} fill unoptimized className="object-cover" />
                       </div>
                     ) : (
                       <div className="flex aspect-video w-full items-center justify-center rounded-lg bg-emerald-100">
@@ -346,22 +343,9 @@ export default async function OfflineOrderDetailPage({
         <h2 className="mb-4 font-black text-slate-950">Activity & Timeline</h2>
         <OfflineActivityTimeline activities={activitiesWithActors} />
 
-        <form action={addOfflineCommentAction} className="mt-6 border-t border-slate-100 pt-4">
-          <input type="hidden" name="order_id" value={order.id} />
-          <div className="flex items-center gap-2">
-            <Input
-              name="message"
-              required
-              maxLength={1000}
-              placeholder="Add an update or comment…"
-              className="flex-1"
-            />
-            <SubmitButton pendingText="Posting…">
-              <Send className="size-4" />
-              Send
-            </SubmitButton>
-          </div>
-        </form>
+        <div className="mt-6 border-t border-slate-100 pt-5">
+          <OfflineCommentComposer orderId={order.id} profile={profile} />
+        </div>
       </Card>
     </div>
   );
