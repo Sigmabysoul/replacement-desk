@@ -13,6 +13,11 @@ const optionalTrackingUrl = z
     "Tracking link must begin with http:// or https://",
   );
 
+export const offlineOrderItemsSchema = z.array(z.object({
+  product_name: z.string().trim().min(1, "Product name is required").max(200),
+  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1").max(999999),
+})).min(1, "Add at least one item").max(20, "An order can contain at most twenty items");
+
 export const createOfflineOrderSchema = z.object({
   order_number: z
     .preprocess(
@@ -68,4 +73,3 @@ export const offlineOrderCommentSchema = z.object({
   order_id: z.string().uuid("Invalid order ID"),
   message: z.string().trim().min(1, "Comment cannot be empty").max(1000),
 });
-

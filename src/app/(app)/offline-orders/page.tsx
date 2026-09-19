@@ -40,7 +40,7 @@ export default async function OfflineOrdersPage({
   const canCreate = hasAnyRole(profile, ["BOSS", "ADMIN"]);
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6 w-full max-w-full min-w-0 overflow-hidden">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-700">Offline Pipeline</p>
@@ -60,7 +60,7 @@ export default async function OfflineOrdersPage({
         )}
       </div>
 
-      <Card className="p-4 sm:p-5">
+      <Card className="p-4 sm:p-5 w-full max-w-full min-w-0 overflow-hidden">
         <form className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_220px_auto]">
           <div className="relative flex min-h-12 w-full items-center">
             <span className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-12 items-center justify-center" aria-hidden="true">
@@ -100,7 +100,7 @@ export default async function OfflineOrdersPage({
       )}
 
       {orders.length ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2 w-full max-w-full min-w-0">
           {orders.map((order) => (
             <OfflineOrderCard
               key={order.id}

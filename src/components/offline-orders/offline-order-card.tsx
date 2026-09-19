@@ -47,10 +47,10 @@ export function OfflineOrderCard({
       aria-label={`Open offline order ${order.so_number}`}
       className="group block rounded-2xl outline-none focus-visible:ring-4 focus-visible:ring-indigo-200"
     >
-      <Card className="h-full cursor-pointer p-4 transition hover:border-indigo-300 hover:shadow-md sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
+      <Card className="h-full cursor-pointer overflow-hidden p-3.5 transition hover:border-indigo-300 hover:shadow-md sm:p-5">
+        <div className="flex items-start justify-between gap-2.5 min-w-0">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-black text-indigo-700">
                 SO: {order.so_number}
               </span>
@@ -60,38 +60,38 @@ export function OfflineOrderCard({
                 </span>
               )}
             </div>
-            <p className="mt-1 text-xs font-semibold text-slate-500">
+            <p className="mt-1 truncate text-xs font-semibold text-slate-500">
               #{order.order_number} · Offline Order
             </p>
-            <p className="mt-2 flex items-center gap-2 text-base font-semibold text-slate-800">
+            <p className="mt-2 flex items-center gap-1.5 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
               <Boxes className="size-4 shrink-0 text-slate-400" />
               <span className="truncate">{order.product_name}</span>
-              <span className="shrink-0 text-slate-500">
+              <span className="shrink-0 text-slate-500 text-xs sm:text-sm">
                 × {order.quantity} {order.unit}
               </span>
             </p>
             {order.logistics_partner && (
-              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 truncate">
                 <Truck className="size-3.5 shrink-0 text-slate-400" />
-                <span>Partner: {order.logistics_partner}</span>
-                {order.lr_number && <span className="font-semibold text-slate-700">· LR: {order.lr_number}</span>}
+                <span className="truncate">Partner: {order.logistics_partner}</span>
+                {order.lr_number && <span className="shrink-0 font-semibold text-slate-700">· LR: {order.lr_number}</span>}
               </p>
             )}
           </div>
-          <OfflineStatusBadge status={order.status} />
+          <OfflineStatusBadge status={order.status} className="shrink-0 text-[11px] sm:text-xs" />
         </div>
 
-        <div className="mt-4 flex items-end justify-between gap-4 border-t border-slate-100 pt-3">
-          <div>
-            <p className="text-sm font-bold text-indigo-700">{actionHint(order.status, userRoles)}</p>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-              <CalendarDays className="size-3.5" />
+        <div className="mt-4 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 min-w-0">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs sm:text-sm font-bold text-indigo-700">{actionHint(order.status, userRoles)}</p>
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 truncate">
+              <CalendarDays className="size-3.5 shrink-0" />
               {formatDate(order.created_at)}
             </p>
           </div>
           <span
             aria-hidden="true"
-            className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 transition group-hover:bg-indigo-600 group-hover:text-white"
+            className="grid size-9 sm:size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 transition group-hover:bg-indigo-600 group-hover:text-white"
           >
             <ArrowRight className="size-5" />
           </span>

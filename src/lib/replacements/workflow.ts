@@ -99,6 +99,9 @@ export function availableActions(
   }
   if (status === "NEEDS_TOKEN" && canPerform(roleOrRoles, "MARK_SHIPPED")) actions.push("MARK_SHIPPED");
   if (status === "SHIPPED" && canPerform(roleOrRoles, "MARK_DELIVERED")) actions.push("MARK_DELIVERED");
+  if (!["SHIPPED", "DELIVERED", "CANCELLED"].includes(status) && canPerform(roleOrRoles, "CANCEL_REPLACEMENT")) {
+    actions.push("CANCEL_REPLACEMENT");
+  }
   return actions;
 }
 

@@ -97,7 +97,7 @@ Never expose or prefix the service-role key or bot token with `NEXT_PUBLIC_`.
 
 Create one account for each role on Admin → Users, then test in order:
 
-1. **CUSTOMER_SUPPORT:** create a replacement or offline order with one or more product photos. Verify replacement dimensions, multi-order customer branches, and automatic order numbers starting at 501. Create and edit a preset in Dimensions.
+1. **CUSTOMER_SUPPORT:** create a replacement order with one or more product line items and product photos. Verify shared replacement dimensions and automatic order numbers starting at 501. Create and edit a preset in Dimensions.
 2. **LOGISTICS:** upload one shipping label and optionally add its tracking link. Confirm product-photo, QC, printing, packing, and dispatch controls are absent.
 3. **PRINTING:** mark the uploaded label printed. Confirm file upload and QC controls are absent.
 4. **PACKING:** upload separate QC pictures and request CUSTOMER_SUPPORT approval.

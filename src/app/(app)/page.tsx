@@ -40,7 +40,7 @@ const OFFLINE_DASHBOARD_COLUMNS =
 export default async function DashboardPage() {
   const profile = await requireProfile();
 
-  const cached = getCachedDashboardData();
+  const cached = getCachedDashboardData(profile.id);
   let replacements: Replacement[] = cached?.replacements ?? [];
   let offlineOrders: OfflineOrder[] = cached?.offlineOrders ?? [];
   let replacementError = cached?.replacementError ?? null;
@@ -74,7 +74,7 @@ export default async function DashboardPage() {
     offlineOrders = (offlineData ?? []) as unknown as OfflineOrder[];
 
     if (!rErr && !oErr) {
-      setCachedDashboardData({
+      setCachedDashboardData(profile.id, {
         replacements,
         offlineOrders,
         replacementError: null,
@@ -283,37 +283,37 @@ export default async function DashboardPage() {
       {/* 3. Dual Pipeline Overview */}
       <div className="grid gap-5 sm:gap-7 lg:grid-cols-2">
         {/* Offline Orders Pipeline */}
-        <div className="rounded-3xl border border-border bg-card p-4 shadow-xs sm:p-6 text-card-foreground">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="grid size-8 place-items-center rounded-lg bg-slate-900 text-white dark:bg-indigo-600">
+        <div className="rounded-3xl border border-border bg-card p-3.5 shadow-xs sm:p-6 text-card-foreground overflow-hidden">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-slate-900 text-white dark:bg-indigo-600">
                 <Boxes className="size-4" />
               </span>
-              <div>
-                <h2 className="text-base font-black text-foreground">Offline Orders Pipeline</h2>
-                <p className="text-[11px] text-muted-foreground">Cartons, Logistics & Storehouse flow</p>
+              <div className="min-w-0">
+                <h2 className="truncate text-sm sm:text-base font-black text-foreground">Offline Orders Pipeline</h2>
+                <p className="truncate text-[11px] text-muted-foreground">Cartons, Logistics & Storehouse flow</p>
               </div>
             </div>
             <Link
               href="/offline-orders"
-              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+              className="shrink-0 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
             >
               View All ({offlineOrders.length})
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 sm:grid-cols-3">
             {offlineMetrics.map((metric) => (
               <Link
                 key={metric.label}
                 href={metric.href}
-                className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-card/70 dark:bg-muted/35 p-3 transition hover:border-indigo-400/50 hover:bg-indigo-50/50 dark:hover:border-indigo-500/50 dark:hover:bg-indigo-950/40"
+                className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-card/70 dark:bg-muted/35 p-2.5 sm:p-3 transition hover:border-indigo-400/50 hover:bg-indigo-50/50 dark:hover:border-indigo-500/50 dark:hover:bg-indigo-950/40 min-w-0"
               >
                 <div className="flex items-center justify-between">
-                  <span className={`grid size-7 place-items-center rounded-lg ${metric.tone}`}>
+                  <span className={`grid size-7 shrink-0 place-items-center rounded-lg ${metric.tone}`}>
                     <metric.icon className="size-3.5" />
                   </span>
-                  <strong className="text-xl font-black text-foreground">{metric.count}</strong>
+                  <strong className="text-lg sm:text-xl font-black text-foreground">{metric.count}</strong>
                 </div>
                 <span className="mt-2 text-[11px] font-bold leading-tight text-muted-foreground group-hover:text-foreground">
                   {metric.label}
@@ -324,37 +324,37 @@ export default async function DashboardPage() {
         </div>
 
         {/* Replacement Orders Pipeline */}
-        <div className="rounded-3xl border border-border bg-card p-4 shadow-xs sm:p-6 text-card-foreground">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-white">
+        <div className="rounded-3xl border border-border bg-card p-3.5 shadow-xs sm:p-6 text-card-foreground overflow-hidden">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-indigo-600 text-white">
                 <Truck className="size-4" />
               </span>
-              <div>
-                <h2 className="text-base font-black text-foreground">Replacements Pipeline</h2>
-                <p className="text-[11px] text-muted-foreground">Support, QC, Packing & Delivery flow</p>
+              <div className="min-w-0">
+                <h2 className="truncate text-sm sm:text-base font-black text-foreground">Replacements Pipeline</h2>
+                <p className="truncate text-[11px] text-muted-foreground">Support, QC, Packing & Delivery flow</p>
               </div>
             </div>
             <Link
               href="/replacements"
-              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+              className="shrink-0 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
             >
               View All ({replacements.length})
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 sm:grid-cols-3">
             {replacementMetrics.map((metric) => (
               <Link
                 key={metric.label}
                 href={metric.href}
-                className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-card/70 dark:bg-muted/35 p-3 transition hover:border-indigo-400/50 hover:bg-indigo-50/50 dark:hover:border-indigo-500/50 dark:hover:bg-indigo-950/40"
+                className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-card/70 dark:bg-muted/35 p-2.5 sm:p-3 transition hover:border-indigo-400/50 hover:bg-indigo-50/50 dark:hover:border-indigo-500/50 dark:hover:bg-indigo-950/40 min-w-0"
               >
                 <div className="flex items-center justify-between">
-                  <span className={`grid size-7 place-items-center rounded-lg ${metric.tone}`}>
+                  <span className={`grid size-7 shrink-0 place-items-center rounded-lg ${metric.tone}`}>
                     <metric.icon className="size-3.5" />
                   </span>
-                  <strong className="text-xl font-black text-foreground">{metric.count}</strong>
+                  <strong className="text-lg sm:text-xl font-black text-foreground">{metric.count}</strong>
                 </div>
                 <span className="mt-2 text-[11px] font-bold leading-tight text-muted-foreground group-hover:text-foreground">
                   {metric.label}

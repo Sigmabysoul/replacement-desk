@@ -9,7 +9,7 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
   return (
     <input
       className={cn(
-        "min-h-12 w-full appearance-none rounded-xl border border-border bg-card px-3.5 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-4 focus:ring-ring/15",
+        "min-h-12 w-full min-w-0 max-w-full appearance-none rounded-xl border border-border bg-card px-3.5 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-4 focus:ring-ring/15",
         className,
       )}
       {...props}
@@ -18,11 +18,11 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
 }
 
 export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: React.Ref<HTMLTextAreaElement> }) {
-  return <textarea className={cn("min-h-28 w-full resize-y rounded-xl border border-border bg-card px-3.5 py-3 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-4 focus:ring-ring/15", className)} {...props} />;
+  return <textarea className={cn("min-h-28 w-full min-w-0 max-w-full resize-y rounded-xl border border-border bg-card px-3.5 py-3 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-4 focus:ring-ring/15", className)} {...props} />;
 }
 
 export function Select({ className, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { ref?: React.Ref<HTMLSelectElement> }) {
-  return <select className={cn("min-h-12 w-full rounded-xl border border-border bg-card px-3.5 text-base text-foreground outline-none focus:border-ring focus:ring-4 focus:ring-ring/15", className)} {...props} />;
+  return <select className={cn("min-h-12 w-full min-w-0 max-w-full rounded-xl border border-border bg-card px-3.5 text-base text-foreground outline-none focus:border-ring focus:ring-4 focus:ring-ring/15", className)} {...props} />;
 }
 
 export { PasswordInput } from "@/components/ui/password-input";

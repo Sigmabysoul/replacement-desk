@@ -5,11 +5,7 @@ import { Input, Textarea } from "@/components/ui/field";
 import { ProductPhotoPicker } from "@/components/replacements/product-photo-picker";
 import { ReasonSelect } from "@/components/replacements/reason-select";
 import { ThemeProvider, useTheme } from "@/components/theme/theme-provider";
-import {
-  OrderBuilder,
-  PRODUCT_LIST_CLASS,
-  groupProductsIntoRows,
-} from "@/components/replacements/order-builder";
+import { OrderBuilder } from "@/components/replacements/order-builder";
 
 describe("shared field styling", () => {
   it("preserves base input styling when a caller adds a custom class", () => {
@@ -42,23 +38,22 @@ describe("new order form structure", () => {
     expect(markup).not.toContain("Courier Partner");
     expect(markup).not.toContain("Order reference");
     expect(markup).toContain("Select a reason");
-    expect(markup).toContain("Product details");
+    expect(markup).toContain("Products in this replacement");
     expect(markup).toContain("Dimensions &amp; fulfilment");
     expect(markup).toContain("value=\"501\"");
-    expect(markup).not.toContain("readOnly=\"\"");
+    expect(markup).toContain("ADD ITEM");
+    expect(markup).not.toContain("ADD ANOTHER REPLACEMENT ORDER");
   });
 
-  it("lets team members edit the proposed Order ID", () => {
+  it("keeps the proposed Order ID admin-only", () => {
     const markup = renderToStaticMarkup(createElement(OrderBuilder, {
       action,
       presets: [],
       isAdmin: false,
       startingOrderNumber: 501,
     }));
-    expect(markup).toContain('aria-label="Order ID"');
-    expect(markup).not.toContain('readOnly=""');
-    expect(markup).toContain('min="1"');
-    expect(markup).toContain("order-id-input");
+    expect(markup).toContain('disabled=""');
+    expect(markup).toContain('inputMode="numeric"');
   });
 
   it("places the Order ID in the section header before product input fields", () => {
@@ -71,23 +66,16 @@ describe("new order form structure", () => {
     expect(markup.indexOf("Order ID")).toBeLessThan(markup.indexOf("Product name or description"));
   });
 
-  it("lays out products as complete pairs with a full-width unpaired card", () => {
-    expect(groupProductsIntoRows([1, 2, 3, 4, 5, 6, 7, 8])).toEqual([
-      [1, 2],
-      [3, 4],
-      [5, 6],
-      [7, 8],
-    ]);
-    expect(groupProductsIntoRows([1, 2, 3, 4, 5])).toEqual([
-      [1, 2],
-      [3, 4],
-      [5],
-    ]);
-  });
-
-  it("uses normal page scrolling instead of a nested product scrollbar", () => {
-    expect(PRODUCT_LIST_CLASS).not.toContain("overflow-y-auto");
-    expect(PRODUCT_LIST_CLASS).not.toContain("max-h-");
+  it("renders one compact product and quantity row by default", () => {
+    const markup = renderToStaticMarkup(createElement(OrderBuilder, {
+      action,
+      presets: [],
+      isAdmin: true,
+      startingOrderNumber: 501,
+    }));
+    expect(markup).toContain("Product name or description");
+    expect(markup).toContain("Quantity");
+    expect(markup).toContain("1 ITEM");
   });
 });
 

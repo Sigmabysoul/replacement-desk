@@ -8,6 +8,8 @@ import {
 } from "@/lib/replacements/workflow";
 import {
   commentSchema,
+  cancelReplacementSchema,
+  replacementItemsSchema,
   replacementSchema,
   transitionSchema,
 } from "@/lib/replacements/validation";
@@ -146,6 +148,30 @@ describe("replacement number generation", () => {
 });
 
 describe("schema validation", () => {
+  it("validates compact replacement line items", () => {
+    expect(replacementItemsSchema.safeParse([
+      { product_name: "Cable", quantity: 2 },
+      { product_name: "Adapter", quantity: 1 },
+    ]).success).toBe(true);
+    expect(replacementItemsSchema.safeParse([]).success).toBe(false);
+    expect(replacementItemsSchema.safeParse([{ product_name: "", quantity: 0 }]).success).toBe(false);
+  });
+
+  it("validates replacement cancellation input", () => {
+    expect(cancelReplacementSchema.safeParse({
+      replacement_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      reason: "Customer requested cancellation",
+    }).success).toBe(true);
+    expect(cancelReplacementSchema.safeParse({
+      replacement_id: "not-a-uuid",
+      reason: "Customer requested cancellation",
+    }).success).toBe(false);
+    expect(cancelReplacementSchema.safeParse({
+      replacement_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      reason: "x".repeat(1001),
+    }).success).toBe(false);
+  });
+
   it("validates valid replacement input", () => {
     const result = replacementSchema.safeParse({
       order_reference: "FK123456",

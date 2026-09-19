@@ -4,11 +4,12 @@ import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasRole, invalidateProfileCache, requireProfile } from "@/lib/auth/session";
 import { invalidateDashboardCache } from "@/lib/cache/dashboard-cache";
-import { ALLOWED_MIME_TYPES, commentSchema, dimensionPresetSchema, MAX_FILE_SIZE, replacementEditSchema, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
+import { ALLOWED_MIME_TYPES, cancelReplacementSchema, commentSchema, dimensionPresetSchema, MAX_FILE_SIZE, replacementEditSchema, replacementItemsSchema, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
 import { safeFileName } from "@/lib/utils";
 import { notifyTelegram } from "@/lib/notifications/telegram";
 import { verifyFileSignature } from "@/lib/security/magic-bytes";
@@ -206,7 +207,7 @@ export async function createReplacementAction(formData: FormData) {
   redirect(`/replacements/${replacement!.id}${warning ? `?warning=${encodeURIComponent(warning)}` : ""}`);
 }
 
-/** Creates one or more replacement/offline orders while keeping every order independently traceable. */
+/** Creates one replacement order containing one or more product line items. */
 export async function createOrderBatchAction(formData: FormData) {
   const profile = await requireProfile(["CUSTOMER_SUPPORT", "ADMIN"]);
   let rawOrders: unknown;
@@ -215,8 +216,19 @@ export async function createOrderBatchAction(formData: FormData) {
   } catch {
     redirect(`/replacements/new?error=${encodeURIComponent("The order form is invalid. Refresh and try again.")}`);
   }
-  if (!Array.isArray(rawOrders) || rawOrders.length < 1 || rawOrders.length > 20) {
-    redirect(`/replacements/new?error=${encodeURIComponent("Create between one and twenty orders at a time.")}`);
+  if (!Array.isArray(rawOrders) || rawOrders.length !== 1) {
+    redirect(`/replacements/new?error=${encodeURIComponent("Submit one replacement order at a time.")}`);
+  }
+
+  let rawItems: unknown;
+  try {
+    rawItems = JSON.parse(String(formData.get("items_manifest") ?? "null"));
+  } catch {
+    redirect(`/replacements/new?error=${encodeURIComponent("The item list is invalid. Refresh and try again.")}`);
+  }
+  const parsedItems = replacementItemsSchema.safeParse(rawItems);
+  if (!parsedItems.success) {
+    redirect(`/replacements/new?error=${encodeURIComponent(parsedItems.error.issues[0]?.message ?? "Check every item.")}`);
   }
 
   const parsedOrders = rawOrders.map((raw) => replacementSchema.safeParse(raw));
@@ -238,7 +250,7 @@ export async function createOrderBatchAction(formData: FormData) {
   }
   const requestedValues = requestedOrderNumbers.filter((value): value is number => value !== null);
   if (new Set(requestedValues).size !== requestedValues.length) {
-    redirect(`/replacements/new?error=${encodeURIComponent("Order IDs must be unique within this batch.")}`);
+    redirect(`/replacements/new?error=${encodeURIComponent("Order ID is invalid.")}`);
   }
 
   const localIds = rawOrders.map((raw) => String((raw as { id?: unknown }).id ?? ""));
@@ -257,10 +269,6 @@ export async function createOrderBatchAction(formData: FormData) {
   }
   if (filesByOrder.some(({ files }) => files.reduce((sum, file) => sum + file.size, 0) > 80 * 1024 * 1024)) {
     redirect(`/replacements/new?error=${encodeURIComponent("Each order's combined product photos must be 80 MB or smaller.")}`);
-  }
-  const batchBytes = filesByOrder.flatMap(({ files }) => files).reduce((sum, file) => sum + file.size, 0);
-  if (batchBytes > 90 * 1024 * 1024) {
-    redirect(`/replacements/new?error=${encodeURIComponent("The complete batch of photos must be 90 MB or smaller. Submit fewer orders at once.")}`);
   }
   try {
     await Promise.all(filesByOrder.map(({ files }) => validateFiles(files, false)));
@@ -285,22 +293,22 @@ export async function createOrderBatchAction(formData: FormData) {
       requested_order_number: requestedOrderNumbers[index],
       tracking_url: null,
     }));
-    const { data, error } = await supabase.rpc("create_order_batch", {
-      p_group_id: orders.length > 1 ? randomUUID() : null,
-      p_orders: orders,
+    const { data, error } = await supabase.rpc("create_replacement_order_with_items", {
+      p_order: orders[0],
       p_attachments: attachmentRows,
+      p_items: parsedItems.data,
     });
-    if (error || !data?.length) throw error ?? new Error("Could not create orders.");
-    created = data as Replacement[];
+    if (error || !data) throw error ?? new Error("Could not create order.");
+    created = [data as Replacement];
   } catch (error) {
     await cleanupUncommittedUploads(supabase, uploaded);
     redirect(`/replacements/new?error=${encodeURIComponent(messageFrom(error))}`);
   }
 
-  const notices = await Promise.all(created.map((order) => notifyTelegram("NEW_REPLACEMENT", order, undefined, profile.full_name)));
-  const warning = notices.some((notice) => !notice.ok) ? "Orders were created, but a Telegram notification could not be sent." : "";
+  const notice = await notifyTelegram("NEW_REPLACEMENT", created[0], undefined, profile.full_name);
+  const warning = notice.ok ? "" : "Order was created, but a Telegram notification could not be sent.";
   invalidateDashboardCache();
-  redirect(`/replacements/${created[0].id}?success=${encodeURIComponent(`${created.length} order${created.length === 1 ? "" : "s"} created.`)}${warning ? `&warning=${encodeURIComponent(warning)}` : ""}`);
+  redirect(`/replacements/${created[0].id}?success=${encodeURIComponent(`Replacement order created with ${parsedItems.data.length} item${parsedItems.data.length === 1 ? "" : "s"}.`)}${warning ? `&warning=${encodeURIComponent(warning)}` : ""}`);
 }
 
 /**
@@ -748,4 +756,48 @@ export async function deleteReplacementAction(formData: FormData) {
   revalidatePath("/replacements");
   revalidatePath("/dispatch");
   redirect(`/replacements${cleanupWarning}`);
+}
+
+/**
+ * Cancels an open replacement order with a mandatory explanatory reason.
+ * Authorization: ADMIN only.
+ */
+export async function cancelReplacementAction(formData: FormData) {
+  await requireProfile(["ADMIN"]);
+  const parsed = cancelReplacementSchema.safeParse({
+    replacement_id: formData.get("replacement_id"),
+    reason: formData.get("reason"),
+  });
+  if (!parsed.success) {
+    const replacementId = String(formData.get("replacement_id") ?? "");
+    const destination = cancelReplacementSchema.shape.replacement_id.safeParse(replacementId).success
+      ? `/replacements/${replacementId}`
+      : "/replacements";
+    const message = parsed.error.issues[0]?.message ?? "Invalid cancellation request";
+    redirect(`${destination}?error=${encodeURIComponent(message)}`);
+  }
+
+  const { replacement_id: replacementId, reason } = parsed.data;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("cancel_replacement_order", {
+    p_replacement_id: replacementId,
+    p_reason: reason,
+  });
+
+  if (error) {
+    redirect(`/replacements/${replacementId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  const replacement = data as Replacement;
+  if (replacement) {
+    after(async () => {
+      await notifyTelegram("CANCELLED", replacement, reason);
+    });
+  }
+
+  invalidateDashboardCache();
+  revalidatePath("/");
+  revalidatePath("/replacements");
+  revalidatePath(`/replacements/${replacementId}`);
+  redirect(`/replacements/${replacementId}?success=${encodeURIComponent("Replacement order cancelled.")}`);
 }

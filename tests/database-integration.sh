@@ -58,7 +58,7 @@ SQL
 
 for migration in supabase/migrations/*.sql; do
   case "$(basename "$migration")" in
-    2026091[3-9]*) continue ;;
+    2026091[3-9]*|2026092*) continue ;;
   esac
   "${psql[@]}" -f "$migration" >/dev/null
 done
@@ -94,7 +94,7 @@ insert into public.attachments(replacement_id, attachment_type, storage_path, fi
 values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'LABEL', 'replacements/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/legacy-label.pdf', 'legacy-label.pdf', 'application/pdf', '33333333-3333-3333-3333-333333333333');
 SQL
 
-for migration in supabase/migrations/2026091[3-9]*.sql; do
+for migration in supabase/migrations/2026091[3-9]*.sql supabase/migrations/2026092*.sql; do
   "${psql[@]}" -f "$migration" >/dev/null
 done
 
@@ -103,6 +103,13 @@ insert into auth.users(id, email, raw_user_meta_data) values
   ('66666666-6666-4666-8666-666666666666', 'logistics@example.com', '{"full_name":"Logistics"}'),
   ('77777777-7777-4777-8777-777777777777', 'new-default@example.com', '{"full_name":"New Default","role":"ADMIN"}');
 update public.profiles set role = 'LOGISTICS' where id = '66666666-6666-4666-8666-666666666666';
+
+insert into public.replacements(id, replacement_number, order_reference, product_name, quantity, created_by)
+values
+  ('12121212-1212-4121-8121-121212121212', 'assigned-by-trigger', 'CANCEL-SHIPPED', 'Shipped Product', 1, '11111111-1111-1111-1111-111111111111'),
+  ('13131313-1313-4131-8131-131313131313', 'assigned-by-trigger', 'CANCEL-CANCELLED', 'Cancelled Product', 1, '11111111-1111-1111-1111-111111111111');
+update public.replacements set status = 'SHIPPED' where id = '12121212-1212-4121-8121-121212121212';
+update public.replacements set status = 'CANCELLED' where id = '13131313-1313-4131-8131-131313131313';
 
 do $$
 begin
@@ -123,6 +130,15 @@ $$;
 
 set role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
+
+do $$
+begin
+  perform public.cancel_replacement_order('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'Unauthorized cancellation');
+  raise exception 'Customer Support unexpectedly cancelled a replacement';
+exception when others then
+  if sqlerrm <> 'Only Admin can cancel replacement orders' then raise; end if;
+end
+$$;
 
 do $$
 begin
@@ -186,11 +202,22 @@ $$;
 
 insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
   (gen_random_uuid(), 'replacement-files', 'replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/CUSTOMER_SUPPORT/99999999-9999-4999-8999-999999999999/photos/product.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
-select public.create_replacement_with_photos(
-  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '99999999-9999-4999-8999-999999999999',
-  'ORDER-1', null, null, 'Test Product', 2, null, null, null,
-  '[{"storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/CUSTOMER_SUPPORT/99999999-9999-4999-8999-999999999999/photos/product.jpg","file_name":"product.jpg","mime_type":"image/jpeg"}]'
+select public.create_replacement_order_with_items(
+  '{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","order_type":"REPLACEMENT","order_reference":"ORDER-1","product_name":"Test Product","quantity":2,"shipping_speed":"STANDARD","length_cm":10,"breadth_cm":20,"height_cm":30}',
+  '[{"replacement_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","storage_path":"replacements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/CUSTOMER_SUPPORT/99999999-9999-4999-8999-999999999999/photos/product.jpg","file_name":"product.jpg","mime_type":"image/jpeg"}]',
+  '[{"product_name":"Test Product","quantity":2},{"product_name":"Second Product","quantity":4}]'
 );
+
+do $$
+begin
+  if (select count(*) from public.replacement_items where replacement_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 2 then
+    raise exception 'Replacement line items were not stored';
+  end if;
+  if (select product_name from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'Test Product' then
+    raise exception 'Replacement primary item compatibility fields were not preserved';
+  end if;
+end
+$$;
 
 insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
   (gen_random_uuid(), 'replacement-files', 'replacements/dddddddd-dddd-4ddd-8ddd-dddddddddddd/CUSTOMER_SUPPORT/12121212-1212-4121-8121-121212121212/photos/offline.jpg', '{"size":1024}', '22222222-2222-2222-2222-222222222222');
@@ -448,6 +475,50 @@ where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 set role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
+
+do $$
+begin
+  perform public.cancel_replacement_order('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', repeat('x', 1001));
+  raise exception 'Oversized cancellation reason unexpectedly succeeded';
+exception when others then
+  if sqlerrm <> 'Cancellation reason is too long' then raise; end if;
+end
+$$;
+select public.cancel_replacement_order('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'Duplicate order');
+do $$
+begin
+  if (select status from public.replacements where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') <> 'CANCELLED' then
+    raise exception 'Admin cancellation did not update the replacement status';
+  end if;
+  if not exists (
+    select 1 from public.activity_logs
+    where replacement_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+      and action = 'ORDER_CANCELLED'
+      and message = 'Duplicate order'
+  ) then
+    raise exception 'Admin cancellation was not audited';
+  end if;
+
+  begin
+    perform public.cancel_replacement_order('12121212-1212-4121-8121-121212121212', 'Already shipped');
+    raise exception 'Shipped replacement was unexpectedly cancelled';
+  exception when others then
+    if sqlerrm <> 'This replacement order cannot be cancelled' then raise; end if;
+  end;
+  begin
+    perform public.cancel_replacement_order('13131313-1313-4131-8131-131313131313', 'Already cancelled');
+    raise exception 'Cancelled replacement was unexpectedly cancelled again';
+  exception when others then
+    if sqlerrm <> 'This replacement order cannot be cancelled' then raise; end if;
+  end;
+  begin
+    perform public.cancel_replacement_order('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Already delivered');
+    raise exception 'Delivered replacement was unexpectedly cancelled';
+  exception when others then
+    if sqlerrm <> 'This replacement order cannot be cancelled' then raise; end if;
+  end;
+end
+$$;
 insert into storage.objects(id, bucket_id, name, metadata, owner_id) values
   (gen_random_uuid(), 'replacement-files', 'replacements/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/CUSTOMER_SUPPORT/13131313-1313-4131-8131-131313131313/photos/admin-offline.jpg', '{"size":1024}', '11111111-1111-1111-1111-111111111111');
 select public.create_order_batch(
@@ -568,7 +639,7 @@ $$;
 set role authenticated;
 -- 1. Step 1: Boss creates offline order (CREATED)
 select set_config('request.jwt.claim.sub', '88888888-8888-4888-8888-888888888888', false);
-select public.create_offline_order(
+select public.create_offline_order_with_items(
   'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   'SO - OFLN115',
   'averX',
@@ -577,13 +648,18 @@ select public.create_offline_order(
   'Rolls',
   'Delhivery',
   '2026-09-04'::date,
-  'Carton count pending with Kartik Da'
+  'Carton count pending with Kartik Da',
+  null,
+  '[{"product_name":"GARBAGE BAG ROLL - 24X32 - BLACK","quantity":400},{"product_name":"GARBAGE BAG ROLL - 30X50 - BLUE","quantity":200}]'
 );
 
 do $$
 begin
   if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'CREATED' then
     raise exception 'Offline order was not created in CREATED status';
+  end if;
+  if (select count(*) from public.offline_order_items where offline_order_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 2 then
+    raise exception 'Offline order line items were not stored';
   end if;
 end
 $$;

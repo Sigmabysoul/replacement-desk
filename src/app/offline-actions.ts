@@ -12,6 +12,7 @@ import {
   confirmDeliverySchema,
   confirmPackingSchema,
   createOfflineOrderSchema,
+  offlineOrderItemsSchema,
   dispatchOrderSchema,
   offlineOrderCommentSchema,
   updateOfflineOrderNumberSchema,
@@ -89,7 +90,22 @@ async function cleanupUncommittedOfflineUploads(
  */
 export async function createOfflineOrderAction(formData: FormData) {
   await requireProfile(["BOSS", "HR", "ADMIN"]);
-  const parsed = createOfflineOrderSchema.safeParse(Object.fromEntries(formData));
+  let rawItems: unknown;
+  try {
+    rawItems = JSON.parse(String(formData.get("items_manifest") ?? "null"));
+  } catch {
+    redirect(`/offline-orders/new?error=${encodeURIComponent("The item list is invalid. Refresh and try again.")}`);
+  }
+  const parsedItems = offlineOrderItemsSchema.safeParse(rawItems);
+  if (!parsedItems.success) {
+    redirect(`/offline-orders/new?error=${encodeURIComponent(parsedItems.error.issues[0]?.message ?? "Check every item.")}`);
+  }
+  const primaryItem = parsedItems.data[0];
+  const parsed = createOfflineOrderSchema.safeParse({
+    ...Object.fromEntries(formData),
+    product_name: primaryItem.product_name,
+    quantity: primaryItem.quantity,
+  });
   if (!parsed.success) {
     redirect(`/offline-orders/new?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
   }
@@ -97,7 +113,7 @@ export async function createOfflineOrderAction(formData: FormData) {
   const orderId = randomUUID();
   const supabase = await createClient();
 
-  const { data, error } = await supabase.rpc("create_offline_order", {
+  const { data, error } = await supabase.rpc("create_offline_order_with_items", {
     p_id: orderId,
     p_so_number: parsed.data.so_number,
     p_brand: parsed.data.brand ?? null,
@@ -108,6 +124,7 @@ export async function createOfflineOrderAction(formData: FormData) {
     p_dispatch_date: parsed.data.dispatch_date ?? null,
     p_notes: parsed.data.notes ?? null,
     p_order_number: parsed.data.order_number ?? null,
+    p_items: parsedItems.data,
   });
 
   if (error || !data) {
@@ -389,4 +406,3 @@ export async function cancelOfflineOrderAction(formData: FormData) {
   revalidatePath("/");
   redirect(`/offline-orders/${orderId}?success=${encodeURIComponent("Order cancelled.")}`);
 }
-

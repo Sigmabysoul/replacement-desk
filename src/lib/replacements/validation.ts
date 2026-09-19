@@ -54,6 +54,11 @@ export const replacementSchema = z.object({
   }
 });
 
+export const replacementItemsSchema = z.array(z.object({
+  product_name: z.string().trim().min(1, "Product is required").max(200),
+  quantity: z.coerce.number().int().min(1).max(999),
+})).min(1, "Add at least one item").max(20, "An order can contain at most twenty items");
+
 export const replacementEditSchema = z.object({
   order_reference: z.string().trim().min(1, "Courier Partner is required").max(100),
   customer_name: optionalText(120),
@@ -81,6 +86,11 @@ export const transitionSchema = z.object({
   replacement_id: z.string().uuid(),
   target_status: z.enum(["LABEL_PRINTED", "QC_APPROVED", "QC_REJECTED", "PACKED", "SHIPPED", "DELIVERED", "NEEDS_TOKEN", "CANCELLED"]),
   message: z.string().trim().max(1000).optional(),
+});
+
+export const cancelReplacementSchema = z.object({
+  replacement_id: z.uuid("Invalid replacement ID"),
+  reason: z.string().trim().min(1, "A cancellation reason is required").max(1000, "Cancellation reason is too long"),
 });
 
 export const MAX_FILE_SIZE = 25 * 1024 * 1024;

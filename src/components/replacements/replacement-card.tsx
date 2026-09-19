@@ -41,26 +41,26 @@ export function ReplacementCard({ replacement, role }: { replacement: Replacemen
       aria-label={`Open replacement order ${replacement.order_reference}`}
       className="group block rounded-2xl outline-none focus-visible:ring-4 focus-visible:ring-indigo-200"
     >
-      <Card className="h-full cursor-pointer p-4 transition hover:border-indigo-300 hover:shadow-md sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+      <Card className="h-full cursor-pointer overflow-hidden p-3.5 transition hover:border-indigo-300 hover:shadow-md sm:p-5">
+        <div className="flex items-start justify-between gap-2.5 min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate font-black tracking-tight text-slate-950">{replacement.order_reference}</p>
-            <p className="mt-0.5 text-xs font-semibold text-slate-500">#{replacement.order_number} · {replacement.order_type === "OFFLINE" ? "Offline" : "Replacement"} · {replacement.replacement_number}</p>
-            <p className="mt-2 flex items-center gap-2 text-base font-semibold text-slate-800">
+            <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">#{replacement.order_number} · {replacement.order_type === "OFFLINE" ? "Offline" : "Replacement"} · {replacement.replacement_number}</p>
+            <p className="mt-2 flex items-center gap-1.5 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
               <Package className="size-4 shrink-0 text-slate-400" />
               <span className="truncate">{replacement.product_name}</span>
-              <span className="shrink-0 text-slate-500">× {replacement.quantity}</span>
+              <span className="shrink-0 text-slate-500 text-xs sm:text-sm">× {replacement.quantity}</span>
             </p>
           </div>
-          <StatusBadge status={replacement.status} />
+          <StatusBadge status={replacement.status} className="shrink-0 text-[11px] sm:text-xs" />
         </div>
-        <div className="mt-4 flex items-end justify-between gap-4 border-t border-slate-100 pt-3">
-          <div>
-            <p className="text-sm font-bold text-indigo-700">{actionHint(replacement.status, role)}</p>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><CalendarDays className="size-3.5" />{formatDate(replacement.created_at)}</p>
+        <div className="mt-4 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 min-w-0">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs sm:text-sm font-bold text-indigo-700">{actionHint(replacement.status, role)}</p>
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 truncate"><CalendarDays className="size-3.5 shrink-0" />{formatDate(replacement.created_at)}</p>
           </div>
-          <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 transition group-hover:bg-indigo-600 group-hover:text-white">
-            <ArrowRight className="size-5" />
+          <span aria-hidden="true" className="grid size-9 sm:size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 transition group-hover:bg-indigo-600 group-hover:text-white">
+            <ArrowRight className="size-4 sm:size-5" />
           </span>
         </div>
       </Card>

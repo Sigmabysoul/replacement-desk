@@ -10,7 +10,8 @@ export type NotificationType =
   | "PACKED"
   | "SHIPPED"
   | "DELIVERED"
-  | "NEEDS_TOKEN";
+  | "NEEDS_TOKEN"
+  | "CANCELLED";
 
 export const NOTIFICATION_RECIPIENTS: Record<NotificationType, readonly Role[]> = {
   NEW_REPLACEMENT: ["LOGISTICS"],
@@ -23,6 +24,7 @@ export const NOTIFICATION_RECIPIENTS: Record<NotificationType, readonly Role[]> 
   SHIPPED: ["CUSTOMER_SUPPORT", "ADMIN"],
   DELIVERED: ["CUSTOMER_SUPPORT", "ADMIN", "LOGISTICS"],
   NEEDS_TOKEN: ["CUSTOMER_SUPPORT", "ADMIN"],
+  CANCELLED: ["LOGISTICS", "PRINTING", "PACKING", "ADMIN"],
 };
 
 export type OfflineNotificationType =
@@ -228,6 +230,17 @@ export function formatTelegramMessage(
         replacement.replacement_number,
         "",
         detail ? `Delivery Notes: ${detail}` : "Delivered to customer successfully.",
+      );
+      break;
+
+    case "CANCELLED":
+      lines.push(
+        "🚫 REPLACEMENT CANCELLED",
+        "",
+        replacement.replacement_number,
+        "",
+        `Reason: ${detail || "Order was cancelled"}`,
+        `Cancelled by: ${actorName || "Staff"}`,
       );
       break;
   }

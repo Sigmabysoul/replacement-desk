@@ -22,6 +22,7 @@ import type {
   OfflineOrder,
   OfflineOrderActivityLog,
   OfflineOrderAttachment,
+  OfflineOrderItem,
   Profile,
 } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -46,6 +47,7 @@ export default async function OfflineOrderDetailPage({
     { data: orderData },
     { data: attachmentData },
     { data: activityData },
+    { data: itemData },
   ] = await Promise.all([
     supabase.from("offline_orders").select("*").eq("id", id).single(),
     supabase
@@ -58,6 +60,7 @@ export default async function OfflineOrderDetailPage({
       .select("*")
       .eq("offline_order_id", id)
       .order("created_at", { ascending: true }),
+    supabase.from("offline_order_items").select("*").eq("offline_order_id", id).order("position"),
   ]);
 
   if (!orderData) notFound();
@@ -68,6 +71,7 @@ export default async function OfflineOrderDetailPage({
     ["BOSS", "HR", "CUSTOMER_SUPPORT", "ADMIN"].includes(r),
   );
   const activities = (activityData ?? []) as OfflineOrderActivityLog[];
+  const items = (itemData?.length ? itemData : [{ id: `legacy-${id}`, offline_order_id: id, product_name: order.product_name, quantity: order.quantity, position: 1, created_at: order.created_at }]) as OfflineOrderItem[];
 
   const actorIds = [
     ...new Set(
@@ -174,16 +178,12 @@ export default async function OfflineOrderDetailPage({
             <h2 className="font-black text-slate-950">Product & Order Details</h2>
           </div>
           <div className="mt-4 grid gap-3 text-sm">
-            <div className="flex justify-between border-b border-slate-100 pb-2">
-              <span className="text-slate-500">Product</span>
-              <strong className="text-right text-slate-900">{order.product_name}</strong>
-            </div>
-            <div className="flex justify-between border-b border-slate-100 pb-2">
-              <span className="text-slate-500">Quantity</span>
-              <strong className="text-slate-900">
-                {order.quantity} {order.unit}
-              </strong>
-            </div>
+            {items.map((item, index) => (
+              <div key={item.id} className="flex justify-between gap-4 border-b border-slate-100 pb-2">
+                <span className="text-slate-500">Item {index + 1}</span>
+                <strong className="text-right text-slate-900">{item.product_name} × {item.quantity} {order.unit}</strong>
+              </div>
+            ))}
             {order.brand && (
               <div className="flex justify-between border-b border-slate-100 pb-2">
                 <span className="text-slate-500">Brand</span>

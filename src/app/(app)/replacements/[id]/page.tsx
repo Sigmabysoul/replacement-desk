@@ -24,7 +24,7 @@ import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import type { ActivityLog, Attachment, Profile, QcSubmission, Replacement } from "@/lib/types";
+import type { ActivityLog, Attachment, Profile, QcSubmission, Replacement, ReplacementItem } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
 function isImageAttachment(file: Attachment) {
@@ -48,6 +48,7 @@ export default async function ReplacementDetailPage({
     { data: attachmentData },
     { data: qcData },
     { data: activityData },
+    { data: itemData },
   ] = await Promise.all([
     supabase.from("replacements").select("*").eq("id", id).single(),
     supabase.from("attachments").select("*").eq("replacement_id", id).order("created_at"),
@@ -57,6 +58,7 @@ export default async function ReplacementDetailPage({
       .eq("replacement_id", id)
       .order("submission_number", { ascending: false }),
     supabase.from("activity_logs").select("*").eq("replacement_id", id).order("created_at", { ascending: true }),
+    supabase.from("replacement_items").select("*").eq("replacement_id", id).order("position"),
   ]);
 
   if (!replacementData) notFound();
@@ -64,6 +66,7 @@ export default async function ReplacementDetailPage({
   const attachments = (attachmentData ?? []) as Attachment[];
   const qcs = (qcData ?? []) as QcSubmission[];
   const activities = (activityData ?? []) as ActivityLog[];
+  const items = (itemData?.length ? itemData : [{ id: `legacy-${id}`, replacement_id: id, product_name: replacement.product_name, quantity: replacement.quantity, position: 1, created_at: replacement.created_at }]) as ReplacementItem[];
 
   const actorIds = [
     ...new Set(
@@ -172,16 +175,16 @@ export default async function ReplacementDetailPage({
             </div>
 
             <dl className="grid gap-x-6 gap-y-5 p-5 sm:grid-cols-2 sm:p-6">
-              <div>
-                <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Product</dt>
-                <dd className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950">
-                  <Package className="size-4 text-indigo-500" />
-                  {replacement.product_name}
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Order items</dt>
+                <dd className="mt-2 grid gap-2">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
+                      <span className="flex min-w-0 items-center gap-2 font-bold text-slate-950"><Package className="size-4 shrink-0 text-indigo-500" /><span className="truncate">{item.product_name}</span></span>
+                      <span className="shrink-0 text-sm font-black text-slate-700">× {item.quantity}</span>
+                    </div>
+                  ))}
                 </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Quantity</dt>
-                <dd className="mt-1 text-base font-bold text-slate-950">{replacement.quantity}</dd>
               </div>
               <div>
                 <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">Courier Partner</dt>

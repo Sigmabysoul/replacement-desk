@@ -59,7 +59,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
   const canCreate = hasAnyRole(profile, ["CUSTOMER_SUPPORT", "ADMIN"]);
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6 w-full max-w-full min-w-0 overflow-hidden">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-700">Replacements Pipeline</p>
@@ -77,7 +77,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
         )}
       </div>
 
-      <Card className="p-4 sm:p-5">
+      <Card className="p-4 sm:p-5 w-full max-w-full min-w-0 overflow-hidden">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2" aria-label="Replacement time range">
             {scopeOptions.map((option) => {
@@ -98,14 +98,16 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
             })}
           </div>
           {hasRole(profile, "ADMIN") && (
-            <form action={archiveCompletedReplacementsAction}>
-              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50">
-                <Archive className="size-4" /> Archive completed 30+ day orders
+            <form action={archiveCompletedReplacementsAction} className="w-full sm:w-auto">
+              <button className="inline-flex min-h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50">
+                <Archive className="size-4 shrink-0" />
+                <span className="sm:hidden">Archive 30+ days</span>
+                <span className="hidden sm:inline">Archive completed 30+ day orders</span>
               </button>
             </form>
           )}
         </div>
-        <form className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_190px_170px_auto]">
+        <form className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_190px_170px_auto] w-full max-w-full min-w-0">
           <input type="hidden" name="scope" value={scope} />
           <div className="relative flex min-h-12 w-full items-center">
             <span className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-12 items-center justify-center" aria-hidden="true">
@@ -148,7 +150,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
       )}
 
       {replacements.length ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2 w-full max-w-full min-w-0">
           {replacements.map((replacement) => (
             <ReplacementCard key={replacement.id} replacement={replacement} role={profile.role} />
           ))}

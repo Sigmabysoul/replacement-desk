@@ -83,6 +83,16 @@ export interface Replacement {
   archived_at: string | null;
   archived_by: string | null;
   creator?: Pick<Profile, "full_name"> | null;
+  items?: ReplacementItem[];
+}
+
+export interface ReplacementItem {
+  id: string;
+  replacement_id: string;
+  product_name: string;
+  quantity: number;
+  position: number;
+  created_at: string;
 }
 
 export interface Attachment {
@@ -174,6 +184,16 @@ export interface OfflineOrder {
   cancelled_at: string | null;
   cancelled_by: string | null;
   creator?: Pick<Profile, "full_name"> | null;
+  items?: OfflineOrderItem[];
+}
+
+export interface OfflineOrderItem {
+  id: string;
+  offline_order_id: string;
+  product_name: string;
+  quantity: number;
+  position: number;
+  created_at: string;
 }
 
 export interface OfflineOrderAttachment {

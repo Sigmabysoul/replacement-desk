@@ -1,5 +1,5 @@
 import { Check, PackageCheck, Printer, Send, TriangleAlert, X } from "lucide-react";
-import { adminOverrideAction, submitLogisticsAction, submitPackingQcAction, transitionAction } from "@/app/actions";
+import { adminOverrideAction, cancelReplacementAction, submitLogisticsAction, submitPackingQcAction, transitionAction } from "@/app/actions";
 import { Card } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field, Select, Textarea } from "@/components/ui/field";
@@ -19,7 +19,7 @@ import type { Profile, Replacement } from "@/lib/types";
  * - PRINTING: Confirms that the uploaded label was printed.
  * - PACKING: Uploads QC pictures, requests CUSTOMER_SUPPORT's review, packs, and dispatches.
  * - CUSTOMER_SUPPORT: Reviews QC photos (Approve / Reject with feedback).
- * - ADMIN: Performs any standard transition or uses emergency status override with reason logging.
+ * - ADMIN: Performs transitions, cancels open orders, or uses emergency status override with reason logging.
  *
  * @param props.replacement Current replacement order data.
  * @param props.profile Active user session profile.
@@ -31,7 +31,8 @@ export function ActionPanel({
   replacement: Replacement;
   profile: Profile;
 }) {
-  const actions = availableActions(profile.role, replacement.status);
+  const userRoles = profile.roles?.length ? profile.roles : [profile.role];
+  const actions = availableActions(userRoles, replacement.status);
   const actionable = actions.some((action) => action !== "COMMENT");
 
   if (!actionable && !["SHIPPED", "CANCELLED"].includes(replacement.status)) {
@@ -135,7 +136,32 @@ export function ActionPanel({
           </form>
         )}
 
-        {profile.role === "ADMIN" && (
+        {/* Admin-only cancellation for orders that have not shipped. */}
+        {actions.includes("CANCEL_REPLACEMENT") && (
+          <details className="mt-2 rounded-xl border border-rose-200 bg-rose-50/50 p-3">
+            <summary className="cursor-pointer text-xs font-bold text-rose-700 hover:underline">
+              Cancel this replacement order
+            </summary>
+            <form action={cancelReplacementAction} className="mt-3 grid gap-3">
+              <input type="hidden" name="replacement_id" value={replacement.id} />
+              <Field label="Cancellation Reason">
+                <Textarea
+                  name="reason"
+                  required
+                  maxLength={1000}
+                  placeholder="Explain why this replacement order is cancelled..."
+                  className="min-h-20 border-rose-300"
+                />
+              </Field>
+              <SubmitButton variant="danger" pendingText="Cancelling…">
+                <TriangleAlert className="size-5" />
+                CANCEL REPLACEMENT ORDER
+              </SubmitButton>
+            </form>
+          </details>
+        )}
+
+        {userRoles.includes("ADMIN") && (
           <details className="border-t border-slate-200 pt-4">
             <summary className="cursor-pointer text-sm font-bold text-slate-600">Admin status override</summary>
             <form action={adminOverrideAction} className="mt-3 grid gap-3">
