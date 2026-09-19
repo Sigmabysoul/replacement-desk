@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut, PackageCheck, Settings, UserRound } from "lucide-react";
+import { LogOut, PackageCheck, UserRound } from "lucide-react";
 import { logoutAction } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -31,15 +31,6 @@ export function AppHeader({ profile }: { profile: Profile }) {
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <ThemeButton />
           <NotificationBell role={profile.role} roles={profile.roles} />
-          {profile.role === "ADMIN" && (
-            <Link
-              href="/admin/settings"
-              className="grid size-9 place-items-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 transition sm:size-10 lg:hidden"
-              aria-label="Settings"
-            >
-              <Settings className="size-4 sm:size-4.5" />
-            </Link>
-          )}
           <Link
             href="/profile"
             className="flex h-9 sm:min-h-11 items-center gap-1.5 rounded-xl px-1.5 sm:px-2 py-1 text-sm font-semibold text-foreground hover:bg-muted/60 transition"

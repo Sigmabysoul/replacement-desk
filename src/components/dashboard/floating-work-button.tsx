@@ -254,7 +254,7 @@ export function FloatingWorkButton({
           />
 
           {/* Drawer / Modal Panel */}
-          <div className="fixed bottom-36 right-4 z-50 w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl ring-1 ring-slate-900/10 sm:right-6 lg:bottom-22">
+          <div className="fixed bottom-36 left-4 right-4 z-50 mx-auto max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl ring-1 ring-slate-900/10 sm:left-auto sm:right-6 sm:w-96 lg:bottom-22">
             <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700">

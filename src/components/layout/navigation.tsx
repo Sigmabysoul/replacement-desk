@@ -6,13 +6,16 @@ import {
   Boxes,
   ClipboardList,
   LayoutDashboard,
+  LogOut,
   PackageCheck,
   Radar,
   Settings,
   Truck,
+  UserRound,
   Users,
 } from "lucide-react";
-import type { Role } from "@/lib/types";
+import { logoutAction } from "@/app/actions";
+import type { Profile, Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -23,128 +26,195 @@ interface NavItem {
   roles: Role[];
 }
 
-const ALL_ROLES: Role[] = ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN", "BOSS", "HR", "CONSIGNMENT"];
+const ALL_ROLES: Role[] = [
+  "CUSTOMER_SUPPORT",
+  "LOGISTICS",
+  "PRINTING",
+  "PACKING",
+  "ADMIN",
+  "BOSS",
+  "HR",
+  "CONSIGNMENT",
+];
 
-const mainItems: NavItem[] = [
+// Operational workflow items only (Settings & Profile moved below user section)
+const operationalNavItems: NavItem[] = [
   { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, roles: ALL_ROLES },
   { href: "/offline-orders", label: "Offline orders", short: "Offline", icon: Boxes, roles: ALL_ROLES },
-  { href: "/replacements", label: "Replacements", short: "Orders", icon: ClipboardList, roles: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN", "BOSS"] },
+  {
+    href: "/replacements",
+    label: "Replacements",
+    short: "Orders",
+    icon: ClipboardList,
+    roles: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN", "BOSS"],
+  },
   { href: "/tracking", label: "Shipment Tracking", short: "Tracking", icon: Radar, roles: ["LOGISTICS", "ADMIN"] },
   { href: "/dispatch", label: "Dispatch", short: "Dispatch", icon: Truck, roles: ["PACKING", "ADMIN"] },
-  { href: "/settings", label: "Settings", short: "Settings", icon: Settings, roles: ["CUSTOMER_SUPPORT", "ADMIN"] },
-  { href: "/profile", label: "Profile", short: "Profile", icon: Users, roles: ALL_ROLES },
 ];
 
 export function Navigation({
+  profile,
   role,
   roles,
 }: {
+  profile?: Profile;
   role?: Role;
   roles?: Role[];
 }) {
   const pathname = usePathname();
-  const userRoles = roles?.length ? roles : role ? [role] : [];
+  const userRoles = roles?.length
+    ? roles
+    : role
+    ? [role]
+    : profile?.roles?.length
+    ? profile.roles
+    : profile?.role
+    ? [profile.role]
+    : [];
   const isAdmin = userRoles.includes("ADMIN");
-  
-  // Deduplicate and filter items based on user roles
-  const operationalItems = mainItems.filter((item) =>
+
+  // Operational items filtered by user role
+  const operationalItems = operationalNavItems.filter((item) =>
     isAdmin || item.roles.some((r) => userRoles.includes(r))
   );
 
-  const adminItems = isAdmin ? [
-    { href: "/admin/users", label: "Users", icon: Users },
-  ] : [];
-
-  const mobileItems = (
-    isAdmin
-      ? [
-          { href: "/", short: "Home", icon: LayoutDashboard },
-          { href: "/offline-orders", short: "Offline", icon: Boxes },
-          { href: "/replacements", short: "Orders", icon: ClipboardList },
-          { href: "/tracking", short: "Tracking", icon: Radar },
-          { href: "/admin/users", short: "Users", icon: Users },
-        ]
-      : operationalItems.map((item) => ({
-          href: item.href,
-          short: item.short,
-          icon: item.icon,
-        }))
-  ).filter((item, index, self) => index === self.findIndex((t) => t.href === item.href));
+  // Clean, responsive mobile items (max 4-5 items, prevents horizontal overflow)
+  const mobileItems = [
+    { href: "/", short: "Home", icon: LayoutDashboard },
+    { href: "/offline-orders", short: "Offline", icon: Boxes },
+    { href: "/replacements", short: "Orders", icon: ClipboardList },
+    ...(userRoles.includes("LOGISTICS") || isAdmin
+      ? [{ href: "/tracking", short: "Tracking", icon: Radar }]
+      : userRoles.includes("PACKING")
+      ? [{ href: "/dispatch", short: "Dispatch", icon: Truck }]
+      : []),
+    { href: "/profile", short: "Profile", icon: UserRound },
+  ];
 
   return (
     <>
+      {/* Desktop Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-800 bg-slate-950 px-4 py-5 text-white lg:flex">
-        <Link href="/" className="mb-8 flex items-center gap-3 px-2">
+        {/* Brand Header */}
+        <Link href="/" className="mb-6 flex items-center gap-3 px-2">
           <span className="grid size-10 place-items-center rounded-xl bg-indigo-600 shadow-md shadow-indigo-600/20">
             <PackageCheck className="size-6" />
           </span>
-          <span>
-            <strong className="block leading-5">TBC_KART</strong>
-            <small className="text-slate-400">Operations workspace</small>
-          </span>
+          <div className="min-w-0">
+            <strong className="block leading-5 truncate">TBC_KART</strong>
+            <small className="text-slate-400 text-xs">Operations workspace</small>
+          </div>
         </Link>
-        <nav className="grid gap-1" aria-label="Main navigation">
+
+        {/* Operational Section */}
+        <nav className="grid gap-1" aria-label="Main operational navigation">
           {operationalItems.map(({ href, label, icon: Icon }) => {
-            const active = href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(href) || (href === "/settings" && (pathname.startsWith("/settings") || pathname.startsWith("/dimensions") || pathname.startsWith("/admin/settings")));
+            const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
             return (
               <Link
                 key={href}
                 href={href}
                 className={cn(
-                  "flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
+                  "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
                   active && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                 )}
               >
-                <Icon className="size-5" />
-                {label}
+                <Icon className="size-5 shrink-0" />
+                <span className="truncate">{label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {isAdmin && (
-          <div className="mt-auto grid gap-1 border-t border-slate-800 pt-3">
-            <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Admin
-            </p>
-            {adminItems.map(({ href, label, icon: Icon }) => {
-              const active = pathname.startsWith(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
-                    active && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                  )}
-                >
-                  <Icon className="size-5" />
-                  {label}
-                </Link>
-              );
-            })}
+        {/* Bottom Section: User Section + Settings/Profile Below */}
+        <div className="mt-auto flex flex-col gap-2 border-t border-slate-800 pt-3">
+          {/* Admin: Users Management link if Admin */}
+          {isAdmin && (
+            <Link
+              href="/admin/users"
+              className={cn(
+                "flex min-h-10 items-center gap-3 rounded-xl px-3 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
+                pathname.startsWith("/admin/users") && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+              )}
+            >
+              <Users className="size-4 shrink-0 text-slate-400" />
+              <span className="truncate">Users Management</span>
+            </Link>
+          )}
+
+          {/* 1. User Identity Section */}
+          <div className="flex items-center gap-2.5 rounded-2xl bg-white/5 px-3 py-2.5">
+            <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-indigo-600 text-xs font-black text-white shadow-xs">
+              {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : <UserRound className="size-4" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold text-white">
+                {profile?.full_name ?? "User"}
+              </p>
+              <div className="mt-0.5 flex flex-wrap gap-1">
+                {userRoles.slice(0, 2).map((r) => (
+                  <span
+                    key={r}
+                    className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-indigo-300"
+                  >
+                    {r}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
-        )}
+
+          {/* 2. Repositioned Below User Section: Profile & Settings */}
+          <div className="grid gap-1">
+            <Link
+              href="/profile"
+              className={cn(
+                "flex min-h-10 items-center gap-3 rounded-xl px-3 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
+                pathname.startsWith("/profile") && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+              )}
+            >
+              <UserRound className="size-4 shrink-0" />
+              <span className="truncate">Profile</span>
+            </Link>
+
+            <Link
+              href={isAdmin ? "/admin/settings" : "/settings"}
+              className={cn(
+                "flex min-h-10 items-center gap-3 rounded-xl px-3 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
+                (pathname.startsWith("/settings") || pathname.startsWith("/admin/settings") || pathname.startsWith("/dimensions")) && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+              )}
+            >
+              <Settings className="size-4 shrink-0" />
+              <span className="truncate">Settings</span>
+            </Link>
+
+            <form action={logoutAction} className="w-full">
+              <button
+                type="submit"
+                className="flex min-h-10 w-full items-center gap-3 rounded-xl px-3 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
+              >
+                <LogOut className="size-4 shrink-0" />
+                <span className="truncate">Sign out</span>
+              </button>
+            </form>
+          </div>
+        </div>
       </aside>
 
       {/* Solid opaque mobile bottom navigation bar */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-border bg-card px-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-4px_25px_rgba(15,23,42,0.08)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-border bg-card px-1 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-4px_25px_rgba(15,23,42,0.08)] lg:hidden"
         style={{ gridTemplateColumns: `repeat(${mobileItems.length}, minmax(0, 1fr))` }}
         aria-label="Mobile navigation"
       >
         {mobileItems.map(({ href, short, icon: Icon }) => {
-          const active = href === "/"
-            ? pathname === "/"
-            : pathname.startsWith(href) || (href === "/settings" && (pathname.startsWith("/settings") || pathname.startsWith("/dimensions")));
+          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
               className={cn(
-                "relative flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl text-[11px] transition-colors active:scale-95",
+                "relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] transition-colors active:scale-95",
                 active
                   ? "text-indigo-600 font-extrabold"
                   : "text-slate-500 hover:text-slate-900 font-medium"
@@ -152,7 +222,7 @@ export function Navigation({
             >
               <span
                 className={cn(
-                  "flex items-center justify-center rounded-full px-3.5 py-1 transition-all",
+                  "flex items-center justify-center rounded-full px-3 py-1 transition-all",
                   active
                     ? "bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200/70"
                     : "text-slate-500"

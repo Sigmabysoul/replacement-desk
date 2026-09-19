@@ -18,6 +18,9 @@ const scopeOptions: { value: TimeScope; label: string }[] = [
   { value: "all", label: "All records" },
 ];
 
+const REPLACEMENT_LIST_COLUMNS =
+  "id, status, created_at, replacement_number, order_reference, order_number, order_type, product_name, quantity, archived_at";
+
 export default async function ReplacementsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; date?: string; scope?: string; error?: string; success?: string }> }) {
   const profile = await requireProfile();
   const params = await searchParams;
@@ -26,7 +29,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
     : "recent_30";
 
   const supabase = await createClient();
-  let query = supabase.from("replacements").select("*").order("created_at", { ascending: false });
+  let query = supabase.from("replacements").select(REPLACEMENT_LIST_COLUMNS).order("created_at", { ascending: false });
   const now = new Date();
   if (scope === "recent_15") {
     query = query.is("archived_at", null).gte("created_at", new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString());

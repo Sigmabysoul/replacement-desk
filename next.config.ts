@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
   // retain their native Next.js output and deployment adapter behavior.
   output: process.env.DOCKER_BUILD === "true" ? "standalone" : undefined,
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",

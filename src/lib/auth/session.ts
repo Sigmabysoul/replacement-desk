@@ -40,6 +40,7 @@ export const getSessionProfile = cache(async (): Promise<Profile | null> => {
     .getAll()
     .filter((c) => c.name.includes("auth-token") || c.name.startsWith("sb-"))
     .map((c) => `${c.name}:${c.value}`)
+    .sort()
     .join(";");
 
   if (!authCookies) return null;

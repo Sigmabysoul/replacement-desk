@@ -8,6 +8,9 @@ import { createClient } from "@/lib/supabase/server";
 import { OFFLINE_ORDER_STATUSES, type OfflineOrder, type OfflineOrderStatus } from "@/lib/types";
 import { offlineStatusLabel } from "@/lib/utils";
 
+const OFFLINE_LIST_COLUMNS =
+  "id, status, created_at, so_number, order_number, brand, product_name, quantity, unit, logistics_partner, lr_number";
+
 export default async function OfflineOrdersPage({
   searchParams,
 }: {
@@ -17,7 +20,7 @@ export default async function OfflineOrdersPage({
   const params = await searchParams;
 
   const supabase = await createClient();
-  let query = supabase.from("offline_orders").select("*").order("created_at", { ascending: false });
+  let query = supabase.from("offline_orders").select(OFFLINE_LIST_COLUMNS).order("created_at", { ascending: false });
 
   if (params.status && OFFLINE_ORDER_STATUSES.includes(params.status as OfflineOrderStatus)) {
     query = query.eq("status", params.status);

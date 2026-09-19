@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasRole, invalidateProfileCache, requireProfile } from "@/lib/auth/session";
+import { invalidateDashboardCache } from "@/lib/cache/dashboard-cache";
 import { ALLOWED_MIME_TYPES, commentSchema, dimensionPresetSchema, MAX_FILE_SIZE, replacementEditSchema, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
 import { safeFileName } from "@/lib/utils";
 import { notifyTelegram } from "@/lib/notifications/telegram";
@@ -298,6 +299,7 @@ export async function createOrderBatchAction(formData: FormData) {
 
   const notices = await Promise.all(created.map((order) => notifyTelegram("NEW_REPLACEMENT", order, undefined, profile.full_name)));
   const warning = notices.some((notice) => !notice.ok) ? "Orders were created, but a Telegram notification could not be sent." : "";
+  invalidateDashboardCache();
   redirect(`/replacements/${created[0].id}?success=${encodeURIComponent(`${created.length} order${created.length === 1 ? "" : "s"} created.`)}${warning ? `&warning=${encodeURIComponent(warning)}` : ""}`);
 }
 
@@ -321,6 +323,7 @@ export async function updateReplacementAction(formData: FormData) {
       redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent("Order ID must be a positive whole number.")}`);
     }
   }
+
   const supabase = await createClient();
   const { data: current } = await supabase.from("replacements").select("tracking_url").eq("id", replacementId).single();
   const { error } = await supabase.rpc("update_replacement_details_with_order_number", {
@@ -335,7 +338,10 @@ export async function updateReplacementAction(formData: FormData) {
     p_notes: parsed.data.notes,
     p_tracking_url: current?.tracking_url ?? null,
   });
+
   if (error) redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent(error.message)}`);
+
+  invalidateDashboardCache();
   revalidatePath(`/replacements/${replacementId}`);
   redirect(`/replacements/${replacementId}`);
 }
@@ -346,6 +352,7 @@ export async function archiveCompletedReplacementsAction() {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("archive_completed_replacements");
   if (error) redirect(`/replacements?error=${encodeURIComponent(error.message)}`);
+  invalidateDashboardCache();
   revalidatePath("/");
   revalidatePath("/replacements");
   revalidatePath("/dispatch");
@@ -391,6 +398,7 @@ export async function transitionAction(formData: FormData) {
   const replacement = data as Replacement;
   const type = notificationForStatus[parsed.data.target_status as keyof typeof notificationForStatus];
   const sent = type ? await notifyTelegram(type, replacement, parsed.data.message) : { ok: true };
+  invalidateDashboardCache();
   revalidatePath("/");
   revalidatePath("/replacements");
   revalidatePath("/tracking");
@@ -443,6 +451,7 @@ export async function submitLogisticsAction(formData: FormData) {
     redirect(`/replacements/${replacementId}?error=${encodeURIComponent(messageFrom(error))}`);
   }
   const sent = await notifyTelegram("LABEL_UPLOADED", replacement!);
+  invalidateDashboardCache();
   revalidatePath(`/replacements/${replacementId}`);
   revalidatePath("/");
   revalidatePath("/replacements");
@@ -493,6 +502,7 @@ export async function submitPackingQcAction(formData: FormData) {
     redirect(`/replacements/${replacementId}?error=${encodeURIComponent(messageFrom(error))}`);
   }
   const sent = await notifyTelegram("QC_SUBMITTED", replacement!);
+  invalidateDashboardCache();
   revalidatePath(`/replacements/${replacementId}`);
   revalidatePath("/");
   revalidatePath("/replacements");
@@ -517,6 +527,7 @@ export async function adminOverrideAction(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("admin_override_replacement", { p_replacement_id: replacementId, p_target_status: target, p_reason: reason });
   if (error) redirect(`/replacements/${replacementId}?error=${encodeURIComponent(error.message)}`);
+  invalidateDashboardCache();
   revalidatePath(`/replacements/${replacementId}`);
   revalidatePath("/");
   redirect(`/replacements/${replacementId}`);
@@ -732,6 +743,7 @@ export async function deleteReplacementAction(formData: FormData) {
     if (storageError) cleanupWarning = "?warning=Order%20deleted%2C%20but%20an%20administrator%20must%20clean%20up%20its%20stored%20files.";
   }
 
+  invalidateDashboardCache();
   revalidatePath("/");
   revalidatePath("/replacements");
   revalidatePath("/dispatch");

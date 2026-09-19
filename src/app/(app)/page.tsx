@@ -26,33 +26,62 @@ import type {
   ReplacementStatus,
   Role,
 } from "@/lib/types";
+import {
+  getCachedDashboardData,
+  setCachedDashboardData,
+} from "@/lib/cache/dashboard-cache";
+
+const REPLACEMENT_DASHBOARD_COLUMNS =
+  "id, status, created_at, replacement_number, order_reference, order_number, order_type, product_name, quantity, customer_name, customer_phone, courier_partner, tracking_id, tracking_url, archived_at, notes";
+
+const OFFLINE_DASHBOARD_COLUMNS =
+  "id, status, created_at, so_number, order_number, brand, product_name, quantity, unit, logistics_partner, tracking_url, lr_number, carton_count, carton_dimensions, carton_weight_kg, dispatch_date, notes, created_by";
 
 export default async function DashboardPage() {
   const profile = await requireProfile();
-  const supabase = await createClient();
 
-  const [
-    { data: replacementData, error: replacementError },
-    { data: offlineData, error: offlineError },
-  ] = await Promise.all([
-    supabase
-      .from("replacements")
-      .select("*")
-      .is("archived_at", null)
-      .order("created_at", { ascending: false })
-      .limit(60),
-    supabase
-      .from("offline_orders")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(60),
-  ]);
+  const cached = getCachedDashboardData();
+  let replacements: Replacement[] = cached?.replacements ?? [];
+  let offlineOrders: OfflineOrder[] = cached?.offlineOrders ?? [];
+  let replacementError = cached?.replacementError ?? null;
+  let offlineError = cached?.offlineError ?? null;
 
-  if (replacementError) console.error("Dashboard replacements query error:", replacementError);
-  if (offlineError) console.error("Dashboard offline orders query error:", offlineError);
+  if (!cached) {
+    const supabase = await createClient();
+    const [
+      { data: replacementData, error: rErr },
+      { data: offlineData, error: oErr },
+    ] = await Promise.all([
+      supabase
+        .from("replacements")
+        .select(REPLACEMENT_DASHBOARD_COLUMNS)
+        .is("archived_at", null)
+        .order("created_at", { ascending: false })
+        .limit(60),
+      supabase
+        .from("offline_orders")
+        .select(OFFLINE_DASHBOARD_COLUMNS)
+        .order("created_at", { ascending: false })
+        .limit(60),
+    ]);
 
-  const replacements = (replacementData ?? []) as unknown as Replacement[];
-  const offlineOrders = (offlineData ?? []) as unknown as OfflineOrder[];
+    replacementError = rErr;
+    offlineError = oErr;
+    if (rErr) console.error("Dashboard replacements query error:", rErr);
+    if (oErr) console.error("Dashboard offline orders query error:", oErr);
+
+    replacements = (replacementData ?? []) as unknown as Replacement[];
+    offlineOrders = (offlineData ?? []) as unknown as OfflineOrder[];
+
+    if (!rErr && !oErr) {
+      setCachedDashboardData({
+        replacements,
+        offlineOrders,
+        replacementError: null,
+        offlineError: null,
+      });
+    }
+  }
 
   const userRoles = profile.roles?.length ? profile.roles : [profile.role];
   const priorityOrder: Role[] = [

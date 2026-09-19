@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { invalidateDashboardCache } from "@/lib/cache/dashboard-cache";
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "@/lib/replacements/validation";
 import {
   cancelOfflineOrderSchema,
@@ -114,6 +115,7 @@ export async function createOfflineOrderAction(formData: FormData) {
   }
 
   const order = data as OfflineOrder;
+  invalidateDashboardCache();
   revalidatePath("/offline-orders");
   revalidatePath("/");
   redirect(`/offline-orders/${order.id}?success=${encodeURIComponent(`Offline order ${order.so_number} created.`)}`);
@@ -141,6 +143,7 @@ export async function updateOfflineOrderNumberAction(formData: FormData) {
     redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(error.message)}`);
   }
 
+  invalidateDashboardCache();
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
@@ -159,6 +162,7 @@ export async function confirmPrintingAction(formData: FormData) {
   const { error } = await supabase.rpc("confirm_offline_printed", { p_order_id: orderId });
   if (error) redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(error.message)}`);
 
+  invalidateDashboardCache();
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
@@ -186,6 +190,7 @@ export async function confirmPackingAction(formData: FormData) {
 
   if (error) redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(error.message)}`);
 
+  invalidateDashboardCache();
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
@@ -238,6 +243,7 @@ export async function dispatchPrepareOfflineOrderAction(formData: FormData) {
     redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(messageFrom(error))}`);
   }
 
+  invalidateDashboardCache();
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
@@ -258,6 +264,7 @@ export async function confirmPickupAction(formData: FormData) {
   const { error } = await supabase.rpc("confirm_offline_pickup", { p_order_id: orderId });
   if (error) redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(error.message)}`);
 
+  invalidateDashboardCache();
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
@@ -308,6 +315,7 @@ export async function confirmDeliveryAction(formData: FormData) {
     redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(messageFrom(error))}`);
   }
 
+  invalidateDashboardCache();
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
@@ -326,6 +334,7 @@ export async function acknowledgeOrderAction(formData: FormData) {
   const { error } = await supabase.rpc("acknowledge_offline_order", { p_order_id: orderId });
   if (error) redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(error.message)}`);
 
+  invalidateDashboardCache();
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
@@ -374,6 +383,7 @@ export async function cancelOfflineOrderAction(formData: FormData) {
 
   if (error) redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(error.message)}`);
 
+  invalidateDashboardCache();
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");

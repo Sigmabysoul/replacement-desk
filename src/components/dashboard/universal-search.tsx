@@ -110,8 +110,8 @@ export function UniversalSearch({
       {isSearching && (
         <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[75vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl ring-1 ring-slate-900/5">
           {/* Filter Tabs */}
-          <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
-            <div className="flex gap-1">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+            <div className="flex flex-wrap gap-1">
               <button
                 type="button"
                 onClick={() => setTab("ALL")}
