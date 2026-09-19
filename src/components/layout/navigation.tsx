@@ -143,7 +143,7 @@ export function Navigation({
           )}
 
           {/* 1. User Identity Section */}
-          <div className="flex items-center gap-2.5 rounded-2xl bg-white/5 px-3 py-2.5">
+          {/* <div className="flex items-center gap-2.5 rounded-2xl bg-white/5 px-3 py-2.5">
             <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-indigo-600 text-xs font-black text-white shadow-xs">
               {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : <UserRound className="size-4" />}
             </span>
@@ -162,7 +162,7 @@ export function Navigation({
                 ))}
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* 2. Repositioned Below User Section: Profile & Settings */}
           <div className="grid gap-1">
