@@ -37,16 +37,19 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from("replacements")
-      .select("id, status, created_at, replacement_number, order_reference, order_number, brand, product_name, customer_name, customer_phone, courier_partner, tracking_id, tracking_link, archived_at, notes, qc_notes")
+      .select("*")
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(60),
     supabase
       .from("offline_orders")
-      .select("id, status, created_at, so_number, order_number, brand, product_name, quantity, unit, logistics_partner, tracking_url, tracking_id, carton_count, carton_dimensions, carton_weight_kg, dispatch_date, notes, created_by")
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(60),
   ]);
+
+  if (replacementError) console.error("Dashboard replacements query error:", replacementError);
+  if (offlineError) console.error("Dashboard offline orders query error:", offlineError);
 
   const replacements = (replacementData ?? []) as unknown as Replacement[];
   const offlineOrders = (offlineData ?? []) as unknown as OfflineOrder[];
