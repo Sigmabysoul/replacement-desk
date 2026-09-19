@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { hasRole, requireProfile } from "@/lib/auth/session";
+import { hasRole, invalidateProfileCache, requireProfile } from "@/lib/auth/session";
 import { ALLOWED_MIME_TYPES, commentSchema, dimensionPresetSchema, MAX_FILE_SIZE, replacementEditSchema, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
 import { safeFileName } from "@/lib/utils";
 import { notifyTelegram } from "@/lib/notifications/telegram";
@@ -132,6 +132,7 @@ export async function loginAction(formData: FormData) {
  * Signs out the current user session and redirects to the login screen.
  */
 export async function logoutAction() {
+  invalidateProfileCache();
   if (isSupabaseConfigured()) {
     try {
       const supabase = await createClient();
@@ -222,14 +223,17 @@ export async function createOrderBatchAction(formData: FormData) {
   if (invalid && !invalid.success) {
     redirect(`/replacements/new?error=${encodeURIComponent(invalid.error.issues[0]?.message ?? "Check every order.")}`);
   }
-  const isAdmin = hasRole(profile, "ADMIN");
   const requestedOrderNumbers = rawOrders.map((raw) => {
-    if (!isAdmin) return null;
-    const value = Number((raw as { requested_order_number?: unknown }).requested_order_number);
+    const rawVal = (raw as { requested_order_number?: unknown }).requested_order_number;
+    if (rawVal === undefined || rawVal === null || rawVal === "") return null;
+    const value = Number(rawVal);
     return Number.isSafeInteger(value) && value >= 1 ? value : null;
   });
-  if (isAdmin && requestedOrderNumbers.some((value) => value === null)) {
-    redirect(`/replacements/new?error=${encodeURIComponent("Every Admin order ID must be a positive whole number.")}`);
+  if (rawOrders.some((raw, idx) => {
+    const rawVal = (raw as { requested_order_number?: unknown }).requested_order_number;
+    return rawVal !== undefined && rawVal !== null && rawVal !== "" && requestedOrderNumbers[idx] === null;
+  })) {
+    redirect(`/replacements/new?error=${encodeURIComponent("Order ID must be a positive whole number.")}`);
   }
   const requestedValues = requestedOrderNumbers.filter((value): value is number => value !== null);
   if (new Set(requestedValues).size !== requestedValues.length) {
@@ -305,13 +309,14 @@ export async function createOrderBatchAction(formData: FormData) {
  * to `activity_logs` and enforces edit constraints.
  */
 export async function updateReplacementAction(formData: FormData) {
-  const profile = await requireProfile(["CUSTOMER_SUPPORT", "ADMIN"]);
+  await requireProfile(["CUSTOMER_SUPPORT", "HR", "BOSS", "ADMIN"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
   const parsed = replacementEditSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
   let requestedOrderNumber: number | null = null;
-  if (hasRole(profile, "ADMIN")) {
-    requestedOrderNumber = Number(formData.get("order_number"));
+  const rawOrderNum = formData.get("order_number");
+  if (rawOrderNum !== null && rawOrderNum !== "") {
+    requestedOrderNumber = Number(rawOrderNum);
     if (!Number.isSafeInteger(requestedOrderNumber) || requestedOrderNumber < 1) {
       redirect(`/replacements/${replacementId}/edit?error=${encodeURIComponent("Order ID must be a positive whole number.")}`);
     }
@@ -621,6 +626,7 @@ export async function updateUserAction(formData: FormData) {
     user_metadata: { ...authRecord.user.user_metadata, full_name: fullName },
   });
   if (authError) redirect(`/admin/users?error=${encodeURIComponent(`Profile name was saved, but Auth metadata could not be updated: ${authError.message}`)}`);
+  invalidateProfileCache();
   revalidatePath("/admin/users");
 }
 

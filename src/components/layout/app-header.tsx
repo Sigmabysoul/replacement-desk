@@ -30,7 +30,7 @@ export function AppHeader({ profile }: { profile: Profile }) {
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <ThemeButton />
-          <NotificationBell role={profile.role} />
+          <NotificationBell role={profile.role} roles={profile.roles} />
           {profile.role === "ADMIN" && (
             <Link
               href="/admin/settings"

@@ -3,14 +3,19 @@ import { ArrowLeft } from "lucide-react";
 import { OfflineOrderForm } from "@/components/offline-orders/offline-order-form";
 import { Notice } from "@/components/ui/notice";
 import { requireProfile } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function NewOfflineOrderPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireProfile(["BOSS", "ADMIN"]);
-  const { error } = await searchParams;
+  await requireProfile(["BOSS", "HR", "ADMIN"]);
+  const [{ error }, supabase] = await Promise.all([searchParams, createClient()]);
+  const { data: nextSeqData } = await supabase.rpc("get_next_order_number");
+  const defaultOrderNumber = Number.isSafeInteger(Number(nextSeqData)) && Number(nextSeqData) >= 1
+    ? Number(nextSeqData)
+    : 501;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -36,7 +41,7 @@ export default async function NewOfflineOrderPage({
       </div>
 
       <div className="mt-6">
-        <OfflineOrderForm />
+        <OfflineOrderForm defaultOrderNumber={defaultOrderNumber} />
       </div>
     </div>
   );

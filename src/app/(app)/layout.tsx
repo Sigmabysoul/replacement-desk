@@ -10,12 +10,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const profile = await requireProfile();
   return (
     <ThemeProvider>
-      <div className="min-h-screen">
+      <div className="min-h-dvh">
         <RealtimeListener />
         <Navigation role={profile.role} roles={profile.roles} />
         <div className="lg:pl-64">
           <AppHeader profile={profile} />
-          <main className="mx-auto max-w-6xl px-4 pb-32 pt-6 sm:px-6 sm:pb-36 lg:pb-10 lg:pt-8">
+          <main className="mx-auto max-w-6xl px-3.5 pb-20 pt-3 sm:px-6 sm:pb-24 lg:pb-10 lg:pt-8">
             {children}
           </main>
         </div>

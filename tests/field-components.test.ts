@@ -45,17 +45,17 @@ describe("new order form structure", () => {
     expect(markup).toContain("Product details");
     expect(markup).toContain("Dimensions &amp; fulfilment");
     expect(markup).toContain("value=\"501\"");
-    expect(markup).toContain("readOnly=\"\"");
+    expect(markup).not.toContain("readOnly=\"\"");
   });
 
-  it("lets Admin edit the proposed Order ID", () => {
+  it("lets team members edit the proposed Order ID", () => {
     const markup = renderToStaticMarkup(createElement(OrderBuilder, {
       action,
       presets: [],
-      isAdmin: true,
+      isAdmin: false,
       startingOrderNumber: 501,
     }));
-    expect(markup).toContain("Order ID editable by Admin");
+    expect(markup).toContain('aria-label="Order ID"');
     expect(markup).not.toContain('readOnly=""');
     expect(markup).toContain('min="1"');
     expect(markup).toContain("order-id-input");

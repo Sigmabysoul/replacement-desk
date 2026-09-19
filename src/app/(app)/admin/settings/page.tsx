@@ -2,6 +2,7 @@ import { Bot, CheckCircle2, KeyRound, ShieldCheck, XCircle, Zap } from "lucide-r
 import { Card } from "@/components/ui/card";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { formatDate } from "@/lib/utils";
 
 function Setting({ label, configured }: { label: string; configured: boolean }) {
   return (
@@ -98,7 +99,7 @@ export default async function SettingsPage() {
                     {n.status}
                   </span>
                   <span className="text-slate-400">
-                    {new Date(n.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    {formatDate(n.created_at)}
                   </span>
                 </div>
               </div>

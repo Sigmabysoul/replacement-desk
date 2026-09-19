@@ -70,13 +70,17 @@ export const offlineStatusTone: Record<OfflineOrderStatus, string> = {
  * @param withTime Whether to include the 12-hour hour:minute time suffix (default: true).
  * @returns Human-readable localized date string.
  */
-export function formatDate(value: string, withTime = true) {
+export function formatDate(value: string | null | undefined, withTime = true) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",
-    ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
-  }).format(new Date(value));
+    ...(withTime ? { hour: "2-digit", minute: "2-digit", hour12: true } : {}),
+  }).format(date);
 }
 
 /**

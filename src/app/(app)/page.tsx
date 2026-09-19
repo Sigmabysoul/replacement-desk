@@ -37,19 +37,19 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from("replacements")
-      .select("*")
+      .select("id, status, created_at, replacement_number, order_reference, order_number, brand, product_name, customer_name, customer_phone, courier_partner, tracking_id, tracking_link, archived_at, notes, qc_notes")
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(60),
     supabase
       .from("offline_orders")
-      .select("*")
+      .select("id, status, created_at, so_number, order_number, brand, product_name, quantity, unit, logistics_partner, tracking_url, tracking_id, carton_count, carton_dimensions, carton_weight_kg, dispatch_date, notes, created_by")
       .order("created_at", { ascending: false })
       .limit(60),
   ]);
 
-  const replacements = (replacementData ?? []) as Replacement[];
-  const offlineOrders = (offlineData ?? []) as OfflineOrder[];
+  const replacements = (replacementData ?? []) as unknown as Replacement[];
+  const offlineOrders = (offlineData ?? []) as unknown as OfflineOrder[];
 
   const userRoles = profile.roles?.length ? profile.roles : [profile.role];
   const priorityOrder: Role[] = [
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
   const primaryRole =
     priorityOrder.find((r) => userRoles.includes(r)) ?? userRoles[0] ?? profile.role;
 
-  // Replacement Metrics
+  // Replacement Metrics with high-contrast, theme-aware accent colors
   const replacementMetrics: {
     label: string;
     count: number;
@@ -79,7 +79,7 @@ export default async function DashboardPage() {
       count: replacements.filter((r) => r.status === "NEW").length,
       statuses: ["NEW"],
       icon: PackageCheck,
-      tone: "bg-blue-50 text-blue-700",
+      tone: "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 dark:ring-1 dark:ring-blue-800/60",
       href: "/replacements?scope=all&status=AWAITING_LOGISTICS",
     },
     {
@@ -87,7 +87,7 @@ export default async function DashboardPage() {
       count: replacements.filter((r) => r.status === "LABEL_UPLOADED").length,
       statuses: ["LABEL_UPLOADED"],
       icon: Printer,
-      tone: "bg-fuchsia-50 text-fuchsia-700",
+      tone: "bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300 dark:ring-1 dark:ring-fuchsia-800/60",
       href: "/replacements?scope=all&status=LABEL_UPLOADED",
     },
     {
@@ -95,7 +95,7 @@ export default async function DashboardPage() {
       count: replacements.filter((r) => r.status === "QC_PENDING").length,
       statuses: ["QC_PENDING"],
       icon: ScanLine,
-      tone: "bg-amber-50 text-amber-800",
+      tone: "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-1 dark:ring-amber-800/60",
       href: "/replacements?status=QC_PENDING",
     },
     {
@@ -103,7 +103,7 @@ export default async function DashboardPage() {
       count: replacements.filter((r) => r.status === "QC_APPROVED").length,
       statuses: ["QC_APPROVED"],
       icon: Camera,
-      tone: "bg-emerald-50 text-emerald-700",
+      tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-1 dark:ring-emerald-800/60",
       href: "/replacements?status=QC_APPROVED",
     },
     {
@@ -111,7 +111,7 @@ export default async function DashboardPage() {
       count: replacements.filter((r) => r.status === "SHIPPED").length,
       statuses: ["SHIPPED"],
       icon: Radar,
-      tone: "bg-sky-50 text-sky-700",
+      tone: "bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 dark:ring-1 dark:ring-sky-800/60",
       href: "/tracking",
     },
     {
@@ -119,12 +119,12 @@ export default async function DashboardPage() {
       count: replacements.filter((r) => r.status === "DELIVERED").length,
       statuses: ["DELIVERED"],
       icon: CheckCircle2,
-      tone: "bg-teal-50 text-teal-700",
+      tone: "bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 dark:ring-1 dark:ring-teal-800/60",
       href: "/replacements?status=DELIVERED",
     },
   ];
 
-  // Offline Orders Metrics
+  // Offline Orders Metrics with high-contrast, theme-aware accent colors
   const offlineMetrics: {
     label: string;
     count: number;
@@ -138,7 +138,7 @@ export default async function DashboardPage() {
       count: offlineOrders.filter((o) => o.status === "CREATED").length,
       statuses: ["CREATED"],
       icon: PackageCheck,
-      tone: "bg-indigo-50 text-indigo-700",
+      tone: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 dark:ring-1 dark:ring-indigo-800/60",
       href: "/offline-orders?status=CREATED",
     },
     {
@@ -146,7 +146,7 @@ export default async function DashboardPage() {
       count: offlineOrders.filter((o) => o.status === "PACKING_CONFIRMED").length,
       statuses: ["PACKING_CONFIRMED"],
       icon: Camera,
-      tone: "bg-amber-50 text-amber-800",
+      tone: "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-1 dark:ring-amber-800/60",
       href: "/offline-orders?status=PACKING_CONFIRMED",
     },
     {
@@ -154,7 +154,7 @@ export default async function DashboardPage() {
       count: offlineOrders.filter((o) => o.status === "DISPATCH_PREPARED").length,
       statuses: ["DISPATCH_PREPARED"],
       icon: Printer,
-      tone: "bg-fuchsia-50 text-fuchsia-700",
+      tone: "bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300 dark:ring-1 dark:ring-fuchsia-800/60",
       href: "/offline-orders?status=DISPATCH_PREPARED",
     },
     {
@@ -162,7 +162,7 @@ export default async function DashboardPage() {
       count: offlineOrders.filter((o) => o.status === "PRINTED").length,
       statuses: ["PRINTED"],
       icon: Truck,
-      tone: "bg-cyan-50 text-cyan-800",
+      tone: "bg-cyan-50 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300 dark:ring-1 dark:ring-cyan-800/60",
       href: "/offline-orders?status=PRINTED",
     },
     {
@@ -170,7 +170,7 @@ export default async function DashboardPage() {
       count: offlineOrders.filter((o) => o.status === "PICKED_UP").length,
       statuses: ["PICKED_UP"],
       icon: FileCheck,
-      tone: "bg-emerald-50 text-emerald-800",
+      tone: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-1 dark:ring-emerald-800/60",
       href: "/offline-orders?status=PICKED_UP",
     },
     {
@@ -178,26 +178,26 @@ export default async function DashboardPage() {
       count: offlineOrders.filter((o) => o.status === "DELIVERED").length,
       statuses: ["DELIVERED"],
       icon: CheckCircle2,
-      tone: "bg-slate-100 text-slate-800",
+      tone: "bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 dark:ring-1 dark:ring-teal-800/60",
       href: "/offline-orders?status=DELIVERED",
     },
   ];
 
   return (
-    <div className="grid gap-7 sm:gap-9">
+    <div className="grid gap-5 sm:gap-8">
       {/* 1. Hero Header */}
-      <section className="flex flex-col gap-4 rounded-3xl border border-border/80 bg-card p-5 shadow-xs sm:flex-row sm:items-end sm:justify-between sm:p-6">
+      <section className="flex flex-col gap-4 rounded-3xl border border-border/80 bg-card p-4 shadow-xs sm:flex-row sm:items-end sm:justify-between sm:p-6 text-card-foreground">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">
+            <span className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">
               Operations Center
             </span>
-            <span className="text-slate-300">·</span>
+            <span className="text-muted-foreground/60">·</span>
             <div className="flex flex-wrap gap-1">
               {userRoles.map((r) => (
                 <span
                   key={r}
-                  className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-indigo-700"
+                  className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 dark:ring-1 dark:ring-indigo-800/60"
                 >
                   {r}
                 </span>
@@ -217,7 +217,7 @@ export default async function DashboardPage() {
           {hasAnyRole(profile, ["BOSS", "ADMIN"]) && (
             <Link
               href="/offline-orders/new"
-              className="flex min-h-11 items-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800"
+              className="flex min-h-11 items-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700"
             >
               <Boxes className="size-4" />
               New Offline Order
@@ -243,28 +243,28 @@ export default async function DashboardPage() {
 
       {/* Error notices if any */}
       {(replacementError || offlineError) && (
-        <Card className="border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+        <Card className="border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
           Some orders could not be refreshed from database. Try reloading the page.
         </Card>
       )}
 
       {/* 3. Dual Pipeline Overview */}
-      <div className="grid gap-7 lg:grid-cols-2">
+      <div className="grid gap-5 sm:gap-7 lg:grid-cols-2">
         {/* Offline Orders Pipeline */}
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs sm:p-6">
+        <div className="rounded-3xl border border-border bg-card p-4 shadow-xs sm:p-6 text-card-foreground">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="grid size-8 place-items-center rounded-lg bg-slate-900 text-white">
+              <span className="grid size-8 place-items-center rounded-lg bg-slate-900 text-white dark:bg-indigo-600">
                 <Boxes className="size-4" />
               </span>
               <div>
-                <h2 className="text-base font-black text-slate-950">Offline Orders Pipeline</h2>
-                <p className="text-[11px] text-slate-500">Cartons, Logistics & Storehouse flow</p>
+                <h2 className="text-base font-black text-foreground">Offline Orders Pipeline</h2>
+                <p className="text-[11px] text-muted-foreground">Cartons, Logistics & Storehouse flow</p>
               </div>
             </div>
             <Link
               href="/offline-orders"
-              className="text-xs font-bold text-indigo-600 hover:underline"
+              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
             >
               View All ({offlineOrders.length})
             </Link>
@@ -275,15 +275,15 @@ export default async function DashboardPage() {
               <Link
                 key={metric.label}
                 href={metric.href}
-                className="group flex flex-col justify-between rounded-2xl border border-slate-100 bg-slate-50/70 p-3 transition hover:border-indigo-300 hover:bg-indigo-50/30"
+                className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-card/70 dark:bg-muted/35 p-3 transition hover:border-indigo-400/50 hover:bg-indigo-50/50 dark:hover:border-indigo-500/50 dark:hover:bg-indigo-950/40"
               >
                 <div className="flex items-center justify-between">
                   <span className={`grid size-7 place-items-center rounded-lg ${metric.tone}`}>
                     <metric.icon className="size-3.5" />
                   </span>
-                  <strong className="text-xl font-black text-slate-950">{metric.count}</strong>
+                  <strong className="text-xl font-black text-foreground">{metric.count}</strong>
                 </div>
-                <span className="mt-2 text-[11px] font-bold leading-tight text-slate-600 group-hover:text-indigo-700">
+                <span className="mt-2 text-[11px] font-bold leading-tight text-muted-foreground group-hover:text-foreground">
                   {metric.label}
                 </span>
               </Link>
@@ -292,20 +292,20 @@ export default async function DashboardPage() {
         </div>
 
         {/* Replacement Orders Pipeline */}
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs sm:p-6">
+        <div className="rounded-3xl border border-border bg-card p-4 shadow-xs sm:p-6 text-card-foreground">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-white">
                 <Truck className="size-4" />
               </span>
               <div>
-                <h2 className="text-base font-black text-slate-950">Replacements Pipeline</h2>
-                <p className="text-[11px] text-slate-500">Support, QC, Packing & Delivery flow</p>
+                <h2 className="text-base font-black text-foreground">Replacements Pipeline</h2>
+                <p className="text-[11px] text-muted-foreground">Support, QC, Packing & Delivery flow</p>
               </div>
             </div>
             <Link
               href="/replacements"
-              className="text-xs font-bold text-indigo-600 hover:underline"
+              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
             >
               View All ({replacements.length})
             </Link>
@@ -316,15 +316,15 @@ export default async function DashboardPage() {
               <Link
                 key={metric.label}
                 href={metric.href}
-                className="group flex flex-col justify-between rounded-2xl border border-slate-100 bg-slate-50/70 p-3 transition hover:border-indigo-300 hover:bg-indigo-50/30"
+                className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-card/70 dark:bg-muted/35 p-3 transition hover:border-indigo-400/50 hover:bg-indigo-50/50 dark:hover:border-indigo-500/50 dark:hover:bg-indigo-950/40"
               >
                 <div className="flex items-center justify-between">
                   <span className={`grid size-7 place-items-center rounded-lg ${metric.tone}`}>
                     <metric.icon className="size-3.5" />
                   </span>
-                  <strong className="text-xl font-black text-slate-950">{metric.count}</strong>
+                  <strong className="text-xl font-black text-foreground">{metric.count}</strong>
                 </div>
-                <span className="mt-2 text-[11px] font-bold leading-tight text-slate-600 group-hover:text-indigo-700">
+                <span className="mt-2 text-[11px] font-bold leading-tight text-muted-foreground group-hover:text-foreground">
                   {metric.label}
                 </span>
               </Link>
@@ -334,17 +334,17 @@ export default async function DashboardPage() {
       </div>
 
       {/* 4. Recent Feeds Side by Side */}
-      <div className="grid gap-7 lg:grid-cols-2">
+      <div className="grid gap-5 sm:gap-7 lg:grid-cols-2">
         {/* Recent Offline Orders Feed */}
         <section>
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Boxes className="size-4 text-slate-900" />
-              <h2 className="text-base font-black text-slate-950">Recent Offline Orders</h2>
+              <Boxes className="size-4 text-foreground" />
+              <h2 className="text-base font-black text-foreground">Recent Offline Orders</h2>
             </div>
             <Link
               href="/offline-orders"
-              className="text-xs font-bold text-indigo-600 hover:underline"
+              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
             >
               View full list
             </Link>
@@ -363,8 +363,8 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <Card className="grid place-items-center p-8 text-center">
-              <Boxes className="size-8 text-slate-300" />
-              <p className="mt-2 text-xs font-bold text-slate-700">No offline orders created yet</p>
+              <Boxes className="size-8 text-muted-foreground/50" />
+              <p className="mt-2 text-xs font-bold text-muted-foreground">No offline orders created yet</p>
             </Card>
           )}
         </section>
@@ -373,12 +373,12 @@ export default async function DashboardPage() {
         <section>
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Truck className="size-4 text-indigo-600" />
-              <h2 className="text-base font-black text-slate-950">Recent Replacements</h2>
+              <Truck className="size-4 text-indigo-600 dark:text-indigo-400" />
+              <h2 className="text-base font-black text-foreground">Recent Replacements</h2>
             </div>
             <Link
               href="/replacements"
-              className="text-xs font-bold text-indigo-600 hover:underline"
+              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
             >
               View full list
             </Link>
@@ -396,8 +396,8 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <Card className="grid place-items-center p-8 text-center">
-              <Truck className="size-8 text-slate-300" />
-              <p className="mt-2 text-xs font-bold text-slate-700">No replacement orders yet</p>
+              <Truck className="size-8 text-muted-foreground/50" />
+              <p className="mt-2 text-xs font-bold text-muted-foreground">No replacement orders yet</p>
             </Card>
           )}
         </section>

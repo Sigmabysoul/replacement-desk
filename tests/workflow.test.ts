@@ -12,7 +12,7 @@ import {
   transitionSchema,
 } from "@/lib/replacements/validation";
 import { formatTelegramMessage } from "@/lib/notifications/format";
-import { safeFileName } from "@/lib/utils";
+import { formatDate, safeFileName } from "@/lib/utils";
 import { validateMagicBytes } from "@/lib/security/magic-bytes";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rate-limit";
 
@@ -363,5 +363,20 @@ describe("security: sliding window rate limiter", () => {
     // Resetting clears the limit
     resetRateLimit(testKey);
     expect(checkRateLimit(testKey, 5, 60000).allowed).toBe(true);
+  });
+});
+
+describe("formatDate timezone enforcement", () => {
+  it("formats dates strictly in Asia/Kolkata timezone", () => {
+    // 06:30 UTC is exactly 12:00 PM in Asia/Kolkata (IST = UTC+5:30)
+    const result = formatDate("2026-09-19T06:30:00.000Z");
+    expect(result).toMatch(/19 Sept? 2026/);
+    expect(result.toLowerCase()).toMatch(/12:00\s*(pm|noon)/i);
+  });
+
+  it("handles null and invalid dates gracefully", () => {
+    expect(formatDate(null)).toBe("");
+    expect(formatDate(undefined)).toBe("");
+    expect(formatDate("invalid-date")).toBe("");
   });
 });

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 
-export function OfflineOrderForm() {
+export function OfflineOrderForm({ defaultOrderNumber }: { defaultOrderNumber?: number }) {
   return (
     <form action={createOfflineOrderAction} className="grid gap-6">
       <Card className="grid gap-5 p-5 sm:p-6">
@@ -15,7 +15,19 @@ export function OfflineOrderForm() {
           <h2 className="text-lg font-black text-slate-950">New Offline Order</h2>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Order ID" hint="Auto-increments · Editable">
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              required
+              name="order_number"
+              defaultValue={defaultOrderNumber}
+              className="font-black"
+              placeholder="e.g. 501"
+            />
+          </Field>
           <Field label="SO Number" hint="Sales Order reference">
             <Input
               required

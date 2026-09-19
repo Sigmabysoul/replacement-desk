@@ -6,14 +6,22 @@ import { createClient } from "@/lib/supabase/server";
 import type { DimensionPreset } from "@/lib/types";
 
 export default async function NewReplacementPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const profile = await requireProfile(["CUSTOMER_SUPPORT", "ADMIN"]);
+  await requireProfile(["CUSTOMER_SUPPORT", "HR", "BOSS", "ADMIN"]);
   const [{ error }, supabase] = await Promise.all([searchParams, createClient()]);
-  const [{ data: presetData }, { data: latestOrderData }] = await Promise.all([
+  const [{ data: presetData }, { data: nextSeqData }] = await Promise.all([
     supabase.from("dimension_presets").select("*").eq("active", true).order("name"),
-    supabase.from("replacements").select("order_number").order("order_number", { ascending: false }).limit(1),
+    supabase.rpc("get_next_order_number"),
   ]);
   const presets = (presetData ?? []) as DimensionPreset[];
-  const startingOrderNumber = Number(latestOrderData?.[0]?.order_number ?? 500) + 1;
+  let startingOrderNumber = Number(nextSeqData);
+  if (!Number.isSafeInteger(startingOrderNumber) || startingOrderNumber < 1) {
+    const { data: latestOrderData } = await supabase
+      .from("replacements")
+      .select("order_number")
+      .order("order_number", { ascending: false })
+      .limit(1);
+    startingOrderNumber = Number(latestOrderData?.[0]?.order_number ?? 500) + 1;
+  }
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -28,7 +36,7 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
         <OrderBuilder
           action={createOrderBatchAction}
           presets={presets}
-          isAdmin={profile.role === "ADMIN"}
+          isAdmin={true}
           startingOrderNumber={startingOrderNumber}
         />
       </div>

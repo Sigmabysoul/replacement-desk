@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CirclePlus, LockKeyhole, Package, Rotate3D, Trash2, UserRound, X } from "lucide-react";
+import { CirclePlus, Package, Rotate3D, Trash2, UserRound, X } from "lucide-react";
 import { ProductPhotoPicker } from "@/components/replacements/product-photo-picker";
 import { ReasonSelect } from "@/components/replacements/reason-select";
 import { Card } from "@/components/ui/card";
@@ -93,7 +93,6 @@ function ProductDetailsSection({
   index,
   compact,
   removable,
-  isAdmin,
   updateOrder,
   removeOrder,
 }: Omit<ProductCardProps, "presets" | "choosePreset">) {
@@ -112,22 +111,18 @@ function ProductDetailsSection({
         <div className="ml-auto w-full sm:w-40">
           <Field
             label="Order ID"
-            hint={isAdmin ? "Admin can change this ID." : "Only Admin can change this ID."}
+            hint="Auto-increments · Editable"
           >
-            <div className="relative">
-              <Input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                required
-                readOnly={!isAdmin}
-                value={order.orderNumber}
-                onChange={(event) => isAdmin && updateOrder(order.id, { orderNumber: event.target.value })}
-                className={cn("order-id-input pr-10 font-black", !isAdmin && "cursor-not-allowed bg-muted")}
-                aria-label={isAdmin ? "Order ID editable by Admin" : "Order ID locked for Customer Support"}
-              />
-              {!isAdmin ? <LockKeyhole className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /> : null}
-            </div>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              required
+              value={order.orderNumber}
+              onChange={(event) => updateOrder(order.id, { orderNumber: event.target.value })}
+              className="order-id-input font-black"
+              aria-label="Order ID"
+            />
           </Field>
         </div>
         {removable ? (
@@ -254,7 +249,7 @@ export function OrderBuilder({
     const customer = customers.find((item) => item.id === order.customerId)!;
     return {
       id: order.id,
-      requested_order_number: isAdmin ? order.orderNumber : null,
+      requested_order_number: order.orderNumber ? Number(order.orderNumber) : null,
       order_type: "REPLACEMENT" as const,
       order_reference: order.orderReference || `REF-${order.orderNumber}`,
       customer_name: customer.name,
@@ -272,7 +267,7 @@ export function OrderBuilder({
       breadth_cm: order.breadth,
       height_cm: order.height,
     };
-  }), [customers, isAdmin, orders]);
+  }), [customers, orders]);
 
   function updateCustomer(id: string, patch: Partial<CustomerDraft>) {
     setCustomers((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));

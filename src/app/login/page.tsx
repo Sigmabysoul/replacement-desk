@@ -20,7 +20,7 @@ export default async function LoginPage({
   const configured = isSupabaseConfigured();
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top_left,#e0e7ff,transparent_40%),#f8fafc] px-4 py-8 sm:py-12">
+    <main className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_top_left,#e0e7ff,transparent_40%),#f8fafc] px-3.5 py-4 sm:px-4 sm:py-12">
       <div className="w-full max-w-md">
         {/* App Branding */}
         <div className="mb-6 sm:mb-8 flex items-center gap-3.5">

@@ -11,6 +11,7 @@ import {
   confirmPackingSchema,
   createOfflineOrderSchema,
   dispatchOrderSchema,
+  updateOfflineOrderNumberSchema,
 } from "@/lib/offline-orders/validation";
 
 describe("offline workflow permissions", () => {
@@ -217,5 +218,43 @@ describe("offline order validation schemas", () => {
     if (valid.success) {
       expect(valid.data.pod_notes).toBe("Received by security guard with stamp");
     }
+  });
+
+  it("validates offline order creation with custom numeric order number", () => {
+    const valid = createOfflineOrderSchema.safeParse({
+      so_number: "OFLN120",
+      product_name: "Rolls",
+      quantity: 50,
+      order_number: "620",
+    });
+    expect(valid.success).toBe(true);
+    if (valid.success) {
+      expect(valid.data.order_number).toBe(620);
+    }
+
+    const invalid = createOfflineOrderSchema.safeParse({
+      so_number: "OFLN120",
+      product_name: "Rolls",
+      quantity: 50,
+      order_number: "-5",
+    });
+    expect(invalid.success).toBe(false);
+  });
+
+  it("validates offline order number update schema", () => {
+    const valid = updateOfflineOrderNumberSchema.safeParse({
+      order_id: "a0000000-0000-4000-8000-000000000001",
+      order_number: "700",
+    });
+    expect(valid.success).toBe(true);
+    if (valid.success) {
+      expect(valid.data.order_number).toBe(700);
+    }
+
+    const invalid = updateOfflineOrderNumberSchema.safeParse({
+      order_id: "a0000000-0000-4000-8000-000000000001",
+      order_number: "0",
+    });
+    expect(invalid.success).toBe(false);
   });
 });

@@ -14,6 +14,12 @@ const optionalTrackingUrl = z
   );
 
 export const createOfflineOrderSchema = z.object({
+  order_number: z
+    .preprocess(
+      (value) => (value === "" || value == null ? null : value),
+      z.coerce.number().int().min(1, "Order ID must be a positive whole number").nullable(),
+    )
+    .optional(),
   so_number: z.string().trim().min(1, "SO Number is required").max(50, "SO Number must be 50 characters or less"),
   brand: optionalText(200),
   product_name: z.string().trim().min(1, "Product name is required").max(200),
@@ -24,6 +30,11 @@ export const createOfflineOrderSchema = z.object({
     .preprocess((value) => (value == null ? "" : value), z.string().trim())
     .transform((value) => value || null),
   notes: optionalText(2000),
+});
+
+export const updateOfflineOrderNumberSchema = z.object({
+  order_id: z.string().uuid("Invalid order ID"),
+  order_number: z.coerce.number().int().min(1, "Order ID must be a positive whole number"),
 });
 
 export const confirmPackingSchema = z.object({

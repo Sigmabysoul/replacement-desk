@@ -48,9 +48,11 @@ html {
   background: var(--background);
   -webkit-text-size-adjust: 100%;
   touch-action: manipulation;
+  overflow-x: hidden;
 }
 body {
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   background: var(--background);
   color: var(--foreground);
@@ -58,6 +60,7 @@ body {
   font-size: 16px;
   line-height: 1.5;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
 button, input, textarea, select, a {
@@ -108,22 +111,28 @@ html[data-theme-mode="dark"] .text-slate-700 { color: var(--foreground) !importa
 html[data-theme-mode="dark"] .text-slate-600,
 html[data-theme-mode="dark"] .text-slate-500,
 html[data-theme-mode="dark"] .text-slate-400 { color: var(--muted-foreground) !important; }
-html[data-theme-mode="dark"] .bg-white,
-html[data-theme-mode="dark"] .bg-slate-50,
-html[data-theme-mode="dark"] .bg-slate-100 { background-color: var(--surface) !important; }
-html[data-theme-mode="dark"] .bg-rose-50,
-html[data-theme-mode="dark"] .bg-emerald-50,
-html[data-theme-mode="dark"] .bg-amber-50,
-html[data-theme-mode="dark"] .bg-orange-50,
-html[data-theme-mode="dark"] .bg-cyan-50,
-html[data-theme-mode="dark"] .bg-fuchsia-50,
-html[data-theme-mode="dark"] .bg-violet-50 { background-color: var(--muted) !important; }
+html[data-theme-mode="dark"] .bg-white { background-color: var(--surface) !important; }
+html[data-theme-mode="dark"] .bg-slate-50 { background-color: color-mix(in srgb, var(--surface) 92%, white 8%) !important; }
+html[data-theme-mode="dark"] .bg-slate-100 { background-color: var(--muted) !important; }
+
+/* Keep colored tone pills vibrant and distinct with high contrast in dark mode */
+html[data-theme-mode="dark"] .bg-blue-50 { background-color: rgba(30, 58, 138, 0.35) !important; color: #93c5fd !important; }
+html[data-theme-mode="dark"] .bg-fuchsia-50 { background-color: rgba(112, 26, 117, 0.35) !important; color: #f0abfc !important; }
+html[data-theme-mode="dark"] .bg-amber-50 { background-color: rgba(120, 53, 15, 0.35) !important; color: #fcd34d !important; }
+html[data-theme-mode="dark"] .bg-emerald-50 { background-color: rgba(6, 78, 59, 0.35) !important; color: #6ee7b7 !important; }
+html[data-theme-mode="dark"] .bg-teal-50 { background-color: rgba(19, 78, 74, 0.35) !important; color: #5eead4 !important; }
+html[data-theme-mode="dark"] .bg-sky-50 { background-color: rgba(12, 74, 110, 0.35) !important; color: #7dd3fc !important; }
+html[data-theme-mode="dark"] .bg-cyan-50 { background-color: rgba(22, 78, 99, 0.35) !important; color: #67e8f9 !important; }
+html[data-theme-mode="dark"] .bg-indigo-50 { background-color: rgba(49, 46, 129, 0.35) !important; color: #a5b4fc !important; }
+html[data-theme-mode="dark"] .bg-rose-50 { background-color: rgba(136, 19, 55, 0.35) !important; color: #fda4af !important; }
+html[data-theme-mode="dark"] .bg-violet-50 { background-color: rgba(76, 29, 149, 0.35) !important; color: #c4b5fd !important; }
+
 html[data-theme-mode="dark"] .text-rose-950,
-html[data-theme-mode="dark"] .text-rose-900,
-html[data-theme-mode="dark"] .text-emerald-900,
-html[data-theme-mode="dark"] .text-amber-900,
+html[data-theme-mode="dark"] .text-rose-900 { color: #fca5a5 !important; }
+html[data-theme-mode="dark"] .text-emerald-900 { color: #86efac !important; }
+html[data-theme-mode="dark"] .text-amber-900 { color: #fde047 !important; }
 html[data-theme-mode="dark"] .text-indigo-950,
-html[data-theme-mode="dark"] .text-indigo-900 { color: var(--foreground) !important; }
+html[data-theme-mode="dark"] .text-indigo-900 { color: #a5b4fc !important; }
 html[data-theme-mode="dark"] .border-slate-100,
 html[data-theme-mode="dark"] .border-slate-200,
 html[data-theme-mode="dark"] .border-slate-300 { border-color: var(--border) !important; }

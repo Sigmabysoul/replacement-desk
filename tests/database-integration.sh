@@ -134,12 +134,28 @@ exception when insufficient_privilege then
 end
 $$;
 
+select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', false);
+
 do $$
 begin
-  perform public.admin_update_order_number('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 750);
-  raise exception 'Customer Support unexpectedly changed an Order ID';
+  perform public.admin_update_order_number('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 700);
+  raise exception 'Printing unexpectedly changed an Order ID';
 exception when others then
-  if sqlerrm <> 'Administrator access required' then raise; end if;
+  if sqlerrm <> 'Unauthorized to change Order ID' then raise; end if;
+end
+$$;
+
+select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
+
+do $$
+begin
+  perform public.admin_update_order_number('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 700);
+  if (select order_number from public.replacements where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') <> 700 then
+    raise exception 'Order ID was not updated to 700';
+  end if;
+  if public.get_next_order_number() <> 701 then
+    raise exception 'Next order number sequence was not advanced to 701';
+  end if;
 end
 $$;
 

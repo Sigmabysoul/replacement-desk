@@ -9,6 +9,7 @@ import {
   Truck,
 } from "lucide-react";
 import { notFound } from "next/navigation";
+import { EditOfflineOrderId } from "@/components/offline-orders/edit-offline-order-id";
 import { OfflineActionPanel } from "@/components/offline-orders/offline-action-panel";
 import { OfflineActivityTimeline } from "@/components/offline-orders/offline-activity-timeline";
 import { OfflineCommentComposer } from "@/components/offline-orders/offline-comment-composer";
@@ -62,6 +63,10 @@ export default async function OfflineOrderDetailPage({
   if (!orderData) notFound();
   const order = orderData as OfflineOrder;
   const attachments = (attachmentData ?? []) as OfflineOrderAttachment[];
+  const userRoles = profile.roles?.length ? profile.roles : [profile.role];
+  const canEditOrderNumber = userRoles.some((r) =>
+    ["BOSS", "HR", "CUSTOMER_SUPPORT", "ADMIN"].includes(r),
+  );
   const activities = (activityData ?? []) as OfflineOrderActivityLog[];
 
   const actorIds = [
@@ -145,9 +150,15 @@ export default async function OfflineOrderDetailPage({
               )}
               <OfflineStatusBadge status={order.status} />
             </div>
-            <p className="mt-1 text-xs text-slate-500">
-              Order #{order.order_number} · Created by {creator?.full_name ?? "Boss"} on {formatDate(order.created_at)}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <EditOfflineOrderId
+                orderId={order.id}
+                currentOrderNumber={order.order_number}
+                canEdit={canEditOrderNumber}
+              />
+              <span>·</span>
+              <span>Created by {creator?.full_name ?? "Boss"} on {formatDate(order.created_at)}</span>
+            </div>
           </div>
         </div>
       </Card>

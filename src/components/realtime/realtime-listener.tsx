@@ -56,6 +56,24 @@ export function RealtimeListener() {
         },
         triggerRefresh,
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "offline_orders",
+        },
+        triggerRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "offline_order_activity",
+        },
+        triggerRefresh,
+      )
       .subscribe();
 
     return () => {

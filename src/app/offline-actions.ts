@@ -13,6 +13,7 @@ import {
   createOfflineOrderSchema,
   dispatchOrderSchema,
   offlineOrderCommentSchema,
+  updateOfflineOrderNumberSchema,
 } from "@/lib/offline-orders/validation";
 import { safeFileName } from "@/lib/utils";
 import { verifyFileSignature } from "@/lib/security/magic-bytes";
@@ -83,10 +84,10 @@ async function cleanupUncommittedOfflineUploads(
 }
 
 /**
- * Boss or Admin creates a new offline order.
+ * Boss, HR, or Admin creates a new offline order.
  */
 export async function createOfflineOrderAction(formData: FormData) {
-  await requireProfile(["BOSS", "ADMIN"]);
+  await requireProfile(["BOSS", "HR", "ADMIN"]);
   const parsed = createOfflineOrderSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     redirect(`/offline-orders/new?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
@@ -105,6 +106,7 @@ export async function createOfflineOrderAction(formData: FormData) {
     p_logistics_partner: parsed.data.logistics_partner ?? null,
     p_dispatch_date: parsed.data.dispatch_date ?? null,
     p_notes: parsed.data.notes ?? null,
+    p_order_number: parsed.data.order_number ?? null,
   });
 
   if (error || !data) {
@@ -115,6 +117,34 @@ export async function createOfflineOrderAction(formData: FormData) {
   revalidatePath("/offline-orders");
   revalidatePath("/");
   redirect(`/offline-orders/${order.id}?success=${encodeURIComponent(`Offline order ${order.so_number} created.`)}`);
+}
+
+/**
+ * Updates an offline order's numeric Order ID.
+ * Authorized for BOSS, HR, CUSTOMER_SUPPORT, and ADMIN.
+ */
+export async function updateOfflineOrderNumberAction(formData: FormData) {
+  await requireProfile(["BOSS", "HR", "CUSTOMER_SUPPORT", "ADMIN"]);
+  const orderId = String(formData.get("order_id") ?? "");
+  const parsed = updateOfflineOrderNumberSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid Order ID.")}`);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("update_offline_order_number", {
+    p_order_id: parsed.data.order_id,
+    p_order_number: parsed.data.order_number,
+  });
+
+  if (error) {
+    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/offline-orders");
+  revalidatePath(`/offline-orders/${orderId}`);
+  revalidatePath("/");
+  redirect(`/offline-orders/${orderId}?success=${encodeURIComponent(`Order ID updated to #${parsed.data.order_number}. Subsequent orders will increment from this.`)}`);
 }
 
 /**

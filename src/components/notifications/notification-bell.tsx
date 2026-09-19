@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
+  Boxes,
   Check,
   CheckCircle2,
   Package,
@@ -14,15 +15,23 @@ import {
   Play,
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import {
+  getOfflineNotificationContent,
+  NOTIFICATION_RECIPIENTS,
+} from "@/lib/notifications/format";
 import type { Role } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface NotificationItem {
   id: string;
-  replacement_id: string;
+  order_type: "REPLACEMENT" | "OFFLINE";
+  target_id: string;
+  href: string;
   title: string;
   subtitle: string;
   created_at: string;
   status?: string;
+  tag: string;
 }
 
 /**
@@ -192,8 +201,12 @@ function getNotificationContent(
  *
  * @param props.role Current user's department role.
  */
-export function NotificationBell({ role }: { role?: Role }) {
+export function NotificationBell({ role, roles }: { role?: Role; roles?: Role[] }) {
   const router = useRouter();
+  const userRoles = useMemo(() => {
+    return roles?.length ? roles : role ? [role] : [];
+  }, [roles, role]);
+  const isAdmin = userRoles.includes("ADMIN");
   const [isOpen, setIsOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
@@ -228,32 +241,70 @@ export function NotificationBell({ role }: { role?: Role }) {
     }
 
     async function loadNotifications() {
-      const { data, error } = await supabase
-        .from("replacements")
-        .select("id, replacement_number, order_reference, product_name, status, updated_at")
-        .order("updated_at", { ascending: false })
-        .limit(10);
+      const [
+        { data: repData },
+        { data: offData },
+      ] = await Promise.all([
+        supabase
+          .from("replacements")
+          .select("id, replacement_number, order_reference, product_name, status, updated_at")
+          .order("updated_at", { ascending: false })
+          .limit(8),
+        supabase
+          .from("offline_orders")
+          .select("id, so_number, product_name, status, updated_at, carton_count, logistics_partner")
+          .order("updated_at", { ascending: false })
+          .limit(8),
+      ]);
 
-      if (!error && data) {
-        setNotifications(
-          data.map((row) => {
-            const content = getNotificationContent(
-              row.status,
-              row.replacement_number,
-              row.order_reference,
-              row.product_name,
-            );
-            return {
-              id: `${row.id}-${row.status}-${row.updated_at}`,
-              replacement_id: row.id,
-              title: content.title,
-              subtitle: content.body,
-              created_at: row.updated_at,
-              status: row.status,
-            };
-          }),
-        );
+      const items: NotificationItem[] = [];
+
+      if (repData) {
+        repData.forEach((row) => {
+          const content = getNotificationContent(
+            row.status,
+            row.replacement_number,
+            row.order_reference,
+            row.product_name,
+          );
+          items.push({
+            id: `rep-${row.id}-${row.status}-${row.updated_at}`,
+            order_type: "REPLACEMENT",
+            target_id: row.id,
+            href: `/replacements/${row.id}`,
+            title: content.title,
+            subtitle: content.body,
+            created_at: row.updated_at,
+            status: row.status,
+            tag: "REPLACEMENT",
+          });
+        });
       }
+
+      if (offData) {
+        offData.forEach((row) => {
+          const content = getOfflineNotificationContent(
+            row.status,
+            row.so_number,
+            row.product_name,
+            { cartonCount: row.carton_count, courier: row.logistics_partner },
+          );
+          items.push({
+            id: `off-${row.id}-${row.status}-${row.updated_at}`,
+            order_type: "OFFLINE",
+            target_id: row.id,
+            href: `/offline-orders/${row.id}`,
+            title: content.title,
+            subtitle: content.body,
+            created_at: row.updated_at,
+            status: row.status,
+            tag: "OFFLINE SO",
+          });
+        });
+      }
+
+      items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setNotifications(items.slice(0, 15));
     }
 
     loadNotifications();
@@ -283,27 +334,84 @@ export function NotificationBell({ role }: { role?: Role }) {
           );
 
           const newItem: NotificationItem = {
-            id: `${row.id}-${row.status}-${row.updated_at || Date.now()}`,
-            replacement_id: row.id,
+            id: `rep-${row.id}-${row.status}-${row.updated_at || Date.now()}`,
+            order_type: "REPLACEMENT",
+            target_id: row.id,
+            href: `/replacements/${row.id}`,
             title: content.title,
             subtitle: content.body,
             created_at: row.updated_at || new Date().toISOString(),
             status: row.status,
+            tag: "REPLACEMENT",
           };
 
           setNotifications((prev) =>
-            [newItem, ...prev.filter((p) => p.replacement_id !== row.id)].slice(0, 15),
+            [newItem, ...prev.filter((p) => p.id !== newItem.id)].slice(0, 15),
           );
 
-          // 1. Play loud warehouse operational alert
-          if (soundEnabled) {
-            playLoudWarehouseAlert(row.status);
-          }
+          const targetRoles = (NOTIFICATION_RECIPIENTS as Record<string, readonly Role[]>)[row.status || ""] ?? [];
+          const isTargetRecipient =
+            isAdmin || targetRoles.length === 0 || targetRoles.some((r) => userRoles.includes(r));
 
-          // 2. Fire system/browser lock screen notification
-          fireSystemNotification(content.title, content.body, row.id, () => {
-            router.push(`/replacements/${row.id}`);
-          });
+          if (isTargetRecipient) {
+            if (soundEnabled) {
+              playLoudWarehouseAlert(row.status);
+            }
+            fireSystemNotification(content.title, content.body, row.id, () => {
+              router.push(`/replacements/${row.id}`);
+            });
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "offline_orders" },
+        (payload) => {
+          const row = payload.new as {
+            id?: string;
+            so_number?: string;
+            product_name?: string;
+            status?: string;
+            carton_count?: number;
+            logistics_partner?: string;
+            updated_at?: string;
+          };
+          if (!row || !row.id) return;
+
+          const content = getOfflineNotificationContent(
+            row.status || "UPDATED",
+            row.so_number || "Offline SO",
+            row.product_name || "Materials",
+            { cartonCount: row.carton_count, courier: row.logistics_partner },
+          );
+
+          const newItem: NotificationItem = {
+            id: `off-${row.id}-${row.status}-${row.updated_at || Date.now()}`,
+            order_type: "OFFLINE",
+            target_id: row.id,
+            href: `/offline-orders/${row.id}`,
+            title: content.title,
+            subtitle: content.body,
+            created_at: row.updated_at || new Date().toISOString(),
+            status: row.status,
+            tag: "OFFLINE SO",
+          };
+
+          setNotifications((prev) =>
+            [newItem, ...prev.filter((p) => p.id !== newItem.id)].slice(0, 15),
+          );
+
+          const isTargetRecipient =
+            isAdmin || content.targetRoles.some((r) => userRoles.includes(r));
+
+          if (isTargetRecipient) {
+            if (soundEnabled) {
+              playLoudWarehouseAlert(row.status);
+            }
+            fireSystemNotification(content.title, content.body, row.id, () => {
+              router.push(`/offline-orders/${row.id}`);
+            });
+          }
         },
       )
       .subscribe();
@@ -311,7 +419,7 @@ export function NotificationBell({ role }: { role?: Role }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [soundEnabled, router]);
+  }, [soundEnabled, router, isAdmin, userRoles]);
 
   // Click outside to close
   useEffect(() => {
@@ -372,11 +480,11 @@ export function NotificationBell({ role }: { role?: Role }) {
           }
         }}
         aria-label="Notifications"
-        className="relative grid size-9 sm:size-10 place-items-center rounded-xl text-slate-600 transition hover:bg-white hover:text-slate-900"
+        className="relative grid size-9 sm:size-10 place-items-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground"
       >
         <Bell className="size-4.5 sm:size-5" />
         {unreadCount > 0 && (
-          <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white shadow-sm ring-2 ring-white animate-pulse">
+          <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white shadow-sm ring-2 ring-background animate-pulse">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -384,17 +492,29 @@ export function NotificationBell({ role }: { role?: Role }) {
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="fixed inset-x-3 top-16 z-50 mx-auto w-auto max-w-sm rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl animate-in fade-in zoom-in-95 sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-96 sm:max-w-none">
-          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
+        <div className="fixed inset-x-3 top-16 z-50 mx-auto w-auto max-w-sm rounded-2xl border border-border bg-card text-card-foreground p-2 shadow-2xl animate-in fade-in zoom-in-95 sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-96 sm:max-w-none">
+          <div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-slate-900">Notifications</span>
-              {role && (
-                <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                  {role}
-                </span>
+              <span className="text-sm font-black text-foreground">Notifications</span>
+              {userRoles.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {userRoles.slice(0, 2).map((r) => (
+                    <span
+                      key={r}
+                      className="rounded border border-indigo-500/20 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400"
+                    >
+                      {r.replace("_", " ")}
+                    </span>
+                  ))}
+                  {userRoles.length > 2 && (
+                    <span className="text-[10px] font-bold text-muted-foreground">
+                      +{userRoles.length - 2}
+                    </span>
+                  )}
+                </div>
               )}
               {unreadCount > 0 && (
-                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">
+                <span className="rounded-full border border-rose-500/30 bg-rose-500/15 px-2 py-0.5 text-[11px] font-bold text-rose-600 dark:text-rose-400">
                   {unreadCount} new
                 </span>
               )}
@@ -404,18 +524,21 @@ export function NotificationBell({ role }: { role?: Role }) {
                 type="button"
                 onClick={() => playLoudWarehouseAlert("PACKED")}
                 title="Test loud warehouse alert sound"
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10"
               >
-                <Play className="size-3 fill-indigo-600" />
+                <Play className="size-3 fill-indigo-600 dark:fill-indigo-400" />
                 <span>Test</span>
               </button>
               <button
                 type="button"
                 onClick={toggleSound}
                 title={soundEnabled ? "Mute loud alert sound" : "Enable loud alert sound"}
-                className={`grid size-7 place-items-center rounded-lg text-xs transition ${
-                  soundEnabled ? "text-indigo-600 hover:bg-indigo-50" : "text-slate-400 hover:bg-slate-100"
-                }`}
+                className={cn(
+                  "grid size-7 place-items-center rounded-lg text-xs transition",
+                  soundEnabled
+                    ? "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
               >
                 {soundEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
               </button>
@@ -424,7 +547,7 @@ export function NotificationBell({ role }: { role?: Role }) {
                   type="button"
                   onClick={markAllRead}
                   title="Mark all as read"
-                  className="grid size-7 place-items-center rounded-lg text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  className="grid size-7 place-items-center rounded-lg text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   <Check className="size-4" />
                 </button>
@@ -432,7 +555,7 @@ export function NotificationBell({ role }: { role?: Role }) {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="grid size-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <X className="size-4" />
               </button>
@@ -441,20 +564,20 @@ export function NotificationBell({ role }: { role?: Role }) {
 
           {/* Browser System Notification Banner */}
           {permission !== "granted" && (
-            <div className="m-2 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-sky-50 p-3">
+            <div className="m-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 dark:bg-indigo-950/30 p-3">
               <div className="flex items-start gap-2.5">
-                <Bell className="mt-0.5 size-4 shrink-0 text-indigo-600" />
+                <Bell className="mt-0.5 size-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-indigo-950">
+                  <p className="text-xs font-bold text-foreground">
                     Get System & Lock-screen Alerts
                   </p>
-                  <p className="mt-0.5 text-[11px] text-indigo-700">
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
                     Receive pop-ups when orders are packed, shipped, or approved even in background.
                   </p>
                   <button
                     type="button"
                     onClick={requestPermission}
-                    className="mt-2 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-indigo-700"
+                    className="mt-2 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 active:scale-95 transition"
                   >
                     <CheckCircle2 className="size-3.5" />
                     Enable Device Alerts
@@ -464,32 +587,54 @@ export function NotificationBell({ role }: { role?: Role }) {
             </div>
           )}
 
-          <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 py-1">
+          <div className="max-h-80 overflow-y-auto divide-y divide-border/50 py-1">
             {notifications.length === 0 ? (
               <div className="py-8 text-center">
-                <Package className="mx-auto size-7 text-slate-300" />
-                <p className="mt-2 text-xs font-semibold text-slate-500">No recent notifications</p>
+                <Package className="mx-auto size-7 text-muted-foreground/40" />
+                <p className="mt-2 text-xs font-semibold text-muted-foreground">No recent notifications</p>
               </div>
             ) : (
-              notifications.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/replacements/${item.replacement_id}`}
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-start gap-3 rounded-xl p-2.5 transition hover:bg-slate-50"
-                >
-                  <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-indigo-50 text-indigo-700">
-                    <Package className="size-3.5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold text-slate-900">{item.title}</p>
-                    <p className="line-clamp-2 text-[11px] text-slate-500">{item.subtitle}</p>
-                    <p className="mt-0.5 text-[10px] text-slate-400">
-                      {formatTimeAgo(item.created_at)}
-                    </p>
-                  </div>
-                </Link>
-              ))
+              notifications.map((item) => {
+                const isOffline = item.order_type === "OFFLINE";
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-start gap-3 rounded-xl p-2.5 transition hover:bg-muted/60"
+                  >
+                    <span
+                      className={cn(
+                        "mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg border text-xs",
+                        isOffline
+                          ? "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                          : "border-indigo-500/25 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+                      )}
+                    >
+                      {isOffline ? <Boxes className="size-3.5" /> : <Package className="size-3.5" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide border",
+                            isOffline
+                              ? "border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                              : "border-indigo-500/30 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+                          )}
+                        >
+                          {item.tag}
+                        </span>
+                        <p className="truncate text-xs font-bold text-foreground">{item.title}</p>
+                      </div>
+                      <p className="line-clamp-2 text-[11px] text-muted-foreground">{item.subtitle}</p>
+                      <p className="mt-1 text-[10px] text-muted-foreground/70">
+                        {formatTimeAgo(item.created_at)}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })
             )}
           </div>
         </div>
@@ -511,5 +656,9 @@ function formatTimeAgo(timestamp: string) {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  return new Date(timestamp).toLocaleDateString();
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(timestamp));
 }
