@@ -7,7 +7,7 @@ import { Input, Select } from "@/components/ui/field";
 import { hasAnyRole, hasRole, requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { STATUSES, type Replacement, type ReplacementStatus } from "@/lib/types";
-import { statusLabel } from "@/lib/utils";
+import { parseDisplayDate, statusLabel } from "@/lib/utils";
 
 type TimeScope = "recent_15" | "recent_30" | "archived" | "all";
 
@@ -19,7 +19,7 @@ const scopeOptions: { value: TimeScope; label: string }[] = [
 ];
 
 const REPLACEMENT_LIST_COLUMNS =
-  "id, status, created_at, replacement_number, order_reference, order_number, order_type, product_name, quantity, archived_at";
+  "id, status, created_at, replacement_number, order_reference, order_number, order_type, product_name, quantity, archived_at, items:replacement_items(id,replacement_id,product_name,quantity,position,created_at)";
 
 export default async function ReplacementsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; date?: string; scope?: string; error?: string; success?: string }> }) {
   const profile = await requireProfile();
@@ -45,12 +45,16 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
   } else if (STATUSES.includes(params.status as ReplacementStatus)) {
     query = query.eq("status", params.status!);
   }
-  if (params.date) query = query.gte("created_at", `${params.date}T00:00:00`).lt("created_at", `${params.date}T23:59:59.999`);
+  const selectedDate = parseDisplayDate(params.date);
+  if (selectedDate) query = query.gte("created_at", `${selectedDate}T00:00:00+05:30`).lt("created_at", `${selectedDate}T23:59:59.999+05:30`);
   if (params.q?.trim()) {
     const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").replace(/\s+/g, " ").slice(0, 100);
     if (q) {
+      const { data: itemMatches } = await supabase.from("replacement_items").select("replacement_id").ilike("product_name", `%${q}%`).limit(100);
+      const itemOrderIds = [...new Set((itemMatches ?? []).map((item) => item.replacement_id))];
       const orderNumberFilter = /^\d+$/.test(q) ? `,order_number.eq.${Number(q)}` : "";
-      query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}`);
+      const itemFilter = itemOrderIds.length ? `,id.in.(${itemOrderIds.join(",")})` : "";
+      query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}${itemFilter}`);
     }
   }
   const { data, error } = await query.limit(100);
@@ -130,7 +134,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
               <option key={status} value={status}>{statusLabel[status]}</option>
             ))}
           </Select>
-          <Input name="date" type="date" defaultValue={params.date} aria-label="Filter by date" />
+          <Input name="date" type="text" inputMode="numeric" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" placeholder="DD/MM/YYYY" defaultValue={params.date} aria-label="Filter by date in DD/MM/YYYY format" />
           <button className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 text-sm font-bold text-white hover:bg-slate-800 transition active:scale-[0.99]">
             <SlidersHorizontal className="size-4" />
             Filter

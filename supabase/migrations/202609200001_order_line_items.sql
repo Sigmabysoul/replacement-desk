@@ -46,6 +46,34 @@ for select to authenticated using (public.current_active_role() is not null);
 grant select on public.replacement_items, public.offline_order_items to authenticated;
 revoke insert, update, delete on public.replacement_items, public.offline_order_items from authenticated;
 
+create function public.sync_replacement_primary_item()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  update public.replacement_items
+  set product_name = new.product_name, quantity = new.quantity
+  where replacement_id = new.id and position = 1;
+  return new;
+end;
+$$;
+
+create trigger replacements_sync_primary_item
+after update of product_name, quantity on public.replacements
+for each row execute function public.sync_replacement_primary_item();
+
+create function public.sync_offline_primary_item()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  update public.offline_order_items
+  set product_name = new.product_name, quantity = new.quantity
+  where offline_order_id = new.id and position = 1;
+  return new;
+end;
+$$;
+
+create trigger offline_orders_sync_primary_item
+after update of product_name, quantity on public.offline_orders
+for each row execute function public.sync_offline_primary_item();
+
 create or replace function public.create_replacement_order_with_items(
   p_order jsonb,
   p_attachments jsonb,

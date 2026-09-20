@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
+import { OrderItemsSummary } from "@/components/orders/order-items-summary";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { Replacement } from "@/lib/types";
@@ -42,12 +43,12 @@ export default async function TrackingPage({
   ] = await Promise.all([
     supabase
       .from("replacements")
-      .select("*")
+      .select("*, items:replacement_items(id,replacement_id,product_name,quantity,position,created_at)")
       .eq("status", "SHIPPED")
       .order("shipped_at", { ascending: false }),
     supabase
       .from("replacements")
-      .select("*")
+      .select("*, items:replacement_items(id,replacement_id,product_name,quantity,position,created_at)")
       .eq("status", "DELIVERED")
       .order("delivered_at", { ascending: false })
       .limit(12),
@@ -119,9 +120,7 @@ export default async function TrackingPage({
                             SHIPPED
                           </span>
                         </div>
-                        <h3 className="mt-1.5 text-base font-black text-slate-900">
-                          {order.product_name} × {order.quantity}
-                        </h3>
+                        <OrderItemsSummary items={order.items} fallbackProduct={order.product_name} fallbackQuantity={order.quantity} className="mt-1.5 text-base text-slate-900" />
                       </div>
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 shrink-0">
                         {transitTime}
@@ -253,9 +252,7 @@ export default async function TrackingPage({
                     </span>
                   </div>
 
-                  <p className="mt-2 truncate text-sm font-bold text-slate-900">
-                    {order.product_name} × {order.quantity}
-                  </p>
+                  <OrderItemsSummary items={order.items} fallbackProduct={order.product_name} fallbackQuantity={order.quantity} className="mt-2 text-sm text-slate-900" />
 
                   <p className="mt-1 text-xs text-slate-500">
                     Courier: <strong className="text-slate-700">{order.courier_partner || order.order_reference || "Standard"}</strong>

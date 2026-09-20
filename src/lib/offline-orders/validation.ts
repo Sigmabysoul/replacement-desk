@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseDisplayDate } from "@/lib/utils";
 
 const optionalText = (max: number) =>
   z
@@ -33,7 +34,8 @@ export const createOfflineOrderSchema = z.object({
   logistics_partner: optionalText(200),
   dispatch_date: z
     .preprocess((value) => (value == null ? "" : value), z.string().trim())
-    .transform((value) => value || null),
+    .refine((value) => !value || parseDisplayDate(value) !== null, "Dispatch date must use DD/MM/YYYY")
+    .transform((value) => value ? parseDisplayDate(value) : null),
   notes: optionalText(2000),
 });
 

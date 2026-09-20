@@ -3,6 +3,7 @@ import { transitionAction } from "@/app/actions";
 import { Card } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Notice } from "@/components/ui/notice";
+import { OrderItemsSummary } from "@/components/orders/order-items-summary";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { Replacement } from "@/lib/types";
@@ -13,8 +14,8 @@ export default async function DispatchPage({ searchParams }: { searchParams: Pro
 
   const supabase = await createClient();
   const [{ data: packedData, error: packedError }, { data: tokenData, error: tokenError }] = await Promise.all([
-    supabase.from("replacements").select("*").eq("status", "PACKED").order("packed_at", { ascending: true }),
-    supabase.from("replacements").select("*").eq("status", "NEEDS_TOKEN").order("needs_token_at", { ascending: true }),
+    supabase.from("replacements").select("*, items:replacement_items(id,replacement_id,product_name,quantity,position,created_at)").eq("status", "PACKED").order("packed_at", { ascending: true }),
+    supabase.from("replacements").select("*, items:replacement_items(id,replacement_id,product_name,quantity,position,created_at)").eq("status", "NEEDS_TOKEN").order("needs_token_at", { ascending: true }),
   ]);
 
   const error = (packedError || tokenError) ? "Could not load dispatch orders." : null;
@@ -45,9 +46,7 @@ export default async function DispatchPage({ searchParams }: { searchParams: Pro
                   </span>
                   <div>
                     <h3 className="font-black text-slate-950">{replacement.replacement_number}</h3>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {replacement.product_name} × {replacement.quantity}
-                    </p>
+                    <OrderItemsSummary items={replacement.items} fallbackProduct={replacement.product_name} fallbackQuantity={replacement.quantity} className="mt-1 text-sm text-slate-700" />
                     <p className="mt-1 text-xs text-slate-500">Order: {replacement.order_reference}</p>
                   </div>
                 </div>
@@ -93,9 +92,7 @@ export default async function DispatchPage({ searchParams }: { searchParams: Pro
                   </span>
                   <div>
                     <h3 className="font-black text-slate-950">{replacement.replacement_number}</h3>
-                    <p className="text-sm font-semibold text-slate-800">
-                      {replacement.product_name} × {replacement.quantity}
-                    </p>
+                    <OrderItemsSummary items={replacement.items} fallbackProduct={replacement.product_name} fallbackQuantity={replacement.quantity} className="mt-1 text-sm text-slate-800" />
                     <p className="mt-1 text-xs text-amber-900 font-medium">Order: {replacement.order_reference} (token pending)</p>
                   </div>
                 </div>

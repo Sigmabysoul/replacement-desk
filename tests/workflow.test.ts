@@ -14,7 +14,7 @@ import {
   transitionSchema,
 } from "@/lib/replacements/validation";
 import { formatTelegramMessage } from "@/lib/notifications/format";
-import { formatDate, safeFileName } from "@/lib/utils";
+import { formatDate, parseDisplayDate, safeFileName } from "@/lib/utils";
 import { validateMagicBytes } from "@/lib/security/magic-bytes";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rate-limit";
 
@@ -396,8 +396,14 @@ describe("formatDate timezone enforcement", () => {
   it("formats dates strictly in Asia/Kolkata timezone", () => {
     // 06:30 UTC is exactly 12:00 PM in Asia/Kolkata (IST = UTC+5:30)
     const result = formatDate("2026-09-19T06:30:00.000Z");
-    expect(result).toMatch(/19 Sept? 2026/);
+    expect(result).toContain("19/09/2026");
     expect(result.toLowerCase()).toMatch(/12:00\s*(pm|noon)/i);
+  });
+
+  it("parses DD/MM/YYYY form values without accepting impossible dates", () => {
+    expect(parseDisplayDate("19/09/2026")).toBe("2026-09-19");
+    expect(parseDisplayDate("31/02/2026")).toBeNull();
+    expect(parseDisplayDate("2026-09-19")).toBeNull();
   });
 
   it("handles null and invalid dates gracefully", () => {

@@ -33,7 +33,8 @@ export function UniversalSearch({
     return replacements.filter((order) => {
       const matchNumber = order.replacement_number.toLowerCase().includes(trimmed);
       const matchOrderNum = String(order.order_number).includes(trimmed);
-      const matchProduct = order.product_name.toLowerCase().includes(trimmed);
+      const matchProduct = (order.items?.length ? order.items : [{ product_name: order.product_name }])
+        .some((item) => item.product_name.toLowerCase().includes(trimmed));
       const matchCustomer = order.customer_name?.toLowerCase().includes(trimmed) ?? false;
       const matchPhone = order.customer_phone?.toLowerCase().includes(trimmed) ?? false;
       const matchRef = order.order_reference?.toLowerCase().includes(trimmed) ?? false;
@@ -58,7 +59,8 @@ export function UniversalSearch({
       const matchSO = order.so_number.toLowerCase().includes(trimmed);
       const matchOrderNum = String(order.order_number).includes(trimmed);
       const matchBrand = order.brand?.toLowerCase().includes(trimmed) ?? false;
-      const matchProduct = order.product_name.toLowerCase().includes(trimmed);
+      const matchProduct = (order.items?.length ? order.items : [{ product_name: order.product_name }])
+        .some((item) => item.product_name.toLowerCase().includes(trimmed));
       const matchLR = order.lr_number?.toLowerCase().includes(trimmed) ?? false;
       const matchPartner = order.logistics_partner?.toLowerCase().includes(trimmed) ?? false;
       return (
@@ -183,9 +185,11 @@ export function UniversalSearch({
                             </span>
                             <ReplacementStatusBadge status={order.status} />
                           </div>
-                          <p className="mt-1 truncate text-xs font-bold text-slate-800">
-                            {order.product_name} × {order.quantity}
-                          </p>
+                          <div className="mt-1 grid gap-0.5 text-xs font-bold text-slate-800">
+                            {(order.items?.length ? order.items : [{ id: "legacy", product_name: order.product_name, quantity: order.quantity }]).map((item) => (
+                              <p key={item.id} className="truncate">{item.product_name} × {item.quantity}</p>
+                            ))}
+                          </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-2.5 text-[11px] text-slate-500">
                             {order.customer_name && (
                               <span className="flex items-center gap-1">
@@ -234,9 +238,11 @@ export function UniversalSearch({
                             )}
                             <OfflineStatusBadge status={order.status} />
                           </div>
-                          <p className="mt-1 truncate text-xs font-bold text-slate-800">
-                            {order.product_name} × {order.quantity} {order.unit}
-                          </p>
+                          <div className="mt-1 grid gap-0.5 text-xs font-bold text-slate-800">
+                            {(order.items?.length ? order.items : [{ id: "legacy", product_name: order.product_name, quantity: order.quantity }]).map((item) => (
+                              <p key={item.id} className="truncate">{item.product_name} × {item.quantity} {order.unit}</p>
+                            ))}
+                          </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500">
                             <span>#{order.order_number}</span>
                             {order.logistics_partner && <span>· Courier: {order.logistics_partner}</span>}

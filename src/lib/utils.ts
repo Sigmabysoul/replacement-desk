@@ -63,8 +63,8 @@ export const offlineStatusTone: Record<OfflineOrderStatus, string> = {
 };
 
 /**
- * Formats an ISO date timestamp string into Indian English locale representation.
- * E.g. "09 Sep 2026, 11:45 PM".
+ * Formats an ISO date timestamp as DD/MM/YYYY, optionally followed by IST time.
+ * E.g. "09/09/2026, 11:45 PM".
  *
  * @param value ISO-8601 date string.
  * @param withTime Whether to include the 12-hour hour:minute time suffix (default: true).
@@ -77,10 +77,24 @@ export function formatDate(value: string | null | undefined, withTime = true) {
   return new Intl.DateTimeFormat("en-IN", {
     timeZone: "Asia/Kolkata",
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
     ...(withTime ? { hour: "2-digit", minute: "2-digit", hour12: true } : {}),
   }).format(date);
+}
+
+/** Converts a DD/MM/YYYY form value to the ISO date format PostgreSQL expects. */
+export function parseDisplayDate(value: string | null | undefined) {
+  const match = value?.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, day, month, year] = match;
+  const candidate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (
+    candidate.getUTCFullYear() !== Number(year) ||
+    candidate.getUTCMonth() !== Number(month) - 1 ||
+    candidate.getUTCDate() !== Number(day)
+  ) return null;
+  return `${year}-${month}-${day}`;
 }
 
 /**

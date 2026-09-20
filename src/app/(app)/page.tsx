@@ -32,10 +32,10 @@ import {
 } from "@/lib/cache/dashboard-cache";
 
 const REPLACEMENT_DASHBOARD_COLUMNS =
-  "id, status, created_at, replacement_number, order_reference, order_number, order_type, product_name, quantity, customer_name, customer_phone, courier_partner, tracking_id, tracking_url, archived_at, notes";
+  "id, status, created_at, replacement_number, order_reference, order_number, order_type, product_name, quantity, customer_name, customer_phone, courier_partner, tracking_id, tracking_url, archived_at, notes, items:replacement_items(id,replacement_id,product_name,quantity,position,created_at)";
 
 const OFFLINE_DASHBOARD_COLUMNS =
-  "id, status, created_at, so_number, order_number, brand, product_name, quantity, unit, logistics_partner, tracking_url, lr_number, carton_count, carton_dimensions, carton_weight_kg, dispatch_date, notes, created_by";
+  "id, status, created_at, so_number, order_number, brand, product_name, quantity, unit, logistics_partner, tracking_url, lr_number, carton_count, carton_dimensions, carton_weight_kg, dispatch_date, notes, created_by, items:offline_order_items(id,offline_order_id,product_name,quantity,position,created_at)";
 
 export default async function DashboardPage() {
   const profile = await requireProfile();

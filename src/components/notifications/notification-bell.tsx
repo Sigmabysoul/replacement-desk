@@ -20,7 +20,7 @@ import {
   NOTIFICATION_RECIPIENTS,
 } from "@/lib/notifications/format";
 import type { Role } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 interface NotificationItem {
   id: string;
@@ -247,12 +247,12 @@ export function NotificationBell({ role, roles }: { role?: Role; roles?: Role[] 
       ] = await Promise.all([
         supabase
           .from("replacements")
-          .select("id, replacement_number, order_reference, product_name, status, updated_at")
+          .select("id, replacement_number, order_reference, product_name, status, updated_at, items:replacement_items(product_name,quantity,position)")
           .order("updated_at", { ascending: false })
           .limit(8),
         supabase
           .from("offline_orders")
-          .select("id, so_number, product_name, status, updated_at, carton_count, logistics_partner")
+          .select("id, so_number, product_name, status, updated_at, carton_count, logistics_partner, items:offline_order_items(product_name,quantity,position)")
           .order("updated_at", { ascending: false })
           .limit(8),
       ]);
@@ -261,11 +261,14 @@ export function NotificationBell({ role, roles }: { role?: Role; roles?: Role[] 
 
       if (repData) {
         repData.forEach((row) => {
+          const productSummary = row.items?.length
+            ? row.items.map((item) => `${item.product_name} × ${item.quantity}`).join(", ")
+            : row.product_name;
           const content = getNotificationContent(
             row.status,
             row.replacement_number,
             row.order_reference,
-            row.product_name,
+            productSummary,
           );
           items.push({
             id: `rep-${row.id}-${row.status}-${row.updated_at}`,
@@ -283,10 +286,13 @@ export function NotificationBell({ role, roles }: { role?: Role; roles?: Role[] 
 
       if (offData) {
         offData.forEach((row) => {
+          const productSummary = row.items?.length
+            ? row.items.map((item) => `${item.product_name} × ${item.quantity}`).join(", ")
+            : row.product_name;
           const content = getOfflineNotificationContent(
             row.status,
             row.so_number,
-            row.product_name,
+            productSummary,
             { cartonCount: row.carton_count, courier: row.logistics_partner },
           );
           items.push({
@@ -656,9 +662,5 @@ function formatTimeAgo(timestamp: string) {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "short",
-  }).format(new Date(timestamp));
+  return formatDate(timestamp, false);
 }

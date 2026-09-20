@@ -9,7 +9,7 @@ import { OFFLINE_ORDER_STATUSES, type OfflineOrder, type OfflineOrderStatus } fr
 import { offlineStatusLabel } from "@/lib/utils";
 
 const OFFLINE_LIST_COLUMNS =
-  "id, status, created_at, so_number, order_number, brand, product_name, quantity, unit, logistics_partner, lr_number";
+  "id, status, created_at, so_number, order_number, brand, product_name, quantity, unit, logistics_partner, lr_number, items:offline_order_items(id,offline_order_id,product_name,quantity,position,created_at)";
 
 export default async function OfflineOrdersPage({
   searchParams,
@@ -29,8 +29,11 @@ export default async function OfflineOrdersPage({
   if (params.q?.trim()) {
     const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").slice(0, 100);
     if (q) {
+      const { data: itemMatches } = await supabase.from("offline_order_items").select("offline_order_id").ilike("product_name", `%${q}%`).limit(100);
+      const itemOrderIds = [...new Set((itemMatches ?? []).map((item) => item.offline_order_id))];
       const orderNumberFilter = /^\d+$/.test(q) ? `,order_number.eq.${Number(q)}` : "";
-      query = query.or(`so_number.ilike.%${q}%,brand.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}`);
+      const itemFilter = itemOrderIds.length ? `,id.in.(${itemOrderIds.join(",")})` : "";
+      query = query.or(`so_number.ilike.%${q}%,brand.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}${itemFilter}`);
     }
   }
 
@@ -122,4 +125,3 @@ export default async function OfflineOrdersPage({
     </div>
   );
 }
-

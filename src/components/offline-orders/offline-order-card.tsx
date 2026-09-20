@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Boxes, CalendarDays, Truck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { OfflineStatusBadge } from "@/components/ui/badge";
+import { OrderItemsSummary } from "@/components/orders/order-items-summary";
 import type { OfflineOrder, Role } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -40,7 +41,6 @@ export function OfflineOrderCard({
   roles?: Role[];
 }) {
   const userRoles = roles?.length ? roles : role ? [role] : [];
-
   return (
     <Link
       href={`/offline-orders/${order.id}`}
@@ -63,13 +63,10 @@ export function OfflineOrderCard({
             <p className="mt-1 truncate text-xs font-semibold text-slate-500">
               #{order.order_number} · Offline Order
             </p>
-            <p className="mt-2 flex items-center gap-1.5 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
+            <div className="mt-2 flex min-w-0 items-start gap-1.5 text-sm text-slate-800 sm:text-base">
               <Boxes className="size-4 shrink-0 text-slate-400" />
-              <span className="truncate">{order.product_name}</span>
-              <span className="shrink-0 text-slate-500 text-xs sm:text-sm">
-                × {order.quantity} {order.unit}
-              </span>
-            </p>
+              <OrderItemsSummary items={order.items} fallbackProduct={order.product_name} fallbackQuantity={order.quantity} unit={order.unit} className="flex-1" />
+            </div>
             {order.logistics_partner && (
               <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 truncate">
                 <Truck className="size-3.5 shrink-0 text-slate-400" />
@@ -100,4 +97,3 @@ export function OfflineOrderCard({
     </Link>
   );
 }
-

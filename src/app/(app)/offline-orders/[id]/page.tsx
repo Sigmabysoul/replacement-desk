@@ -193,7 +193,7 @@ export default async function OfflineOrderDetailPage({
             {order.dispatch_date && (
               <div className="flex justify-between border-b border-slate-100 pb-2">
                 <span className="text-slate-500">Target Dispatch Date</span>
-                <strong className="text-slate-900">{order.dispatch_date}</strong>
+                <strong className="text-slate-900">{formatDate(order.dispatch_date, false)}</strong>
               </div>
             )}
             {order.notes && (

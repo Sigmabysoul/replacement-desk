@@ -11,6 +11,7 @@ import {
   confirmPackingSchema,
   createOfflineOrderSchema,
   dispatchOrderSchema,
+  offlineOrderItemsSchema,
   updateOfflineOrderNumberSchema,
 } from "@/lib/offline-orders/validation";
 
@@ -154,6 +155,15 @@ describe("offline workflow assertions & available actions", () => {
 });
 
 describe("offline order validation schemas", () => {
+  it("validates compact offline order line items", () => {
+    expect(offlineOrderItemsSchema.safeParse([
+      { product_name: "Garbage bags", quantity: 400 },
+      { product_name: "Cleaning cloths", quantity: 50 },
+    ]).success).toBe(true);
+    expect(offlineOrderItemsSchema.safeParse([]).success).toBe(false);
+    expect(offlineOrderItemsSchema.safeParse([{ product_name: "", quantity: 0 }]).success).toBe(false);
+  });
+
   it("validates offline order creation inputs", () => {
     const valid = createOfflineOrderSchema.safeParse({
       so_number: "SO - OFLN115",
@@ -162,7 +172,7 @@ describe("offline order validation schemas", () => {
       quantity: "400",
       unit: "Rolls",
       logistics_partner: "Delhivery",
-      dispatch_date: "2026-09-04",
+      dispatch_date: "04/09/2026",
       notes: "Carton count pending with Kartik Da",
     });
     expect(valid.success).toBe(true);

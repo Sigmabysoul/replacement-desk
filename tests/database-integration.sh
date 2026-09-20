@@ -664,6 +664,15 @@ begin
 end
 $$;
 
+select public.update_offline_order_number('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 812);
+do $$
+begin
+  if public.get_next_order_number() <> 813 then
+    raise exception 'Offline Order ID change did not set the next Order ID to 813';
+  end if;
+end
+$$;
+
 -- 2. Step 2: Consignment confirms packing (PACKING_CONFIRMED)
 select set_config('request.jwt.claim.sub', 'aaaaaaaa-baaa-4aaa-8aaa-aaaaaaaaaaaa', false);
 select public.confirm_offline_packing('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 3, '56X32X38', 57);

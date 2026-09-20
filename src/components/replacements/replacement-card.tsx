@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarDays, Package } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
+import { OrderItemsSummary } from "@/components/orders/order-items-summary";
 import type { Replacement, Role } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -46,11 +47,10 @@ export function ReplacementCard({ replacement, role }: { replacement: Replacemen
           <div className="min-w-0 flex-1">
             <p className="truncate font-black tracking-tight text-slate-950">{replacement.order_reference}</p>
             <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">#{replacement.order_number} · {replacement.order_type === "OFFLINE" ? "Offline" : "Replacement"} · {replacement.replacement_number}</p>
-            <p className="mt-2 flex items-center gap-1.5 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
+            <div className="mt-2 flex min-w-0 items-start gap-1.5 text-sm text-slate-800 sm:text-base">
               <Package className="size-4 shrink-0 text-slate-400" />
-              <span className="truncate">{replacement.product_name}</span>
-              <span className="shrink-0 text-slate-500 text-xs sm:text-sm">× {replacement.quantity}</span>
-            </p>
+              <OrderItemsSummary items={replacement.items} fallbackProduct={replacement.product_name} fallbackQuantity={replacement.quantity} className="flex-1" />
+            </div>
           </div>
           <StatusBadge status={replacement.status} className="shrink-0 text-[11px] sm:text-xs" />
         </div>

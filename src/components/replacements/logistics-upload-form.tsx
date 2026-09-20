@@ -5,15 +5,6 @@ import { FileText, Send, Truck, UploadCloud, X } from "lucide-react";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Field, Input } from "@/components/ui/field";
 
-const COMMON_COURIERS = [
-  "Delhivery",
-  "Blue Dart",
-  "DTDC",
-  "SafeXpress",
-  "Amazon Shipping",
-  "Shadowfax",
-];
-
 /** Collects Logistics' shipping label, Courier Partner, Tracking ID, and Tracking link before Printing takes over. */
 export function LogisticsUploadForm({
   replacementId,
@@ -55,32 +46,16 @@ export function LogisticsUploadForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Field label="Courier Partner" hint="Select or type courier">
+          <Field label="Courier Partner">
             <Input
               name="courier_partner"
               required
               value={courier}
               onChange={(e) => setCourier(e.target.value)}
               maxLength={100}
-              placeholder="e.g. Delhivery, Blue Dart..."
+              placeholder="Enter courier partner"
             />
           </Field>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {COMMON_COURIERS.map((partner) => (
-              <button
-                key={partner}
-                type="button"
-                onClick={() => setCourier(partner)}
-                className={`rounded-lg px-2 py-0.5 text-[11px] font-bold transition ${
-                  courier === partner
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                {partner}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div>
