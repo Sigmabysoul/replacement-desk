@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { requireProfile } from "@/lib/auth/session";
 
 export default async function SettingsHubPage() {
-  const profile = await requireProfile(["CUSTOMER_SUPPORT", "ADMIN"]);
+  const profile = await requireProfile();
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">

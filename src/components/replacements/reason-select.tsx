@@ -12,15 +12,17 @@ const DEFAULT_PRESETS = [
 
 export function ReasonSelect({
   defaultValue,
-  label = "Reason (optional)",
+  label = "Reason",
   name = "reason",
   presets = DEFAULT_PRESETS,
+  required = false,
   onValueChange,
 }: {
   defaultValue?: string | null;
   label?: string;
   name?: string | null;
   presets?: readonly string[];
+  required?: boolean;
   onValueChange?: (value: string) => void;
 }) {
   const initialIsPreset = defaultValue && presets.includes(defaultValue);
@@ -43,9 +45,10 @@ export function ReasonSelect({
     <div className="grid gap-2">
       {name ? <input type="hidden" name={name} value={effectiveValue} /> : null}
       <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
-        {label}
+        {label} {required ? <span className="text-rose-500">*</span> : null}
       </label>
       <Select
+        required={required}
         value={preset}
         onChange={(event) => {
           const nextPreset = event.target.value;
@@ -65,6 +68,7 @@ export function ReasonSelect({
 
       {preset === "Other" && (
         <Input
+          required={required}
           type="text"
           maxLength={200}
           autoFocus={!initialCustom}

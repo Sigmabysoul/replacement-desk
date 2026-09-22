@@ -122,6 +122,9 @@ begin
   if (select role from public.profiles where id = '77777777-7777-4777-8777-777777777777') <> 'PRINTING' then
     raise exception 'New profiles do not default safely to Printing';
   end if;
+  if (select first_admin_user_id from public.workspace_bootstrap where singleton = true) <> '11111111-1111-1111-1111-111111111111' then
+    raise exception 'Existing administrator was not recorded as the permanent workspace bootstrap';
+  end if;
   if (select status from public.replacements where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') <> 'LABEL_PRINTED' then
     raise exception 'In-flight order status was not preserved';
   end if;
@@ -407,8 +410,8 @@ select public.transition_replacement('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'SH
 
 do $$
 begin
-  if has_function_privilege('authenticated', 'public.submit_qc(uuid,uuid,jsonb)', 'execute') then
-    raise exception 'Legacy submit_qc RPC is still callable';
+  if to_regprocedure('public.submit_qc(uuid,uuid,jsonb)') is not null then
+    raise exception 'Legacy submit_qc RPC still exists';
   end if;
   if (select status from public.replacements where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 'SHIPPED' then
     raise exception 'Workflow did not reach SHIPPED';

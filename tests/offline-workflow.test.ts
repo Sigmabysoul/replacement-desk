@@ -233,8 +233,12 @@ describe("offline order validation schemas", () => {
   it("validates offline order creation with custom numeric order number", () => {
     const valid = createOfflineOrderSchema.safeParse({
       so_number: "OFLN120",
+      brand: "averX",
       product_name: "Rolls",
       quantity: 50,
+      logistics_partner: "Delhivery",
+      dispatch_date: "25/09/2026",
+      notes: "High priority order",
       order_number: "620",
     });
     expect(valid.success).toBe(true);
@@ -244,8 +248,12 @@ describe("offline order validation schemas", () => {
 
     const invalid = createOfflineOrderSchema.safeParse({
       so_number: "OFLN120",
+      brand: "averX",
       product_name: "Rolls",
       quantity: 50,
+      logistics_partner: "Delhivery",
+      dispatch_date: "25/09/2026",
+      notes: "High priority order",
       order_number: "-5",
     });
     expect(invalid.success).toBe(false);

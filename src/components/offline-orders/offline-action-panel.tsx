@@ -81,6 +81,7 @@ export function OfflineActionPanel({
               </Field>
               <Field label="Box Dimensions" hint="LxBxH (e.g. 56X32X38)">
                 <Input
+                  required
                   name="carton_dimensions"
                   maxLength={100}
                   defaultValue={order.carton_dimensions ?? ""}
@@ -89,6 +90,7 @@ export function OfflineActionPanel({
               </Field>
               <Field label="Total Weight (KG)">
                 <Input
+                  required
                   type="number"
                   step="0.01"
                   min="0.01"
@@ -116,6 +118,7 @@ export function OfflineActionPanel({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Logistics Partner">
                 <Input
+                  required
                   name="logistics_partner"
                   defaultValue={order.logistics_partner ?? ""}
                   placeholder="e.g. Delhivery, Bluedart, SafeXpress"
@@ -123,6 +126,7 @@ export function OfflineActionPanel({
               </Field>
               <Field label="LR / Consignment Number">
                 <Input
+                  required
                   name="lr_number"
                   defaultValue={order.lr_number ?? ""}
                   placeholder="e.g. DEL12345678"
@@ -131,6 +135,7 @@ export function OfflineActionPanel({
             </div>
             <Field label="Tracking Link" hint="Must begin with https://">
               <Input
+                required
                 type="url"
                 name="tracking_url"
                 defaultValue={order.tracking_url ?? ""}
@@ -229,6 +234,7 @@ export function OfflineActionPanel({
             </div>
             <Field label="Proof of Delivery Notes">
               <Textarea
+                required
                 name="pod_notes"
                 placeholder="Recipient name, delivery timestamp, signature confirmation notes..."
                 className="min-h-20"

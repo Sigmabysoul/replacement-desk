@@ -62,6 +62,7 @@ export function LogisticsUploadForm({
           <Field label="Tracking ID / AWB Number" hint="Docket or tracking number">
             <Input
               name="tracking_id"
+              required
               value={trackingId}
               onChange={(e) => setTrackingId(e.target.value)}
               maxLength={100}
@@ -72,11 +73,12 @@ export function LogisticsUploadForm({
       </div>
 
       <Field
-        label="Tracking Link (optional)"
+        label="Tracking Link"
         hint="Direct link to track shipment online (must begin with https://)"
       >
         <Input
           name="tracking_url"
+          required
           type="url"
           inputMode="url"
           maxLength={2000}

@@ -160,6 +160,12 @@ export async function createReplacementAction(formData: FormData) {
   const profile = await requireProfile(["CUSTOMER_SUPPORT", "ADMIN"]);
   const parsed = replacementSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(`/replacements/new?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the form.")}`);
+  if (!parsed.data.customer_name) redirect(`/replacements/new?error=${encodeURIComponent("Customer name is required.")}`);
+  if (!parsed.data.customer_email) redirect(`/replacements/new?error=${encodeURIComponent("Customer email is required.")}`);
+  if (!parsed.data.customer_phone) redirect(`/replacements/new?error=${encodeURIComponent("Customer phone is required.")}`);
+  if (!parsed.data.customer_address) redirect(`/replacements/new?error=${encodeURIComponent("Customer address is required.")}`);
+  if (!parsed.data.reason) redirect(`/replacements/new?error=${encodeURIComponent("Replacement reason is required.")}`);
+  if (!parsed.data.notes) redirect(`/replacements/new?error=${encodeURIComponent("Order notes are required.")}`);
 
   const photos = formFiles(formData, "product_photos");
   if (!photos.length || photos.length > 12) {
@@ -236,6 +242,23 @@ export async function createOrderBatchAction(formData: FormData) {
   if (invalid && !invalid.success) {
     redirect(`/replacements/new?error=${encodeURIComponent(invalid.error.issues[0]?.message ?? "Check every order.")}`);
   }
+
+  // Validate mandatory fields for replacement creation
+  for (const raw of rawOrders as Array<Record<string, unknown>>) {
+    const name = String(raw.customer_name ?? "").trim();
+    const email = String(raw.customer_email ?? "").trim();
+    const phone = String(raw.customer_phone ?? "").trim();
+    const address = String(raw.customer_address ?? "").trim();
+    const reason = String(raw.reason ?? "").trim();
+    const notes = String(raw.notes ?? "").trim();
+    if (!name) redirect(`/replacements/new?error=${encodeURIComponent("Customer name is required.")}`);
+    if (!email) redirect(`/replacements/new?error=${encodeURIComponent("Customer email is required.")}`);
+    if (!phone) redirect(`/replacements/new?error=${encodeURIComponent("Customer phone is required.")}`);
+    if (!address) redirect(`/replacements/new?error=${encodeURIComponent("Customer address is required.")}`);
+    if (!reason) redirect(`/replacements/new?error=${encodeURIComponent("Replacement reason is required.")}`);
+    if (!notes) redirect(`/replacements/new?error=${encodeURIComponent("Order notes are required.")}`);
+  }
+
   const requestedOrderNumbers = rawOrders.map((raw) => {
     const rawVal = (raw as { requested_order_number?: unknown }).requested_order_number;
     if (rawVal === undefined || rawVal === null || rawVal === "") return null;
@@ -430,6 +453,11 @@ export async function submitLogisticsAction(formData: FormData) {
   const trackingId = String(formData.get("tracking_id") ?? "").trim();
   const trackingUrl = String(formData.get("tracking_url") ?? "").trim();
   if (!/^[0-9a-f-]{36}$/i.test(replacementId)) redirect("/replacements?error=Invalid%20replacement.");
+  if (!courierPartner) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Courier partner is required.")}`);
+  if (!trackingId) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Tracking ID / AWB number is required.")}`);
+  if (!trackingUrl || !/^https?:\/\/[^\s]+$/i.test(trackingUrl)) {
+    redirect(`/replacements/${replacementId}?error=${encodeURIComponent("A valid tracking link beginning with http:// or https:// is required.")}`);
+  }
   if (labels.length !== 1) redirect(`/replacements/${replacementId}?error=${encodeURIComponent("Add exactly one shipping label.")}`);
   try {
     await validateFiles(labels);

@@ -1,4 +1,5 @@
-import { Bot, CheckCircle2, KeyRound, ShieldCheck, XCircle, Zap } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Bot, CheckCircle2, KeyRound, Ruler, ShieldCheck, XCircle, Zap } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -33,6 +34,22 @@ export default async function SettingsPage() {
         <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">System & Settings</h1>
         <p className="mt-1 text-sm text-slate-600">Integrations, security posture, and notification audit logs.</p>
       </div>
+
+      {/* Product Dimensions Preset Settings */}
+      <Link href="/dimensions" className="group block">
+        <Card className="flex items-start gap-4 p-5 transition hover:border-indigo-300 hover:shadow-md">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700">
+            <Ruler className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="font-black text-slate-950">Product Dimensions & Presets</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Create, view, edit, or archive reusable package size presets (Length × Breadth × Height in cm).
+            </p>
+          </div>
+          <ArrowRight className="ml-auto mt-2 size-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-indigo-600" />
+        </Card>
+      </Link>
 
       {/* Security & Optimization Posture */}
       <Card className="p-5">

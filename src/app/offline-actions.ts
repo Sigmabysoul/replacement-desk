@@ -289,25 +289,38 @@ export async function confirmPickupAction(formData: FormData) {
 }
 
 /**
- * HR confirms delivery and attaches Proof of Delivery (POD).
+ * HR or Logistics confirms delivery and attaches Proof of Delivery (POD).
  */
 export async function confirmDeliveryAction(formData: FormData) {
-  await requireProfile(["HR", "ADMIN"]);
+  await requireProfile(["HR", "LOGISTICS", "ADMIN"]);
   const orderId = String(formData.get("order_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "");
   const parsed = confirmDeliverySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid delivery details.")}`);
+    const errorMsg = parsed.error.issues[0]?.message ?? "Invalid delivery details.";
+    if (returnTo.startsWith("/tracking")) {
+      redirect(`/tracking?error=${encodeURIComponent(errorMsg)}`);
+    }
+    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(errorMsg)}`);
   }
 
   const files = formFiles(formData, "pod_documents");
   if (files.length > 10) {
-    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent("Maximum 10 POD documents allowed.")}`);
+    const errorMsg = "Maximum 10 POD documents allowed.";
+    if (returnTo.startsWith("/tracking")) {
+      redirect(`/tracking?error=${encodeURIComponent(errorMsg)}`);
+    }
+    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(errorMsg)}`);
   }
 
   try {
     await validateOfflineFiles(files);
   } catch (error) {
-    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(messageFrom(error))}`);
+    const errorMsg = messageFrom(error);
+    if (returnTo.startsWith("/tracking")) {
+      redirect(`/tracking?error=${encodeURIComponent(errorMsg)}`);
+    }
+    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(errorMsg)}`);
   }
 
   const supabase = await createClient();
@@ -329,13 +342,21 @@ export async function confirmDeliveryAction(formData: FormData) {
     if (error) throw error;
   } catch (error) {
     await cleanupUncommittedOfflineUploads(supabase, uploaded);
-    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(messageFrom(error))}`);
+    const errorMsg = messageFrom(error);
+    if (returnTo.startsWith("/tracking")) {
+      redirect(`/tracking?error=${encodeURIComponent(errorMsg)}`);
+    }
+    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(errorMsg)}`);
   }
 
   invalidateDashboardCache();
   revalidatePath("/offline-orders");
   revalidatePath(`/offline-orders/${orderId}`);
+  revalidatePath("/tracking");
   revalidatePath("/");
+  if (returnTo.startsWith("/tracking")) {
+    redirect(`/tracking?success=${encodeURIComponent("Offline order delivery confirmed.")}`);
+  }
   redirect(`/offline-orders/${orderId}?success=${encodeURIComponent("Delivery confirmed.")}`);
 }
 

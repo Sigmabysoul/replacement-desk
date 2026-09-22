@@ -68,10 +68,10 @@ export function OrderBuilder({ action, presets, isAdmin, startingOrderNumber }: 
 
       <Card className="grid gap-4 p-4 sm:grid-cols-2 sm:p-6">
         <div className="flex items-center gap-2 sm:col-span-2"><UserRound className="size-5 text-indigo-600" /><h2 className="font-black text-foreground">Customer details</h2></div>
-        <Field label="Customer name"><Input value={customer.name} onChange={(event) => setCustomer({ ...customer, name: event.target.value })} maxLength={120} /></Field>
-        <Field label="Customer email"><Input type="email" inputMode="email" value={customer.email} onChange={(event) => setCustomer({ ...customer, email: event.target.value.toLowerCase() })} className="lowercase" maxLength={254} /></Field>
-        <Field label="Phone"><Input type="tel" inputMode="tel" value={customer.phone} onChange={(event) => setCustomer({ ...customer, phone: event.target.value })} maxLength={40} /></Field>
-        <div className="sm:col-span-2"><Field label="Customer address"><Textarea value={customer.address} onChange={(event) => setCustomer({ ...customer, address: event.target.value })} maxLength={1000} className="min-h-24" /></Field></div>
+        <Field label="Customer name"><Input required value={customer.name} onChange={(event) => setCustomer({ ...customer, name: event.target.value })} maxLength={120} /></Field>
+        <Field label="Customer email"><Input required type="email" inputMode="email" value={customer.email} onChange={(event) => setCustomer({ ...customer, email: event.target.value.toLowerCase() })} className="lowercase" maxLength={254} /></Field>
+        <Field label="Phone"><Input required type="tel" inputMode="tel" value={customer.phone} onChange={(event) => setCustomer({ ...customer, phone: event.target.value })} maxLength={40} /></Field>
+        <div className="sm:col-span-2"><Field label="Customer address"><Textarea required value={customer.address} onChange={(event) => setCustomer({ ...customer, address: event.target.value })} maxLength={1000} className="min-h-24" /></Field></div>
       </Card>
 
       <Card className="grid gap-5 p-4 sm:p-6">
@@ -91,7 +91,7 @@ export function OrderBuilder({ action, presets, isAdmin, startingOrderNumber }: 
           ))}
         </div>
         <button type="button" onClick={() => setItems((current) => [...current, newItem()])} className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--brand)]/50 font-bold text-[var(--brand)] transition hover:bg-muted"><CirclePlus className="size-5" /> ADD ITEM</button>
-        <div className="grid gap-4 sm:grid-cols-2"><ReasonSelect name={null} defaultValue={reason} onValueChange={setReason} /><Field label="Notes"><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={2000} className="min-h-24" /></Field></div>
+        <div className="grid gap-4 sm:grid-cols-2"><ReasonSelect required name={null} defaultValue={reason} onValueChange={setReason} /><Field label="Notes"><Textarea required value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={2000} className="min-h-24" /></Field></div>
       </Card>
 
       <Card className="grid gap-4 bg-muted/25 p-4 sm:p-6">

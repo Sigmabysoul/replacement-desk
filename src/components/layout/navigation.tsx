@@ -178,7 +178,7 @@ export function Navigation({
             </Link>
 
             <Link
-              href={isAdmin ? "/admin/settings" : "/settings"}
+              href="/settings"
               className={cn(
                 "flex min-h-10 items-center gap-3 rounded-xl px-3 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
                 (pathname.startsWith("/settings") || pathname.startsWith("/admin/settings") || pathname.startsWith("/dimensions")) && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"

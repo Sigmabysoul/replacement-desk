@@ -57,15 +57,16 @@ export default async function EditReplacementPage({
             <Input name="quantity" type="number" min={1} max={999} required defaultValue={replacement.quantity} />
           </Field>
           <ReasonSelect
+            required
             defaultValue={replacement.reason}
             presets={replacement.order_type === "OFFLINE" ? ["Offline order"] : undefined}
           />
           <Field label="Customer name">
-            <Input name="customer_name" defaultValue={replacement.customer_name ?? ""} />
+            <Input name="customer_name" required defaultValue={replacement.customer_name ?? ""} />
           </Field>
           <div className="sm:col-span-2">
             <Field label="Notes">
-              <Textarea name="notes" defaultValue={replacement.notes ?? ""} />
+              <Textarea name="notes" required defaultValue={replacement.notes ?? ""} />
             </Field>
           </div>
         </Card>

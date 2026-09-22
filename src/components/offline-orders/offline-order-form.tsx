@@ -27,7 +27,7 @@ export function OfflineOrderForm({ defaultOrderNumber }: { defaultOrderNumber?: 
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Order ID" hint="Auto-increments · Editable"><Input type="text" inputMode="numeric" pattern="[0-9]*" required name="order_number" defaultValue={defaultOrderNumber} className="font-black" placeholder="e.g. 501" /></Field>
           <Field label="SO Number" hint="Sales Order reference"><Input required name="so_number" maxLength={50} placeholder="e.g. OFLN115" className="font-bold" /></Field>
-          <Field label="Brand" hint="Client or brand name"><Input name="brand" maxLength={200} placeholder="e.g. averX" /></Field>
+          <Field label="Brand" hint="Client or brand name"><Input name="brand" required maxLength={200} placeholder="e.g. averX" /></Field>
         </div>
 
         <div className="grid gap-3">
@@ -45,10 +45,10 @@ export function OfflineOrderForm({ defaultOrderNumber }: { defaultOrderNumber?: 
 
         <Field label="Unit" hint="Applied to every item in this order"><Select name="unit" defaultValue="Pieces"><option value="Pieces">Pieces</option><option value="Rolls">Rolls</option><option value="Boxes">Boxes</option><option value="Packets">Packets</option><option value="KG">KG</option><option value="Sets">Sets</option></Select></Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Logistics Partner"><Input name="logistics_partner" maxLength={200} placeholder="Enter logistics partner" /></Field>
-          <Field label="Target Dispatch Date" hint="DD/MM/YYYY"><Input type="text" inputMode="numeric" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" name="dispatch_date" placeholder="DD/MM/YYYY" /></Field>
+          <Field label="Logistics Partner"><Input name="logistics_partner" required maxLength={200} placeholder="Enter logistics partner" /></Field>
+          <Field label="Target Dispatch Date" hint="DD/MM/YYYY"><Input required type="text" inputMode="numeric" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" name="dispatch_date" placeholder="DD/MM/YYYY" /></Field>
         </div>
-        <Field label="Notes" hint="Special instructions, packing notes, etc."><Textarea name="notes" maxLength={2000} placeholder="e.g. Carton count pending..." className="min-h-24" /></Field>
+        <Field label="Notes" hint="Special instructions, packing notes, etc."><Textarea name="notes" required maxLength={2000} placeholder="e.g. Carton count pending..." className="min-h-24" /></Field>
         <SubmitButton pendingText="Creating offline order…">CREATE OFFLINE ORDER · {items.length} ITEM{items.length === 1 ? "" : "S"}</SubmitButton>
       </Card>
     </form>
