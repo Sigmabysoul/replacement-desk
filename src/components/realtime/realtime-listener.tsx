@@ -70,7 +70,16 @@ export function RealtimeListener() {
         {
           event: "*",
           schema: "public",
-          table: "offline_order_activity",
+          table: "offline_order_activity_logs",
+        },
+        triggerRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "customer_presets",
         },
         triggerRefresh,
       )

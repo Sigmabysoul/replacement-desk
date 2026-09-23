@@ -83,18 +83,38 @@ export function formatDate(value: string | null | undefined, withTime = true) {
   }).format(date);
 }
 
-/** Converts a DD/MM/YYYY form value to the ISO date format PostgreSQL expects. */
+/** Converts a YYYY-MM-DD (HTML5 date picker) or DD/MM/YYYY form value to the ISO date format PostgreSQL expects. */
 export function parseDisplayDate(value: string | null | undefined) {
-  const match = value?.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!match) return null;
-  const [, day, month, year] = match;
-  const candidate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
-  if (
-    candidate.getUTCFullYear() !== Number(year) ||
-    candidate.getUTCMonth() !== Number(month) - 1 ||
-    candidate.getUTCDate() !== Number(day)
-  ) return null;
-  return `${year}-${month}-${day}`;
+  if (!value) return null;
+  const trimmed = value.trim();
+
+  // Support HTML5 date input format YYYY-MM-DD
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    const candidate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    if (
+      candidate.getUTCFullYear() !== Number(year) ||
+      candidate.getUTCMonth() !== Number(month) - 1 ||
+      candidate.getUTCDate() !== Number(day)
+    ) return null;
+    return `${year}-${month}-${day}`;
+  }
+
+  // Support DD/MM/YYYY format
+  const ddmmyyyyMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const [, day, month, year] = ddmmyyyyMatch;
+    const candidate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    if (
+      candidate.getUTCFullYear() !== Number(year) ||
+      candidate.getUTCMonth() !== Number(month) - 1 ||
+      candidate.getUTCDate() !== Number(day)
+    ) return null;
+    return `${year}-${month}-${day}`;
+  }
+
+  return null;
 }
 
 /**

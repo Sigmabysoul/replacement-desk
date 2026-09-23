@@ -826,3 +826,106 @@ export async function cancelReplacementAction(formData: FormData) {
   revalidatePath(`/replacements/${replacementId}`);
   redirect(`/replacements/${replacementId}?success=${encodeURIComponent("Replacement order cancelled.")}`);
 }
+
+/**
+ * Logistics or Admin marks a replacement delivery as successfully delivered with notes.
+ */
+export async function markReplacementSuccessfulAction(formData: FormData) {
+  await requireProfile(["LOGISTICS", "ADMIN"]);
+  const replacementId = String(formData.get("replacement_id") ?? "");
+  const notes = String(formData.get("notes") ?? formData.get("message") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/tracking");
+
+  if (!/^[0-9a-f-]{36}$/i.test(replacementId)) {
+    redirect(`${returnTo}?error=${encodeURIComponent("Invalid replacement order.")}`);
+  }
+  if (!notes) {
+    redirect(`${returnTo}?error=${encodeURIComponent("Delivery notes are required.")}`);
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("transition_replacement", {
+    p_replacement_id: replacementId,
+    p_target_status: "DELIVERED",
+    p_message: notes,
+  });
+
+  if (error) {
+    redirect(`${returnTo}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  const replacement = data as Replacement;
+  if (replacement) {
+    after(async () => {
+      await notifyTelegram("DELIVERED", replacement, notes);
+    });
+  }
+
+  invalidateDashboardCache();
+  revalidatePath("/");
+  revalidatePath("/replacements");
+  revalidatePath("/tracking");
+  revalidatePath(`/replacements/${replacementId}`);
+  redirect(`${returnTo}?success=${encodeURIComponent(`Replacement ${replacement?.replacement_number ?? ""} marked as delivered.`)}`);
+}
+
+/**
+ * Logistics or Admin marks a replacement delivery as unsuccessful, RTO, or assigns RTA re-dispatch.
+ */
+export async function markReplacementUnsuccessfulAction(formData: FormData) {
+  await requireProfile(["LOGISTICS", "ADMIN"]);
+  const replacementId = String(formData.get("replacement_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const outcome = String(formData.get("outcome") ?? "").trim().toUpperCase();
+  const isRta = outcome === "RTA" || formData.get("is_rta") === "true" || formData.get("is_rta") === "on";
+  const newCourier = String(formData.get("courier_partner") ?? "").trim();
+  const newTrackingId = String(formData.get("tracking_id") ?? "").trim();
+  const newTrackingUrl = String(formData.get("tracking_url") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/tracking");
+
+  if (!/^[0-9a-f-]{36}$/i.test(replacementId)) {
+    redirect(`${returnTo}?error=${encodeURIComponent("Invalid replacement order.")}`);
+  }
+
+  if (isRta || (newCourier && newTrackingId)) {
+    if (!newCourier) {
+      redirect(`${returnTo}?error=${encodeURIComponent("New courier partner is required for RTA re-assignment.")}`);
+    }
+    if (!newTrackingId) {
+      redirect(`${returnTo}?error=${encodeURIComponent("New tracking ID / AWB is required for RTA re-assignment.")}`);
+    }
+    if (newTrackingUrl && !/^https?:\/\/[^\s]+$/i.test(newTrackingUrl)) {
+      redirect(`${returnTo}?error=${encodeURIComponent("Tracking link must begin with http:// or https://")}`);
+    }
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("mark_replacement_unsuccessful", {
+    p_replacement_id: replacementId,
+    p_reason: reason || null,
+    p_new_courier: newCourier || null,
+    p_new_tracking_id: newTrackingId || null,
+    p_new_tracking_url: newTrackingUrl || null,
+    p_outcome: outcome || (isRta ? "RTA" : null),
+  });
+
+  if (error) {
+    redirect(`${returnTo}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  const replacement = data as Replacement;
+  const isReassigned = Boolean(newCourier && newTrackingId);
+  const msg = outcome === "RTO"
+    ? `Replacement ${replacement?.replacement_number ?? ""} marked as RTO (Return to Origin).`
+    : isReassigned
+    ? `Replacement ${replacement?.replacement_number ?? ""} re-assigned (RTA) with ${newCourier}.`
+    : `Replacement ${replacement?.replacement_number ?? ""} marked as delivery unsuccessful.`;
+
+  invalidateDashboardCache();
+  revalidatePath("/");
+  revalidatePath("/replacements");
+  revalidatePath("/tracking");
+  revalidatePath(`/replacements/${replacementId}`);
+  redirect(`${returnTo}?success=${encodeURIComponent(msg)}`);
+}
+

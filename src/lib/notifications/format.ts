@@ -38,12 +38,12 @@ export type OfflineNotificationType =
 
 export const OFFLINE_NOTIFICATION_RECIPIENTS: Record<OfflineNotificationType, readonly Role[]> = {
   OFFLINE_CREATED: ["CONSIGNMENT"],
-  OFFLINE_PACKING_CONFIRMED: ["HR"],
+  OFFLINE_PACKING_CONFIRMED: ["LOGISTICS"],
   OFFLINE_DISPATCH_PREPARED: ["PRINTING"],
   OFFLINE_PRINTED: ["CONSIGNMENT", "PACKING", "BOSS"],
-  OFFLINE_PICKED_UP: ["CONSIGNMENT", "HR", "BOSS"],
-  OFFLINE_DELIVERED: ["BOSS", "HR"],
-  OFFLINE_ACKNOWLEDGED: ["BOSS", "HR", "CONSIGNMENT"],
+  OFFLINE_PICKED_UP: ["HR", "BOSS"],
+  OFFLINE_DELIVERED: ["BOSS"],
+  OFFLINE_ACKNOWLEDGED: ["BOSS", "HR", "CONSIGNMENT", "LOGISTICS"],
 };
 
 /**
@@ -61,44 +61,44 @@ export function getOfflineNotificationContent(
     case "CREATED":
       return {
         title: `📋 New Offline Order · ${soNumber}`,
-        body: `SO ${soNumber} (${productName}) created. Consignment Team: please confirm cartons & weight.`,
+        body: `SO ${soNumber} (${productName}) created. Consignment Team (Ali Sir): please confirm dimensions & cartons.`,
         targetRoles: ["CONSIGNMENT", "ADMIN"] as Role[],
       };
     case "PACKING_CONFIRMED":
       return {
         title: `📦 Cartons Confirmed · ${soNumber}`,
-        body: `Consignment confirmed ${extra?.cartonCount ? `${extra.cartonCount} cartons` : "packing"}. HR (Nainisha): please upload dispatch details & photos.`,
-        targetRoles: ["HR", "ADMIN"] as Role[],
+        body: `Consignment confirmed ${extra?.cartonCount ? `${extra.cartonCount} cartons` : "packing"}. Logistics Team: please enter LR number, tracking link, and upload labels.`,
+        targetRoles: ["LOGISTICS", "ADMIN"] as Role[],
       };
     case "DISPATCH_PREPARED":
       return {
         title: `📑 Dispatch Ready · ${soNumber}`,
-        body: `HR prepared dispatch documents. Storehouse Print Team: ready to print carton labels.`,
+        body: `Logistics prepared dispatch details. Printing Team: ready to print carton labels.`,
         targetRoles: ["PRINTING", "ADMIN"] as Role[],
       };
     case "PRINTED":
       return {
         title: `🖨️ Labels Printed · ${soNumber}`,
-        body: `Storehouse confirmed labels printed for ${soNumber}. Ready for transporter/courier pickup.`,
+        body: `Printing team printed labels for ${soNumber}. Consignment Team (Ali Sir): please verify boxes and mark packed / ready for pickup.`,
         targetRoles: ["CONSIGNMENT", "PACKING", "BOSS", "ADMIN"] as Role[],
       };
     case "PICKED_UP":
       return {
         title: `🚚 Consignment Picked Up · ${soNumber}`,
-        body: `${soNumber} picked up ${extra?.courier ? `by ${extra.courier}` : ""}. In transit to destination.`,
-        targetRoles: ["CONSIGNMENT", "HR", "BOSS", "ADMIN"] as Role[],
+        body: `${soNumber} picked up ${extra?.courier ? `by ${extra.courier}` : ""}. HR Team: please upload delivery challan & POD upon delivery.`,
+        targetRoles: ["HR", "BOSS", "ADMIN"] as Role[],
       };
     case "DELIVERED":
       return {
         title: `📬 Consignment Delivered · ${soNumber}`,
-        body: `${soNumber} marked delivered. Boss / HR: please verify POD and acknowledge.`,
-        targetRoles: ["BOSS", "HR", "ADMIN"] as Role[],
+        body: `${soNumber} marked delivered with challan & POD. Boss: please verify and acknowledge.`,
+        targetRoles: ["BOSS", "ADMIN"] as Role[],
       };
     case "ACKNOWLEDGED":
       return {
         title: `✅ Order Completed · ${soNumber}`,
-        body: `SO ${soNumber} has been acknowledged and marked fully completed.`,
-        targetRoles: ["BOSS", "HR", "CONSIGNMENT", "ADMIN"] as Role[],
+        body: `SO ${soNumber} has been acknowledged and marked fully completed. Logistics can track final delivery.`,
+        targetRoles: ["BOSS", "HR", "CONSIGNMENT", "LOGISTICS", "ADMIN"] as Role[],
       };
     default:
       return {

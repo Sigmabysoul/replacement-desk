@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
 import { hasAnyRole, requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedOperationalData, setCachedOperationalData } from "@/lib/cache/dashboard-cache";
 import { OFFLINE_ORDER_STATUSES, type OfflineOrder, type OfflineOrderStatus } from "@/lib/types";
 import { offlineStatusLabel } from "@/lib/utils";
 
@@ -19,26 +20,36 @@ export default async function OfflineOrdersPage({
   const profile = await requireProfile();
   const params = await searchParams;
 
-  const supabase = await createClient();
-  let query = supabase.from("offline_orders").select(OFFLINE_LIST_COLUMNS).order("created_at", { ascending: false });
+  const cacheKey = `offline_orders:${params.status || "all"}:${params.q?.trim() || ""}`;
+  let orders = getCachedOperationalData<OfflineOrder[]>(cacheKey);
+  let error: unknown = null;
 
-  if (params.status && OFFLINE_ORDER_STATUSES.includes(params.status as OfflineOrderStatus)) {
-    query = query.eq("status", params.status);
-  }
+  if (!orders) {
+    const supabase = await createClient();
+    let query = supabase.from("offline_orders").select(OFFLINE_LIST_COLUMNS).order("created_at", { ascending: false });
 
-  if (params.q?.trim()) {
-    const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").slice(0, 100);
-    if (q) {
-      const { data: itemMatches } = await supabase.from("offline_order_items").select("offline_order_id").ilike("product_name", `%${q}%`).limit(100);
-      const itemOrderIds = [...new Set((itemMatches ?? []).map((item) => item.offline_order_id))];
-      const orderNumberFilter = /^\d+$/.test(q) ? `,order_number.eq.${Number(q)}` : "";
-      const itemFilter = itemOrderIds.length ? `,id.in.(${itemOrderIds.join(",")})` : "";
-      query = query.or(`so_number.ilike.%${q}%,brand.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}${itemFilter}`);
+    if (params.status && OFFLINE_ORDER_STATUSES.includes(params.status as OfflineOrderStatus)) {
+      query = query.eq("status", params.status);
+    }
+
+    if (params.q?.trim()) {
+      const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").slice(0, 100);
+      if (q) {
+        const { data: itemMatches } = await supabase.from("offline_order_items").select("offline_order_id").ilike("product_name", `%${q}%`).limit(100);
+        const itemOrderIds = [...new Set((itemMatches ?? []).map((item) => item.offline_order_id))];
+        const orderNumberFilter = /^\d+$/.test(q) ? `,order_number.eq.${Number(q)}` : "";
+        const itemFilter = itemOrderIds.length ? `,id.in.(${itemOrderIds.join(",")})` : "";
+        query = query.or(`so_number.ilike.%${q}%,brand.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}${itemFilter}`);
+      }
+    }
+
+    const { data, error: qErr } = await query.limit(100);
+    orders = (data ?? []) as OfflineOrder[];
+    error = qErr;
+    if (!qErr) {
+      setCachedOperationalData(cacheKey, orders, 15000);
     }
   }
-
-  const { data, error } = await query.limit(100);
-  const orders = (data ?? []) as OfflineOrder[];
 
   const canCreate = hasAnyRole(profile, ["BOSS", "ADMIN"]);
 
@@ -55,6 +66,7 @@ export default async function OfflineOrdersPage({
         {canCreate && (
           <Link
             href="/offline-orders/new"
+            prefetch={true}
             className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--brand)] px-4 text-sm font-bold text-white shadow-lg shadow-[var(--brand)]/20 transition hover:-translate-y-0.5 hover:brightness-95"
           >
             <CirclePlus className="size-5" />
@@ -96,7 +108,7 @@ export default async function OfflineOrdersPage({
         </form>
       </Card>
 
-      {error && (
+      {Boolean(error) && (
         <Card className="border-rose-200 bg-rose-50 p-4 text-rose-900">
           Could not load offline orders. Please refresh the page.
         </Card>

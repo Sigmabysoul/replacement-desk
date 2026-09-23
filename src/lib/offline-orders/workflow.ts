@@ -24,9 +24,9 @@ const transitions: Record<OfflineOrderStatus, readonly OfflineOrderStatus[]> = {
 };
 
 const permissions: Record<OfflineWorkflowAction, readonly Role[]> = {
-  CREATE_OFFLINE_ORDER: ["BOSS", "ADMIN"],
+  CREATE_OFFLINE_ORDER: ["HR", "BOSS", "ADMIN"],
   CONFIRM_PACKING: ["CONSIGNMENT", "ADMIN"],
-  DISPATCH_PREPARE: ["HR", "ADMIN"],
+  DISPATCH_PREPARE: ["LOGISTICS", "ADMIN"],
   CONFIRM_PRINTING: ["PRINTING", "ADMIN"],
   CONFIRM_PICKUP: ["CONSIGNMENT", "ADMIN"],
   CONFIRM_DELIVERY: ["HR", "LOGISTICS", "ADMIN"],

@@ -23,9 +23,29 @@ export const createOfflineOrderSchema = z.object({
   logistics_partner: z.string().trim().min(1, "Logistics partner is required").max(200),
   dispatch_date: z
     .preprocess((value) => (value == null ? "" : value), z.string().trim())
-    .refine((value) => Boolean(value) && parseDisplayDate(value) !== null, "Target dispatch date is required (DD/MM/YYYY)")
+    .refine((value) => Boolean(value) && parseDisplayDate(value) !== null, "Target dispatch date is required")
     .transform((value) => parseDisplayDate(value)!),
   notes: z.string().trim().min(1, "Notes are required").max(2000),
+  customer_name: z.string().trim().min(1, "Customer name is required").max(200),
+  customer_address: z.string().trim().min(1, "Customer address is required").max(2000),
+  customer_phone: z.string().trim().min(1, "Customer phone number is required").max(50),
+  customer_email: z
+    .preprocess((value) => (value === "" || value == null ? null : value), z.string().trim().email("Invalid email address").max(255).nullable())
+    .optional(),
+  customer_preset_id: z
+    .preprocess((value) => (value === "" || value == null ? null : value), z.string().uuid("Invalid customer preset ID").nullable())
+    .optional(),
+});
+
+export const customerPresetSchema = z.object({
+  id: z.string().uuid("Invalid customer preset ID").optional(),
+  name: z.string().trim().min(1, "Customer name is required").max(200),
+  phone: z.string().trim().min(1, "Customer phone number is required").max(50),
+  email: z
+    .preprocess((value) => (value === "" || value == null ? null : value), z.string().trim().email("Invalid email address").max(255).nullable())
+    .optional(),
+  address: z.string().trim().min(1, "Customer address is required").max(2000),
+  active: z.coerce.boolean().default(true),
 });
 
 export const updateOfflineOrderNumberSchema = z.object({

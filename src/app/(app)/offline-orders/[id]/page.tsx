@@ -3,9 +3,13 @@ import Image from "next/image";
 import {
   ArrowLeft,
   Boxes,
+  Building2,
   Download,
   ExternalLink,
   FileText,
+  Mail,
+  MapPin,
+  Phone,
   Trash2,
   Truck,
 } from "lucide-react";
@@ -221,6 +225,59 @@ export default async function OfflineOrderDetailPage({
                 <p className="mt-1 whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-xs text-slate-700">
                   {order.notes}
                 </p>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Customer Details */}
+        <Card className="p-5">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <Building2 className="size-5 text-indigo-600" />
+            <h2 className="font-black text-slate-950">Customer Details</h2>
+          </div>
+          <div className="mt-4 grid gap-3 text-sm">
+            <div className="flex justify-between border-b border-slate-100 pb-2">
+              <span className="text-slate-500">Customer / Company</span>
+              <strong className="text-slate-900">{order.customer_name || "—"}</strong>
+            </div>
+            {order.customer_phone ? (
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-500">Phone</span>
+                <a
+                  href={`tel:${order.customer_phone}`}
+                  className="inline-flex items-center gap-1 font-bold text-indigo-600 hover:underline"
+                >
+                  <Phone className="size-3.5" />
+                  {order.customer_phone}
+                </a>
+              </div>
+            ) : null}
+            {order.customer_email ? (
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-500">Email</span>
+                <a
+                  href={`mailto:${order.customer_email}`}
+                  className="inline-flex items-center gap-1 font-bold text-indigo-600 hover:underline"
+                >
+                  <Mail className="size-3.5" />
+                  {order.customer_email}
+                </a>
+              </div>
+            ) : null}
+            {order.customer_address ? (
+              <div className="pt-1">
+                <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <MapPin className="size-3.5" /> Delivery Address
+                </span>
+                <p className="mt-1 whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-xs text-slate-700">
+                  {order.customer_address}
+                </p>
+              </div>
+            ) : (
+              <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-500">Address</span>
+                <span className="text-slate-400">Not recorded</span>
               </div>
             )}
           </div>

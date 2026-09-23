@@ -10,6 +10,7 @@ import {
   confirmDeliverySchema,
   confirmPackingSchema,
   createOfflineOrderSchema,
+  customerPresetSchema,
   dispatchOrderSchema,
   offlineOrderItemsSchema,
   updateOfflineOrderNumberSchema,
@@ -39,9 +40,16 @@ describe("offline workflow permissions", () => {
     expect(canPerformOffline("CONSIGNMENT", "CONFIRM_DELIVERY")).toBe(false);
   });
 
-  it("allows HR team to prepare dispatch and confirm delivery with POD", () => {
-    expect(canPerformOffline("HR", "DISPATCH_PREPARE")).toBe(true);
+  it("allows Logistics team to prepare dispatch and upload LR number/labels", () => {
+    expect(canPerformOffline("LOGISTICS", "DISPATCH_PREPARE")).toBe(true);
+    expect(canPerformOffline("LOGISTICS", "CONFIRM_PACKING")).toBe(false);
+    expect(canPerformOffline("LOGISTICS", "CONFIRM_PRINTING")).toBe(false);
+  });
+
+  it("allows HR team to create offline orders and confirm delivery with POD", () => {
+    expect(canPerformOffline("HR", "CREATE_OFFLINE_ORDER")).toBe(true);
     expect(canPerformOffline("HR", "CONFIRM_DELIVERY")).toBe(true);
+    expect(canPerformOffline("HR", "DISPATCH_PREPARE")).toBe(false);
     expect(canPerformOffline("HR", "CONFIRM_PACKING")).toBe(false);
     expect(canPerformOffline("HR", "CONFIRM_PICKUP")).toBe(false);
   });
@@ -78,9 +86,9 @@ describe("offline workflow permissions", () => {
 
     // Esha as CUSTOMER_SUPPORT + HR
     const eshaRoles = ["CUSTOMER_SUPPORT", "HR"] as const;
-    expect(canPerformOffline(eshaRoles, "DISPATCH_PREPARE")).toBe(true);
+    expect(canPerformOffline(eshaRoles, "CREATE_OFFLINE_ORDER")).toBe(true);
     expect(canPerformOffline(eshaRoles, "CONFIRM_DELIVERY")).toBe(true);
-    expect(canPerformOffline(eshaRoles, "CONFIRM_PRINTING")).toBe(false);
+    expect(canPerformOffline(eshaRoles, "DISPATCH_PREPARE")).toBe(false);
   });
 });
 
@@ -140,7 +148,8 @@ describe("offline workflow assertions & available actions", () => {
     expect(availableOfflineActions("CONSIGNMENT", "CREATED")).toContain("CONFIRM_PACKING");
     expect(availableOfflineActions("HR", "CREATED")).not.toContain("CONFIRM_PACKING");
 
-    expect(availableOfflineActions("HR", "PACKING_CONFIRMED")).toContain("DISPATCH_PREPARE");
+    expect(availableOfflineActions("LOGISTICS", "PACKING_CONFIRMED")).toContain("DISPATCH_PREPARE");
+    expect(availableOfflineActions("HR", "PACKING_CONFIRMED")).not.toContain("DISPATCH_PREPARE");
     expect(availableOfflineActions("PRINTING", "DISPATCH_PREPARED")).toContain("CONFIRM_PRINTING");
     expect(availableOfflineActions("CONSIGNMENT", "PRINTED")).toContain("CONFIRM_PICKUP");
     expect(availableOfflineActions("HR", "PICKED_UP")).toContain("CONFIRM_DELIVERY");
@@ -148,7 +157,7 @@ describe("offline workflow assertions & available actions", () => {
   });
 
   it("computes available actions for users with multiple roles", () => {
-    const multiRole = ["CONSIGNMENT", "HR"] as const;
+    const multiRole = ["CONSIGNMENT", "LOGISTICS", "HR"] as const;
     expect(availableOfflineActions(multiRole, "CREATED")).toContain("CONFIRM_PACKING");
     expect(availableOfflineActions(multiRole, "PACKING_CONFIRMED")).toContain("DISPATCH_PREPARE");
     expect(availableOfflineActions(multiRole, "PRINTED")).toContain("CONFIRM_PICKUP");
@@ -186,11 +195,34 @@ describe("offline order validation schemas", () => {
       logistics_partner: "Delhivery",
       dispatch_date: "04/09/2026",
       notes: "Carton count pending with Kartik Da",
+      customer_name: "TBC Kart Warehouse",
+      customer_address: "Plot 42, Industrial Area, Phase 2, Mumbai",
+      customer_phone: "+91 98765 43210",
+      customer_email: "orders@tbckart.com",
     });
     expect(valid.success).toBe(true);
     if (valid.success) {
       expect(valid.data.quantity).toBe(400);
       expect(valid.data.so_number).toBe("SO - OFLN115");
+      expect(valid.data.customer_name).toBe("TBC Kart Warehouse");
+    }
+
+    const validCalendarDate = createOfflineOrderSchema.safeParse({
+      so_number: "SO - OFLN116",
+      brand: "averX",
+      product_name: "GARBAGE BAG ROLL - 24X32 - BLACK",
+      quantity: "400",
+      unit: "Rolls",
+      logistics_partner: "Delhivery",
+      dispatch_date: "2026-09-04",
+      notes: "Pick from calendar picker",
+      customer_name: "Apex Logistics",
+      customer_address: "77 Ring Road, Delhi",
+      customer_phone: "9988776655",
+    });
+    expect(validCalendarDate.success).toBe(true);
+    if (validCalendarDate.success) {
+      expect(validCalendarDate.data.dispatch_date).toBe("2026-09-04");
     }
 
     const invalid = createOfflineOrderSchema.safeParse({
@@ -252,6 +284,9 @@ describe("offline order validation schemas", () => {
       dispatch_date: "25/09/2026",
       notes: "High priority order",
       order_number: "620",
+      customer_name: "Metro Supermarket",
+      customer_address: "5th Main Road, Bengaluru",
+      customer_phone: "9123456789",
     });
     expect(valid.success).toBe(true);
     if (valid.success) {
@@ -267,6 +302,9 @@ describe("offline order validation schemas", () => {
       dispatch_date: "25/09/2026",
       notes: "High priority order",
       order_number: "-5",
+      customer_name: "Metro Supermarket",
+      customer_address: "5th Main Road, Bengaluru",
+      customer_phone: "9123456789",
     });
     expect(invalid.success).toBe(false);
   });
@@ -284,6 +322,24 @@ describe("offline order validation schemas", () => {
     const invalid = updateOfflineOrderNumberSchema.safeParse({
       order_id: "a0000000-0000-4000-8000-000000000001",
       order_number: "0",
+    });
+    expect(invalid.success).toBe(false);
+  });
+
+  it("validates customer preset schema", () => {
+    const valid = customerPresetSchema.safeParse({
+      name: "TBC Kart Central Warehouse",
+      phone: "+91 98765 43210",
+      email: "logistics@tbckart.in",
+      address: "Warehouse B, Industrial Area, Sector 58, Gurgaon",
+      active: true,
+    });
+    expect(valid.success).toBe(true);
+
+    const invalid = customerPresetSchema.safeParse({
+      name: "",
+      address: "",
+      phone: "",
     });
     expect(invalid.success).toBe(false);
   });

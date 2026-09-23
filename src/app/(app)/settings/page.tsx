@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Ruler, SlidersHorizontal, Users } from "lucide-react";
+import { ArrowRight, Building2, Ruler, SlidersHorizontal, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { hasRole, requireProfile } from "@/lib/auth/session";
 
@@ -16,6 +16,19 @@ export default async function SettingsHubPage() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <Link href="/customers" className="group">
+          <Card className="flex h-full items-start gap-4 p-5 transition hover:border-indigo-300 hover:shadow-md">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700">
+              <Building2 className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <strong className="block text-foreground">Customer setup</strong>
+              <span className="mt-1 block text-sm leading-5 text-muted-foreground">Manage reusable customer profiles, contacts, and delivery addresses for offline orders.</span>
+            </span>
+            <ArrowRight className="ml-auto mt-2 size-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-indigo-600" />
+          </Card>
+        </Link>
+
         <Link href="/dimensions" className="group">
           <Card className="flex h-full items-start gap-4 p-5 transition hover:border-indigo-300 hover:shadow-md">
             <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700">

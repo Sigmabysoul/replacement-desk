@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -62,6 +63,14 @@ export function Navigation({
   roles?: Role[];
 }) {
   const pathname = usePathname();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [prevPathname, setPrevPathname] = useState(pathname);
+
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    setPendingHref(null);
+  }
+
   const userRoles = roles?.length
     ? roles
     : role
@@ -94,6 +103,15 @@ export function Navigation({
 
   return (
     <>
+      {/* Instant visual navigation feedback bar */}
+      {pendingHref && (
+        <div
+          role="progressbar"
+          aria-label="Loading page"
+          className="fixed inset-x-0 top-0 z-[100] h-1 bg-gradient-to-r from-indigo-500 via-indigo-600 to-indigo-400 shadow-xs animate-pulse"
+        />
+      )}
+
       {/* Desktop Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-800 bg-slate-950 px-4 py-5 text-white lg:flex">
         {/* Brand Header */}
@@ -115,6 +133,10 @@ export function Navigation({
               <Link
                 key={href}
                 href={href}
+                prefetch={true}
+                onClick={() => {
+                  if (href !== pathname) setPendingHref(href);
+                }}
                 className={cn(
                   "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
                   active && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
@@ -133,6 +155,10 @@ export function Navigation({
           {isAdmin && (
             <Link
               href="/admin/users"
+              prefetch={true}
+              onClick={() => {
+                if (pathname !== "/admin/users") setPendingHref("/admin/users");
+              }}
               className={cn(
                 "flex min-h-10 items-center gap-3 rounded-xl px-3 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
                 pathname.startsWith("/admin/users") && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
@@ -143,32 +169,14 @@ export function Navigation({
             </Link>
           )}
 
-          {/* 1. User Identity Section */}
-          {/* <div className="flex items-center gap-2.5 rounded-2xl bg-white/5 px-3 py-2.5">
-            <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-indigo-600 text-xs font-black text-white shadow-xs">
-              {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : <UserRound className="size-4" />}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-bold text-white">
-                {profile?.full_name ?? "User"}
-              </p>
-              <div className="mt-0.5 flex flex-wrap gap-1">
-                {userRoles.slice(0, 2).map((r) => (
-                  <span
-                    key={r}
-                    className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-indigo-300"
-                  >
-                    {r}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div> */}
-
           {/* 2. Repositioned Below User Section: Profile & Settings */}
           <div className="grid gap-1">
             <Link
               href="/profile"
+              prefetch={true}
+              onClick={() => {
+                if (pathname !== "/profile") setPendingHref("/profile");
+              }}
               className={cn(
                 "flex min-h-10 items-center gap-3 rounded-xl px-3 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
                 pathname.startsWith("/profile") && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
@@ -180,6 +188,10 @@ export function Navigation({
 
             <Link
               href="/settings"
+              prefetch={true}
+              onClick={() => {
+                if (pathname !== "/settings") setPendingHref("/settings");
+              }}
               className={cn(
                 "flex min-h-10 items-center gap-3 rounded-xl px-3 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-colors",
                 (pathname.startsWith("/settings") || pathname.startsWith("/admin/settings") || pathname.startsWith("/dimensions")) && "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
@@ -214,6 +226,10 @@ export function Navigation({
             <Link
               key={href}
               href={href}
+              prefetch={true}
+              onClick={() => {
+                if (href !== pathname) setPendingHref(href);
+              }}
               className={cn(
                 "relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 text-[10.5px] sm:text-[11px] transition-colors active:scale-95",
                 active

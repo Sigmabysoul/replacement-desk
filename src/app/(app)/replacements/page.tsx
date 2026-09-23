@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
 import { hasAnyRole, hasRole, requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedOperationalData, setCachedOperationalData } from "@/lib/cache/dashboard-cache";
 import { STATUSES, type Replacement, type ReplacementStatus } from "@/lib/types";
 import { parseDisplayDate, statusLabel } from "@/lib/utils";
 
@@ -28,37 +29,47 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
     ? params.scope as TimeScope
     : "recent_30";
 
-  const supabase = await createClient();
-  let query = supabase.from("replacements").select(REPLACEMENT_LIST_COLUMNS).order("created_at", { ascending: false });
-  const now = new Date();
-  if (scope === "recent_15") {
-    query = query.is("archived_at", null).gte("created_at", new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString());
-  } else if (scope === "recent_30") {
-    query = query.is("archived_at", null).gte("created_at", new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
-  } else if (scope === "archived") {
-    query = query.not("archived_at", "is", null);
-  }
-  if (params.status === "AWAITING_LOGISTICS") {
-    query = query.eq("status", "NEW");
-  } else if (params.status === "AWAITING_QC") {
-    query = query.in("status", ["LABEL_PRINTED", "QC_REJECTED"]);
-  } else if (STATUSES.includes(params.status as ReplacementStatus)) {
-    query = query.eq("status", params.status!);
-  }
-  const selectedDate = parseDisplayDate(params.date);
-  if (selectedDate) query = query.gte("created_at", `${selectedDate}T00:00:00+05:30`).lt("created_at", `${selectedDate}T23:59:59.999+05:30`);
-  if (params.q?.trim()) {
-    const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").replace(/\s+/g, " ").slice(0, 100);
-    if (q) {
-      const { data: itemMatches } = await supabase.from("replacement_items").select("replacement_id").ilike("product_name", `%${q}%`).limit(100);
-      const itemOrderIds = [...new Set((itemMatches ?? []).map((item) => item.replacement_id))];
-      const orderNumberFilter = /^\d+$/.test(q) ? `,order_number.eq.${Number(q)}` : "";
-      const itemFilter = itemOrderIds.length ? `,id.in.(${itemOrderIds.join(",")})` : "";
-      query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}${itemFilter}`);
+  const cacheKey = `replacements:${scope}:${params.status || "all"}:${params.date || ""}:${params.q?.trim() || ""}`;
+  let replacements = getCachedOperationalData<Replacement[]>(cacheKey);
+  let error: unknown = null;
+
+  if (!replacements) {
+    const supabase = await createClient();
+    let query = supabase.from("replacements").select(REPLACEMENT_LIST_COLUMNS).order("created_at", { ascending: false });
+    const now = new Date();
+    if (scope === "recent_15") {
+      query = query.is("archived_at", null).gte("created_at", new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString());
+    } else if (scope === "recent_30") {
+      query = query.is("archived_at", null).gte("created_at", new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
+    } else if (scope === "archived") {
+      query = query.not("archived_at", "is", null);
+    }
+    if (params.status === "AWAITING_LOGISTICS") {
+      query = query.eq("status", "NEW");
+    } else if (params.status === "AWAITING_QC") {
+      query = query.in("status", ["LABEL_PRINTED", "QC_REJECTED"]);
+    } else if (STATUSES.includes(params.status as ReplacementStatus)) {
+      query = query.eq("status", params.status!);
+    }
+    const selectedDate = parseDisplayDate(params.date);
+    if (selectedDate) query = query.gte("created_at", `${selectedDate}T00:00:00+05:30`).lt("created_at", `${selectedDate}T23:59:59.999+05:30`);
+    if (params.q?.trim()) {
+      const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").replace(/\s+/g, " ").slice(0, 100);
+      if (q) {
+        const { data: itemMatches } = await supabase.from("replacement_items").select("replacement_id").ilike("product_name", `%${q}%`).limit(100);
+        const itemOrderIds = [...new Set((itemMatches ?? []).map((item) => item.replacement_id))];
+        const orderNumberFilter = /^\d+$/.test(q) ? `,order_number.eq.${Number(q)}` : "";
+        const itemFilter = itemOrderIds.length ? `,id.in.(${itemOrderIds.join(",")})` : "";
+        query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}${itemFilter}`);
+      }
+    }
+    const { data, error: qErr } = await query.limit(100);
+    replacements = (data ?? []) as Replacement[];
+    error = qErr;
+    if (!qErr) {
+      setCachedOperationalData(cacheKey, replacements, 15000);
     }
   }
-  const { data, error } = await query.limit(100);
-  const replacements = (data ?? []) as Replacement[];
 
   const canCreate = hasAnyRole(profile, ["CUSTOMER_SUPPORT", "ADMIN"]);
 
@@ -142,9 +153,9 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
         </form>
       </Card>
 
-      {(error || params.error) && (
+      {(Boolean(error) || params.error) && (
         <Card className="border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900">
-          {params.error ?? error?.message}
+          {params.error ?? (error && typeof error === "object" && "message" in error ? String(error.message) : "Could not load replacements.")}
         </Card>
       )}
       {params.success && (

@@ -691,8 +691,20 @@ begin
 end
 $$;
 
--- 3. Step 3: HR prepares dispatch & photos (DISPATCH_PREPARED)
+-- 3. Step 3: Logistics prepares dispatch & photos (DISPATCH_PREPARED)
+-- Verify HR is unauthorized
 select set_config('request.jwt.claim.sub', '99999999-9999-4999-8999-999999999999', false);
+do $$
+begin
+  perform public.dispatch_prepare_offline_order('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'DEL123456', 'https://delhivery.com/track/123', 'Delhivery', '[]');
+  raise exception 'HR unexpectedly prepared dispatch';
+exception when others then
+  if sqlerrm <> 'Only Logistics or Admin can prepare dispatch details and photos' then raise; end if;
+end
+$$;
+
+-- Logistics prepares dispatch
+select set_config('request.jwt.claim.sub', '66666666-6666-4666-8666-666666666666', false);
 select public.dispatch_prepare_offline_order('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'DEL123456', 'https://delhivery.com/track/123', 'Delhivery', '[]');
 
 do $$
@@ -747,6 +759,18 @@ do $$
 begin
   if (select status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'ACKNOWLEDGED' then
     raise exception 'Acknowledgment failed';
+  end if;
+end
+$$;
+
+-- 8. Step 8: Logistics marks RTO (Return to Origin) in shipment tracking
+select set_config('request.jwt.claim.sub', '66666666-6666-4666-8666-666666666666', false);
+select public.mark_offline_delivery_unsuccessful('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Customer refused delivery', null, null, null, 'RTO');
+
+do $$
+begin
+  if (select delivery_status from public.offline_orders where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') <> 'RTO' then
+    raise exception 'RTO status was not saved';
   end if;
 end
 $$;

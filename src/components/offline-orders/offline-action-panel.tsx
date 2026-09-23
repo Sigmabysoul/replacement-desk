@@ -108,12 +108,12 @@ export function OfflineActionPanel({
           </form>
         )}
 
-        {/* Step 2: HR adds logistics details + uploads compressed photos */}
+        {/* Step 2: Logistics adds details + uploads shipping labels & photos */}
         {actions.includes("DISPATCH_PREPARE") && (
           <form action={dispatchPrepareOfflineOrderAction} className="grid gap-4">
             <input type="hidden" name="order_id" value={order.id} />
             <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs text-indigo-900">
-              <strong>HR Team (Nainisha Mam):</strong> Enter courier, LR number, tracking link, and attach photos/labels for the Printing team.
+              <strong>Logistics Team:</strong> Enter courier, LR number, tracking link, and attach shipping labels and dispatch documents for the Printing team.
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Logistics Partner">
@@ -145,14 +145,14 @@ export function OfflineActionPanel({
 
             <div>
               <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Dispatch Photos & Labels (sent to Printing Team)
+                Shipping Labels & Dispatch Photos (sent to Printing Team)
               </label>
               <OfflinePhotoPicker name="dispatch_documents" maxFiles={20} />
             </div>
 
-            <SubmitButton pendingText="Saving dispatch details and photos…">
+            <SubmitButton pendingText="Saving dispatch details and labels…">
               <Truck className="size-5" />
-              SUBMIT DISPATCH DETAILS & PHOTOS
+              SUBMIT DISPATCH DETAILS & LABELS
             </SubmitButton>
           </form>
         )}
@@ -161,7 +161,7 @@ export function OfflineActionPanel({
         {actions.includes("CONFIRM_PRINTING") && (
           <div className="grid gap-4">
             <div className="rounded-xl border border-fuchsia-100 bg-fuchsia-50/50 p-3.5 text-xs text-fuchsia-900">
-              <strong>Printing Team:</strong> Please print the shipping labels and documents uploaded by HR below, then mark printing done.
+              <strong>Printing Team:</strong> Please print the shipping labels and documents uploaded by Logistics below, then mark printing done.
             </div>
 
             {attachments.length > 0 && (
@@ -216,21 +216,21 @@ export function OfflineActionPanel({
           <form action={confirmPickupAction}>
             <input type="hidden" name="order_id" value={order.id} />
             <div className="mb-3 rounded-xl border border-cyan-100 bg-cyan-50/50 p-3 text-xs text-cyan-900">
-              <strong>Consignment Team (Ali Sir):</strong> Once the courier has picked up the packed and labelled boxes, confirm the pickup.
+              <strong>Consignment Team (Ali Sir):</strong> Once labelled boxes are packed and ready for transporter/courier pickup, confirm the pickup.
             </div>
             <ConfirmButton message="Confirm that the courier has picked up the packed boxes from the warehouse.">
               <Check className="size-5" />
-              CONFIRM PICK UP DONE
+              CONFIRM PACKED & PICKED UP
             </ConfirmButton>
           </form>
         )}
 
-        {/* Step 5: HR confirms delivery with POD */}
+        {/* Step 5: HR confirms delivery with Challan & POD */}
         {actions.includes("CONFIRM_DELIVERY") && (
           <form action={confirmDeliveryAction} className="grid gap-4">
             <input type="hidden" name="order_id" value={order.id} />
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 text-xs text-emerald-900">
-              <strong>HR Team (Nainisha Mam):</strong> Confirm delivery to the client and upload Proof of Delivery (POD).
+              <strong>HR Team:</strong> Confirm delivery to the client and upload delivery challan / Proof of Delivery (POD).
             </div>
             <Field label="Proof of Delivery Notes">
               <Textarea

@@ -20,6 +20,7 @@ export type AttachmentType = "CUSTOMER_PHOTO" | "LABEL" | "PROOF_PHOTO" | "QC_PH
 export type QcDecision = "PENDING" | "APPROVED" | "REJECTED";
 export type OrderType = "REPLACEMENT" | "OFFLINE";
 export type ShippingSpeed = "STANDARD" | "EXPRESS";
+export type DeliveryStatus = "SUCCESSFUL" | "UNSUCCESSFUL" | "RTA" | "RTO";
 
 export interface DimensionPreset {
   id: string;
@@ -27,6 +28,18 @@ export interface DimensionPreset {
   length_cm: number;
   breadth_cm: number;
   height_cm: number;
+  active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerPreset {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string;
   active: boolean;
   created_by: string;
   created_at: string;
@@ -79,6 +92,10 @@ export interface Replacement {
   delivered_at: string | null;
   delivered_by: string | null;
   delivery_notes: string | null;
+  delivery_status?: DeliveryStatus | null;
+  rta_reason?: string | null;
+  rta_at?: string | null;
+  rta_by?: string | null;
   needs_token_at: string | null;
   archived_at: string | null;
   archived_by: string | null;
@@ -179,10 +196,19 @@ export interface OfflineOrder {
   picked_up_by: string | null;
   delivered_at: string | null;
   delivered_by: string | null;
+  delivery_status?: DeliveryStatus | null;
+  rta_reason?: string | null;
+  rta_at?: string | null;
+  rta_by?: string | null;
   acknowledged_at: string | null;
   acknowledged_by: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
+  customer_name?: string | null;
+  customer_address?: string | null;
+  customer_phone?: string | null;
+  customer_email?: string | null;
+  customer_preset_id?: string | null;
   creator?: Pick<Profile, "full_name"> | null;
   items?: OfflineOrderItem[];
 }

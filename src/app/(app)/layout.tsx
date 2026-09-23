@@ -4,8 +4,6 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 import { RealtimeListener } from "@/components/realtime/realtime-listener";
 import { requireProfile } from "@/lib/auth/session";
 
-export const dynamic = "force-dynamic";
-
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireProfile();
   return (

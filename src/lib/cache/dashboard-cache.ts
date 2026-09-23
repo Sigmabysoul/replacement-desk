@@ -52,9 +52,42 @@ export function setCachedDashboardData(
   });
 }
 
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+const operationalCache = new Map<string, CacheEntry<unknown>>();
+
 /**
- * Invalidates the dashboard cache immediately so subsequent views receive fresh data.
+ * Returns cached operational list query results if still within TTL.
+ */
+export function getCachedOperationalData<T>(key: string): T | null {
+  const entry = operationalCache.get(key);
+  if (entry && entry.expiresAt > Date.now()) {
+    return entry.data as T;
+  }
+  operationalCache.delete(key);
+  return null;
+}
+
+/**
+ * Caches operational list query results for a short duration (default 15 seconds).
+ */
+export function setCachedOperationalData<T>(key: string, data: T, ttlMs = 15000): void {
+  if (operationalCache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of operationalCache) {
+      if (v.expiresAt <= now) operationalCache.delete(k);
+    }
+  }
+  operationalCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+}
+
+/**
+ * Invalidates all operational and dashboard caches immediately so subsequent views receive fresh data.
  */
 export function invalidateDashboardCache() {
   cachedDashboards.clear();
+  operationalCache.clear();
 }

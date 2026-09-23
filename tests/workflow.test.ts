@@ -411,10 +411,12 @@ describe("formatDate timezone enforcement", () => {
     expect(result.toLowerCase()).toMatch(/12:00\s*(pm|noon)/i);
   });
 
-  it("parses DD/MM/YYYY form values without accepting impossible dates", () => {
+  it("parses DD/MM/YYYY and calendar YYYY-MM-DD form values without accepting impossible dates", () => {
     expect(parseDisplayDate("19/09/2026")).toBe("2026-09-19");
+    expect(parseDisplayDate("2026-09-19")).toBe("2026-09-19");
     expect(parseDisplayDate("31/02/2026")).toBeNull();
-    expect(parseDisplayDate("2026-09-19")).toBeNull();
+    expect(parseDisplayDate("2026-02-31")).toBeNull();
+    expect(parseDisplayDate("not-a-date")).toBeNull();
   });
 
   it("handles null and invalid dates gracefully", () => {

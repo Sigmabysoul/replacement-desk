@@ -13,6 +13,7 @@ import {
   confirmDeliverySchema,
   confirmPackingSchema,
   createOfflineOrderSchema,
+  customerPresetSchema,
   offlineOrderItemsSchema,
   dispatchOrderSchema,
   offlineOrderCommentSchema,
@@ -126,6 +127,11 @@ export async function createOfflineOrderAction(formData: FormData) {
     p_notes: parsed.data.notes ?? null,
     p_order_number: parsed.data.order_number ?? null,
     p_items: parsedItems.data,
+    p_customer_name: parsed.data.customer_name ?? null,
+    p_customer_address: parsed.data.customer_address ?? null,
+    p_customer_phone: parsed.data.customer_phone ?? null,
+    p_customer_email: parsed.data.customer_email ?? null,
+    p_customer_preset_id: parsed.data.customer_preset_id ?? null,
   });
 
   if (error || !data) {
@@ -216,10 +222,10 @@ export async function confirmPackingAction(formData: FormData) {
 }
 
 /**
- * HR prepares dispatch details with LR number, tracking URL, and compressed photos.
+ * Logistics prepares dispatch details with LR number, tracking URL, and shipping label / dispatch photos.
  */
 export async function dispatchPrepareOfflineOrderAction(formData: FormData) {
-  await requireProfile(["HR", "ADMIN"]);
+  await requireProfile(["LOGISTICS", "ADMIN"]);
   const orderId = String(formData.get("order_id") ?? "");
   const parsed = dispatchOrderSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -477,3 +483,118 @@ export async function deleteOfflineOrderAction(formData: FormData) {
   revalidatePath("/tracking");
   redirect(`/offline-orders${cleanupWarning}`);
 }
+
+/**
+ * Logistics or Admin marks an offline order delivery as unsuccessful, RTO, or assigns RTA re-dispatch.
+ */
+export async function markOfflineDeliveryUnsuccessfulAction(formData: FormData) {
+  await requireProfile(["LOGISTICS", "ADMIN"]);
+  const orderId = String(formData.get("order_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const outcome = String(formData.get("outcome") ?? "").trim().toUpperCase();
+  const isRta = outcome === "RTA" || formData.get("is_rta") === "true" || formData.get("is_rta") === "on";
+  const newPartner = String(formData.get("logistics_partner") ?? "").trim();
+  const newLrNumber = String(formData.get("lr_number") ?? "").trim();
+  const newTrackingUrl = String(formData.get("tracking_url") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/tracking");
+
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+    redirect(`${returnTo}?error=${encodeURIComponent("Invalid offline order.")}`);
+  }
+
+  if (isRta || (newPartner && newLrNumber)) {
+    if (!newPartner) {
+      redirect(`${returnTo}?error=${encodeURIComponent("New delivery partner is required for RTA re-assignment.")}`);
+    }
+    if (!newLrNumber) {
+      redirect(`${returnTo}?error=${encodeURIComponent("New LR / tracking number is required for RTA re-assignment.")}`);
+    }
+    if (newTrackingUrl && !/^https?:\/\/[^\s]+$/i.test(newTrackingUrl)) {
+      redirect(`${returnTo}?error=${encodeURIComponent("Tracking link must begin with http:// or https://")}`);
+    }
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("mark_offline_delivery_unsuccessful", {
+    p_order_id: orderId,
+    p_reason: reason || null,
+    p_new_logistics_partner: newPartner || null,
+    p_new_lr_number: newLrNumber || null,
+    p_new_tracking_url: newTrackingUrl || null,
+    p_outcome: outcome || (isRta ? "RTA" : null),
+  });
+
+  if (error) {
+    redirect(`${returnTo}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  const order = data as OfflineOrder;
+  const isReassigned = Boolean(newPartner && newLrNumber);
+  const msg = outcome === "RTO"
+    ? `Offline order ${order?.so_number ?? ""} marked as RTO (Return to Origin).`
+    : isReassigned
+    ? `Offline order ${order?.so_number ?? ""} re-assigned (RTA) with ${newPartner}.`
+    : `Offline order ${order?.so_number ?? ""} marked as delivery unsuccessful.`;
+
+  invalidateDashboardCache();
+  revalidatePath("/");
+  revalidatePath("/offline-orders");
+  revalidatePath("/tracking");
+  revalidatePath(`/offline-orders/${orderId}`);
+  redirect(`${returnTo}?success=${encodeURIComponent(msg)}`);
+}
+
+/**
+ * Creates or edits reusable customer presets for offline orders.
+ * HR, Boss, Customer Support, and Admin can manage presets.
+ */
+export async function saveCustomerPresetAction(formData: FormData) {
+  const profile = await requireProfile(["HR", "BOSS", "CUSTOMER_SUPPORT", "ADMIN"]);
+  const parsed = customerPresetSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    redirect(`/customers?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the customer details.")}`);
+  }
+
+  const supabase = await createClient();
+  const values = {
+    name: parsed.data.name,
+    phone: parsed.data.phone ?? null,
+    email: parsed.data.email ?? null,
+    address: parsed.data.address,
+    active: parsed.data.active ?? true,
+  };
+
+  const { error } = parsed.data.id
+    ? await supabase.from("customer_presets").update(values).eq("id", parsed.data.id)
+    : await supabase.from("customer_presets").insert({ ...values, created_by: profile.id });
+
+  if (error) {
+    redirect(`/customers?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/customers");
+  revalidatePath("/offline-orders/new");
+  redirect("/customers?success=Customer%20profile%20saved.");
+}
+
+/**
+ * Archives a customer preset so it no longer appears in future selections.
+ */
+export async function archiveCustomerPresetAction(formData: FormData) {
+  await requireProfile(["HR", "BOSS", "CUSTOMER_SUPPORT", "ADMIN"]);
+  const id = String(formData.get("id") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    redirect("/customers?error=Invalid%20customer%20profile.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("customer_presets").update({ active: false }).eq("id", id);
+  if (error) {
+    redirect(`/customers?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/customers");
+  revalidatePath("/offline-orders/new");
+  redirect("/customers?success=Customer%20profile%20archived.");
+}
+

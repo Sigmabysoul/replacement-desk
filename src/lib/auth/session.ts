@@ -63,7 +63,7 @@ export const getSessionProfile = cache(async (): Promise<Profile | null> => {
     if (profile && profile.active) {
       profileCache.set(cacheKey, {
         profile,
-        expiresAt: Date.now() + 60 * 1000, // 60s TTL
+        expiresAt: Date.now() + 300 * 1000, // 300s (5 min) TTL
       });
     }
     return profile;

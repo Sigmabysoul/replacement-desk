@@ -11,15 +11,16 @@ import {
   UserRound,
   Weight,
 } from "lucide-react";
-import { transitionAction } from "@/app/actions";
-import { confirmDeliveryAction } from "@/app/offline-actions";
 import { Card } from "@/components/ui/card";
-import { ConfirmButton } from "@/components/ui/confirm-button";
-import { Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { OrderItemsSummary } from "@/components/orders/order-items-summary";
+import { ShipmentCardActions } from "@/components/tracking/shipment-card-actions";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import {
+  getCachedOperationalData,
+  setCachedOperationalData,
+} from "@/lib/cache/dashboard-cache";
 import type { OfflineOrder, Replacement } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -32,6 +33,14 @@ function daysInTransit(shippedAt: string | null): string {
   return `${diffDays} days in transit`;
 }
 
+interface TrackingDataPayload {
+  inTransitReplacements: Replacement[];
+  deliveredReplacements: Replacement[];
+  inTransitOffline: OfflineOrder[];
+  deliveredOffline: OfflineOrder[];
+  error: string | null;
+}
+
 export default async function TrackingPage({
   searchParams,
 }: {
@@ -41,46 +50,65 @@ export default async function TrackingPage({
   const { error: queryError, success: querySuccess, type: queryType } = await searchParams;
   const currentTab = queryType === "replacements" || queryType === "offline" ? queryType : "all";
 
-  const supabase = await createClient();
-  const [
-    { data: shippedReplacementsData, error: shippedReplacementsError },
-    { data: deliveredReplacementsData, error: deliveredReplacementsError },
-    { data: pickedUpOfflineData, error: pickedUpOfflineError },
-    { data: deliveredOfflineData, error: deliveredOfflineError },
-  ] = await Promise.all([
-    supabase
-      .from("replacements")
-      .select("*, items:replacement_items(id,replacement_id,product_name,quantity,position,created_at)")
-      .eq("status", "SHIPPED")
-      .order("shipped_at", { ascending: false }),
-    supabase
-      .from("replacements")
-      .select("*, items:replacement_items(id,replacement_id,product_name,quantity,position,created_at)")
-      .eq("status", "DELIVERED")
-      .order("delivered_at", { ascending: false })
-      .limit(12),
-    supabase
-      .from("offline_orders")
-      .select("*, items:offline_order_items(id,offline_order_id,product_name,quantity,position,created_at)")
-      .eq("status", "PICKED_UP")
-      .order("picked_up_at", { ascending: false }),
-    supabase
-      .from("offline_orders")
-      .select("*, items:offline_order_items(id,offline_order_id,product_name,quantity,position,created_at)")
-      .in("status", ["DELIVERED", "ACKNOWLEDGED"])
-      .order("delivered_at", { ascending: false })
-      .limit(12),
-  ]);
+  let trackingData = getCachedOperationalData<TrackingDataPayload>("tracking_data");
 
-  const inTransitReplacements = (shippedReplacementsData ?? []) as Replacement[];
-  const deliveredReplacements = (deliveredReplacementsData ?? []) as Replacement[];
-  const inTransitOffline = (pickedUpOfflineData ?? []) as OfflineOrder[];
-  const deliveredOffline = (deliveredOfflineData ?? []) as OfflineOrder[];
+  if (!trackingData) {
+    const supabase = await createClient();
+    const [
+      { data: shippedReplacementsData, error: shippedReplacementsError },
+      { data: deliveredReplacementsData, error: deliveredReplacementsError },
+      { data: pickedUpOfflineData, error: pickedUpOfflineError },
+      { data: deliveredOfflineData, error: deliveredOfflineError },
+    ] = await Promise.all([
+      supabase
+        .from("replacements")
+        .select("*, items:replacement_items(id,replacement_id,product_name,quantity,position,created_at)")
+        .eq("status", "SHIPPED")
+        .order("shipped_at", { ascending: false }),
+      supabase
+        .from("replacements")
+        .select("*, items:replacement_items(id,replacement_id,product_name,quantity,position,created_at)")
+        .eq("status", "DELIVERED")
+        .order("delivered_at", { ascending: false })
+        .limit(12),
+      supabase
+        .from("offline_orders")
+        .select("*, items:offline_order_items(id,offline_order_id,product_name,quantity,position,created_at)")
+        .eq("status", "PICKED_UP")
+        .order("picked_up_at", { ascending: false }),
+      supabase
+        .from("offline_orders")
+        .select("*, items:offline_order_items(id,offline_order_id,product_name,quantity,position,created_at)")
+        .in("status", ["DELIVERED", "ACKNOWLEDGED"])
+        .order("delivered_at", { ascending: false })
+        .limit(12),
+    ]);
 
-  const error =
-    shippedReplacementsError || deliveredReplacementsError || pickedUpOfflineError || deliveredOfflineError
-      ? "Could not load shipment records."
-      : null;
+    const queryFailure =
+      shippedReplacementsError || deliveredReplacementsError || pickedUpOfflineError || deliveredOfflineError
+        ? "Could not load shipment records."
+        : null;
+
+    trackingData = {
+      inTransitReplacements: (shippedReplacementsData ?? []) as Replacement[],
+      deliveredReplacements: (deliveredReplacementsData ?? []) as Replacement[],
+      inTransitOffline: (pickedUpOfflineData ?? []) as OfflineOrder[],
+      deliveredOffline: (deliveredOfflineData ?? []) as OfflineOrder[],
+      error: queryFailure,
+    };
+
+    if (!queryFailure) {
+      setCachedOperationalData("tracking_data", trackingData, 15000);
+    }
+  }
+
+  const {
+    inTransitReplacements,
+    deliveredReplacements,
+    inTransitOffline,
+    deliveredOffline,
+    error,
+  } = trackingData;
 
   const totalInTransit = inTransitReplacements.length + inTransitOffline.length;
   const totalDelivered = deliveredReplacements.length + deliveredOffline.length;
@@ -89,7 +117,7 @@ export default async function TrackingPage({
   const showOffline = currentTab === "all" || currentTab === "offline";
 
   return (
-    <div className="grid gap-7">
+    <div className="grid gap-7 w-full max-w-full min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-700">
@@ -100,7 +128,7 @@ export default async function TrackingPage({
             Shipment Tracking
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            Track all in-transit replacements and offline order shipments, then mark them delivered once received.
+            Track all in-transit shipments, record delivery outcomes (successful or unsuccessful), and assign RTA re-attempts.
           </p>
         </div>
 
@@ -118,6 +146,7 @@ export default async function TrackingPage({
       <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
         <Link
           href="/tracking"
+          prefetch={true}
           className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
             currentTab === "all"
               ? "bg-indigo-600 text-white shadow-xs"
@@ -128,6 +157,7 @@ export default async function TrackingPage({
         </Link>
         <Link
           href="/tracking?type=replacements"
+          prefetch={true}
           className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
             currentTab === "replacements"
               ? "bg-indigo-600 text-white shadow-xs"
@@ -138,6 +168,7 @@ export default async function TrackingPage({
         </Link>
         <Link
           href="/tracking?type=offline"
+          prefetch={true}
           className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
             currentTab === "offline"
               ? "bg-indigo-600 text-white shadow-xs"
@@ -175,19 +206,35 @@ export default async function TrackingPage({
               return (
                 <Card
                   key={order.id}
-                  className="flex flex-col justify-between overflow-hidden border-sky-200/80 p-5 shadow-xs transition hover:border-indigo-300 hover:shadow-md"
+                  className={`flex flex-col justify-between overflow-hidden p-5 shadow-xs transition hover:shadow-md ${
+                    order.delivery_status === "UNSUCCESSFUL"
+                      ? "border-rose-300 bg-rose-50/20"
+                      : order.delivery_status === "RTA"
+                      ? "border-amber-300 bg-amber-50/20"
+                      : "border-sky-200/80 hover:border-indigo-300"
+                  }`}
                 >
                   <div>
                     {/* Header */}
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-black text-indigo-700">
                             {order.replacement_number}
                           </span>
-                          <span className="rounded-md bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-800">
-                            SHIPPED
-                          </span>
+                          {order.delivery_status === "UNSUCCESSFUL" ? (
+                            <span className="rounded-md bg-rose-100 px-2 py-0.5 text-xs font-black text-rose-800">
+                              DELIVERY FAILED
+                            </span>
+                          ) : order.delivery_status === "RTA" ? (
+                            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-black text-amber-800">
+                              RTA / RE-ASSIGNED
+                            </span>
+                          ) : (
+                            <span className="rounded-md bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-800">
+                              SHIPPED
+                            </span>
+                          )}
                         </div>
                         <OrderItemsSummary
                           items={order.items}
@@ -263,27 +310,15 @@ export default async function TrackingPage({
                     </div>
                   </div>
 
-                  {/* Delivery Action Form */}
-                  <form action={transitionAction} className="mt-5 border-t border-slate-100 pt-4">
-                    <input type="hidden" name="replacement_id" value={order.id} />
-                    <input type="hidden" name="target_status" value="DELIVERED" />
-
-                    <div className="mb-3">
-                      <Input
-                        required
-                        name="message"
-                        placeholder="Delivery notes (e.g. Received with customer signature / gate delivery)…"
-                        className="h-10 text-xs"
-                      />
-                    </div>
-
-                    <ConfirmButton
-                      message={`Confirm ${order.replacement_number} has been successfully delivered to the customer?`}
-                    >
-                      <CheckCircle2 className="size-5" />
-                      MARK SUCCESSFULLY DELIVERED
-                    </ConfirmButton>
-                  </form>
+                  {/* Interactive Action Controls */}
+                  <ShipmentCardActions
+                    orderId={order.id}
+                    orderType="replacement"
+                    orderNumber={order.replacement_number}
+                    deliveryStatus={order.delivery_status ?? null}
+                    rtaReason={order.rta_reason}
+                    courierPartner={order.courier_partner}
+                  />
                 </Card>
               );
             })}
@@ -311,19 +346,35 @@ export default async function TrackingPage({
               return (
                 <Card
                   key={order.id}
-                  className="flex flex-col justify-between overflow-hidden border-purple-200/80 p-5 shadow-xs transition hover:border-purple-300 hover:shadow-md"
+                  className={`flex flex-col justify-between overflow-hidden p-5 shadow-xs transition hover:shadow-md ${
+                    order.delivery_status === "UNSUCCESSFUL"
+                      ? "border-rose-300 bg-rose-50/20"
+                      : order.delivery_status === "RTA"
+                      ? "border-amber-300 bg-amber-50/20"
+                      : "border-purple-200/80 hover:border-purple-300"
+                  }`}
                 >
                   <div>
                     {/* Header */}
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="rounded-md bg-purple-50 px-2 py-0.5 text-xs font-black text-purple-700">
                             {order.so_number}
                           </span>
-                          <span className="rounded-md bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-800">
-                            PICKED UP
-                          </span>
+                          {order.delivery_status === "UNSUCCESSFUL" ? (
+                            <span className="rounded-md bg-rose-100 px-2 py-0.5 text-xs font-black text-rose-800">
+                              DELIVERY FAILED
+                            </span>
+                          ) : order.delivery_status === "RTA" ? (
+                            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-black text-amber-800">
+                              RTA / RE-ASSIGNED
+                            </span>
+                          ) : (
+                            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-800">
+                              PICKED UP
+                            </span>
+                          )}
                           {order.brand && (
                             <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
                               {order.brand}
@@ -401,6 +452,22 @@ export default async function TrackingPage({
                         ) : null}
                       </div>
 
+                      {order.customer_name && (
+                        <div className="flex items-center gap-2">
+                          <UserRound className="size-3.5 text-slate-400 shrink-0" />
+                          <span className="font-semibold text-slate-800">{order.customer_name}</span>
+                          {order.customer_phone && (
+                            <span className="text-slate-400">· {order.customer_phone}</span>
+                          )}
+                        </div>
+                      )}
+                      {order.customer_address && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="size-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">{order.customer_address}</span>
+                        </div>
+                      )}
+
                       {order.picked_up_at && (
                         <div className="flex items-center gap-2 text-[11px] text-slate-400">
                           <Clock className="size-3.5 shrink-0" />
@@ -410,27 +477,15 @@ export default async function TrackingPage({
                     </div>
                   </div>
 
-                  {/* Delivery Action Form for Offline Order */}
-                  <form action={confirmDeliveryAction} className="mt-5 border-t border-slate-100 pt-4">
-                    <input type="hidden" name="order_id" value={order.id} />
-                    <input type="hidden" name="return_to" value="/tracking" />
-
-                    <div className="mb-3">
-                      <Input
-                        required
-                        name="pod_notes"
-                        placeholder="Proof of delivery notes (e.g. Delivered to client store / signed by manager)…"
-                        className="h-10 text-xs"
-                      />
-                    </div>
-
-                    <ConfirmButton
-                      message={`Confirm offline order ${order.so_number} has been delivered?`}
-                    >
-                      <CheckCircle2 className="size-5" />
-                      MARK OFFLINE ORDER DELIVERED
-                    </ConfirmButton>
-                  </form>
+                  {/* Interactive Action Controls */}
+                  <ShipmentCardActions
+                    orderId={order.id}
+                    orderType="offline"
+                    orderNumber={order.so_number}
+                    deliveryStatus={order.delivery_status ?? null}
+                    rtaReason={order.rta_reason}
+                    courierPartner={order.logistics_partner}
+                  />
                 </Card>
               );
             })}
@@ -492,6 +547,12 @@ export default async function TrackingPage({
                       Courier: <strong className="text-slate-700">{order.courier_partner || order.order_reference || "Standard"}</strong>
                     </p>
 
+                    {order.delivery_notes && (
+                      <p className="mt-2 rounded-lg border border-emerald-200/60 bg-emerald-50/50 p-2 text-xs text-slate-700">
+                        <strong>Notes:</strong> {order.delivery_notes}
+                      </p>
+                    )}
+
                     {order.delivered_at && (
                       <p className="mt-3 text-[11px] text-slate-400">
                         Delivered on {formatDate(order.delivered_at)}
@@ -530,6 +591,12 @@ export default async function TrackingPage({
                       Partner: <strong className="text-slate-700">{order.logistics_partner || "Standard"}</strong>
                       {order.brand ? ` · ${order.brand}` : ""}
                     </p>
+
+                    {order.pod_notes && (
+                      <p className="mt-2 rounded-lg border border-purple-200/60 bg-purple-50/50 p-2 text-xs text-slate-700">
+                        <strong>Notes:</strong> {order.pod_notes}
+                      </p>
+                    )}
 
                     {order.delivered_at && (
                       <p className="mt-3 text-[11px] text-slate-400">
