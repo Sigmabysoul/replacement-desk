@@ -1,4 +1,5 @@
-import { ShieldCheck, UserPlus, Users } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { createUserAction, updateUserAction } from "@/app/actions";
 import { Card } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/field";
@@ -29,6 +30,15 @@ export default async function UsersPage({
 
   return (
     <div className="grid gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 lg:hidden">
+        <Link
+          href="/profile"
+          className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-indigo-600"
+        >
+          <ArrowLeft className="size-4" /> Back to Profile
+        </Link>
+      </div>
+
       <div>
         <p className="text-sm font-bold text-indigo-700">ADMIN</p>
         <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">

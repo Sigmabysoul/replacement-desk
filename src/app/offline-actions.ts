@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { invalidateDashboardCache } from "@/lib/cache/dashboard-cache";
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "@/lib/replacements/validation";
 import {
@@ -426,4 +427,53 @@ export async function cancelOfflineOrderAction(formData: FormData) {
   revalidatePath(`/offline-orders/${orderId}`);
   revalidatePath("/");
   redirect(`/offline-orders/${orderId}?success=${encodeURIComponent("Order cancelled.")}`);
+}
+
+/**
+ * Admin or Customer Support permanently deletes an offline order and all related database records and stored files.
+ */
+export async function deleteOfflineOrderAction(formData: FormData) {
+  await requireProfile(["ADMIN", "CUSTOMER_SUPPORT"]);
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+    redirect("/offline-orders?error=Invalid%20order%20ID.");
+  }
+
+  const supabase = await createClient();
+  const { data: order } = await supabase
+    .from("offline_orders")
+    .select("id, so_number")
+    .eq("id", orderId)
+    .single();
+
+  if (!order) {
+    redirect("/offline-orders?error=Offline%20order%20not%20found.");
+  }
+
+  const { data: attachments } = await supabase
+    .from("offline_order_attachments")
+    .select("storage_path")
+    .eq("offline_order_id", orderId);
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("offline_orders").delete().eq("id", orderId);
+  if (error) {
+    redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  const storagePaths = (attachments ?? []).map((a) => a.storage_path).filter(Boolean);
+  let cleanupWarning = "";
+  if (storagePaths.length > 0) {
+    const { error: storageError } = await admin.storage.from("offline-order-files").remove(storagePaths);
+    if (storageError) {
+      cleanupWarning = "?warning=Order%20deleted%2C%20but%20an%20administrator%20must%20clean%20up%20its%20stored%20files.";
+    }
+  }
+
+  invalidateDashboardCache();
+  revalidatePath("/");
+  revalidatePath("/offline-orders");
+  revalidatePath("/dispatch");
+  revalidatePath("/tracking");
+  redirect(`/offline-orders${cleanupWarning}`);
 }

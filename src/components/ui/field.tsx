@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return <label className="grid gap-2 text-sm font-semibold text-slate-800"><span>{label}</span>{children}{hint && <span className="text-xs font-normal leading-5 text-slate-500">{hint}</span>}</label>;
+  return <label className="grid gap-2 text-sm font-semibold text-slate-800"><span>{label}</span>{children}{hint && <span className="text-xs font-normal leading-5 text-slate-500 break-all">{hint}</span>}</label>;
 }
 
 export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { ref?: React.Ref<HTMLInputElement> }) {

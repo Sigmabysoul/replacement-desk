@@ -55,6 +55,18 @@ describe("offline workflow permissions", () => {
     expect(canPerformOffline("ADMIN", "CONFIRM_DELIVERY")).toBe(true);
     expect(canPerformOffline("ADMIN", "ACKNOWLEDGE_ORDER")).toBe(true);
     expect(canPerformOffline("ADMIN", "CANCEL_ORDER")).toBe(true);
+    expect(canPerformOffline("ADMIN", "DELETE_ORDER")).toBe(true);
+  });
+
+  it("allows Admin and Customer Support to delete offline orders", () => {
+    expect(canPerformOffline("ADMIN", "DELETE_ORDER")).toBe(true);
+    expect(canPerformOffline("CUSTOMER_SUPPORT", "DELETE_ORDER")).toBe(true);
+    expect(canPerformOffline("BOSS", "DELETE_ORDER")).toBe(false);
+    expect(canPerformOffline("HR", "DELETE_ORDER")).toBe(false);
+    expect(canPerformOffline("CONSIGNMENT", "DELETE_ORDER")).toBe(false);
+    expect(canPerformOffline("PRINTING", "DELETE_ORDER")).toBe(false);
+    expect(canPerformOffline("PACKING", "DELETE_ORDER")).toBe(false);
+    expect(canPerformOffline("LOGISTICS", "DELETE_ORDER")).toBe(false);
   });
 
   it("supports users holding multiple roles", () => {

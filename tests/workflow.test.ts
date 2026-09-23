@@ -65,6 +65,17 @@ describe("replacement workflow permissions", () => {
     expect(canPerform("ADMIN", "MARK_PACKED")).toBe(true);
     expect(canPerform("ADMIN", "MARK_SHIPPED")).toBe(true);
     expect(canPerform("ADMIN", "CANCEL_REPLACEMENT")).toBe(true);
+    expect(canPerform("ADMIN", "DELETE_REPLACEMENT")).toBe(true);
+  });
+
+  it("allows Customer Support and Admin to delete replacement orders", () => {
+    expect(canPerform("CUSTOMER_SUPPORT", "DELETE_REPLACEMENT")).toBe(true);
+    expect(canPerform("ADMIN", "DELETE_REPLACEMENT")).toBe(true);
+    expect(canPerform("LOGISTICS", "DELETE_REPLACEMENT")).toBe(false);
+    expect(canPerform("PRINTING", "DELETE_REPLACEMENT")).toBe(false);
+    expect(canPerform("PACKING", "DELETE_REPLACEMENT")).toBe(false);
+    expect(canPerform("BOSS", "DELETE_REPLACEMENT")).toBe(false);
+    expect(canPerform("HR", "DELETE_REPLACEMENT")).toBe(false);
   });
 });
 

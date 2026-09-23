@@ -78,7 +78,7 @@ export function Navigation({
     isAdmin || item.roles.some((r) => userRoles.includes(r))
   );
 
-  // Clean, responsive mobile items (max 4-5 items, prevents horizontal overflow)
+  // Clean, responsive mobile items (max 5-6 items, prevents horizontal overflow)
   const mobileItems = [
     { href: "/", short: "Home", icon: LayoutDashboard },
     { href: "/offline-orders", short: "Offline", icon: Boxes },
@@ -88,6 +88,7 @@ export function Navigation({
       : userRoles.includes("PACKING")
       ? [{ href: "/dispatch", short: "Dispatch", icon: Truck }]
       : []),
+    ...(isAdmin ? [{ href: "/admin/users", short: "Users", icon: Users }] : []),
     { href: "/profile", short: "Profile", icon: UserRound },
   ];
 
@@ -214,7 +215,7 @@ export function Navigation({
               key={href}
               href={href}
               className={cn(
-                "relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] transition-colors active:scale-95",
+                "relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 text-[10.5px] sm:text-[11px] transition-colors active:scale-95",
                 active
                   ? "text-indigo-600 font-extrabold"
                   : "text-slate-500 hover:text-slate-900 font-medium"
@@ -222,7 +223,7 @@ export function Navigation({
             >
               <span
                 className={cn(
-                  "flex items-center justify-center rounded-full px-3 py-1 transition-all",
+                  "flex items-center justify-center rounded-full px-2 sm:px-3 py-1 transition-all",
                   active
                     ? "bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200/70"
                     : "text-slate-500"
@@ -230,7 +231,7 @@ export function Navigation({
               >
                 <Icon className={cn("size-5 shrink-0", active ? "stroke-[2.5]" : "stroke-2")} />
               </span>
-              <span className="truncate max-w-[64px] text-center leading-none tracking-tight">{short}</span>
+              <span className="truncate max-w-[56px] sm:max-w-[64px] text-center leading-none tracking-tight">{short}</span>
             </Link>
           );
         })}

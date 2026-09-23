@@ -6,7 +6,7 @@ import { Field, Input, Textarea } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ReasonSelect } from "@/components/replacements/reason-select";
-import { requireProfile } from "@/lib/auth/session";
+import { hasAnyRole, requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { Replacement } from "@/lib/types";
 
@@ -17,7 +17,7 @@ export default async function EditReplacementPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireProfile(["CUSTOMER_SUPPORT", "HR", "BOSS", "ADMIN"]);
+  const profile = await requireProfile(["CUSTOMER_SUPPORT", "HR", "BOSS", "ADMIN"]);
   const { id } = await params;
   const { error } = await searchParams;
   const supabase = await createClient();
@@ -73,21 +73,23 @@ export default async function EditReplacementPage({
         <SubmitButton pendingText="Saving…">SAVE CHANGES</SubmitButton>
       </form>
 
-      <div className="mt-8 border-t border-slate-200 pt-6">
-        <h2 className="text-sm font-bold text-slate-900">Danger zone</h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Delete this replacement permanently if it was created by mistake.
-        </p>
-        <form action={deleteReplacementAction} className="mt-3">
-          <input type="hidden" name="replacement_id" value={replacement.id} />
-          <ConfirmButton
-            variant="danger"
-            message={`Are you sure you want to permanently delete ${replacement.replacement_number}? All attached files will be deleted.`}
-          >
-            DELETE REPLACEMENT ORDER
-          </ConfirmButton>
-        </form>
-      </div>
+      {hasAnyRole(profile, ["ADMIN", "CUSTOMER_SUPPORT"]) && (
+        <div className="mt-8 border-t border-slate-200 pt-6">
+          <h2 className="text-sm font-bold text-slate-900">Danger zone</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Delete this replacement permanently if it was created by mistake.
+          </p>
+          <form action={deleteReplacementAction} className="mt-3">
+            <input type="hidden" name="replacement_id" value={replacement.id} />
+            <ConfirmButton
+              variant="danger"
+              message={`Are you sure you want to permanently delete ${replacement.replacement_number}? All attached files will be deleted.`}
+            >
+              DELETE REPLACEMENT ORDER
+            </ConfirmButton>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ export type OfflineWorkflowAction =
   | "CONFIRM_DELIVERY"
   | "ACKNOWLEDGE_ORDER"
   | "CANCEL_ORDER"
+  | "DELETE_ORDER"
   | "COMMENT";
 
 const transitions: Record<OfflineOrderStatus, readonly OfflineOrderStatus[]> = {
@@ -31,6 +32,7 @@ const permissions: Record<OfflineWorkflowAction, readonly Role[]> = {
   CONFIRM_DELIVERY: ["HR", "LOGISTICS", "ADMIN"],
   ACKNOWLEDGE_ORDER: ["BOSS", "ADMIN"],
   CANCEL_ORDER: ["BOSS", "ADMIN"],
+  DELETE_ORDER: ["ADMIN", "CUSTOMER_SUPPORT"],
   COMMENT: ["BOSS", "HR", "CONSIGNMENT", "PRINTING", "CUSTOMER_SUPPORT", "LOGISTICS", "PACKING", "ADMIN"],
 };
 

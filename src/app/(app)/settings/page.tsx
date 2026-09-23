@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowRight, Ruler, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, Ruler, SlidersHorizontal, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { requireProfile } from "@/lib/auth/session";
+import { hasRole, requireProfile } from "@/lib/auth/session";
 
 export default async function SettingsHubPage() {
   const profile = await requireProfile();
+  const isAdmin = hasRole(profile, "ADMIN");
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
@@ -28,7 +29,22 @@ export default async function SettingsHubPage() {
           </Card>
         </Link>
 
-        {profile.role === "ADMIN" ? (
+        {isAdmin ? (
+          <Link href="/admin/users" className="group">
+            <Card className="flex h-full items-start gap-4 p-5 transition hover:border-indigo-300 hover:shadow-md">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700">
+                <Users className="size-5" />
+              </span>
+              <span className="min-w-0">
+                <strong className="block text-foreground">User management</strong>
+                <span className="mt-1 block text-sm leading-5 text-muted-foreground">Invite workers, assign operational roles, and manage access.</span>
+              </span>
+              <ArrowRight className="ml-auto mt-2 size-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-indigo-600" />
+            </Card>
+          </Link>
+        ) : null}
+
+        {isAdmin ? (
           <Link href="/admin/settings" className="group">
             <Card className="flex h-full items-start gap-4 p-5 transition hover:border-indigo-300 hover:shadow-md">
               <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700">

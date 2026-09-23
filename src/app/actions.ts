@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { hasRole, invalidateProfileCache, requireProfile } from "@/lib/auth/session";
+import { invalidateProfileCache, requireProfile } from "@/lib/auth/session";
 import { invalidateDashboardCache } from "@/lib/cache/dashboard-cache";
 import { ALLOWED_MIME_TYPES, cancelReplacementSchema, commentSchema, dimensionPresetSchema, MAX_FILE_SIZE, replacementEditSchema, replacementItemsSchema, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
 import { safeFileName } from "@/lib/utils";
@@ -740,7 +740,7 @@ export async function archiveDimensionPresetAction(formData: FormData) {
  * pointing at missing evidence, then performs best-effort privileged file cleanup.
  */
 export async function deleteReplacementAction(formData: FormData) {
-  const profile = await requireProfile(["ADMIN", "CUSTOMER_SUPPORT"]);
+  await requireProfile(["ADMIN", "CUSTOMER_SUPPORT"]);
   const replacementId = String(formData.get("replacement_id") ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(replacementId)) {
     redirect("/replacements?error=Invalid%20replacement%20ID.");
@@ -755,10 +755,6 @@ export async function deleteReplacementAction(formData: FormData) {
 
   if (!replacement) {
     redirect("/replacements?error=Replacement%20not%20found.");
-  }
-
-  if (!hasRole(profile, "ADMIN") && (replacement.created_by !== profile.id || replacement.status !== "NEW")) {
-    redirect(`/replacements/${replacementId}?error=You%20can%20only%20delete%20new%20orders%20you%20created.`);
   }
 
   const { data: attachments } = await supabase
@@ -783,6 +779,7 @@ export async function deleteReplacementAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/replacements");
   revalidatePath("/dispatch");
+  revalidatePath("/tracking");
   redirect(`/replacements${cleanupWarning}`);
 }
 

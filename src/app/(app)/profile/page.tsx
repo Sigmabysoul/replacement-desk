@@ -1,11 +1,12 @@
-import { ShieldCheck, UserRound } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, ShieldCheck, UserRound, Users } from "lucide-react";
 import { updatePasswordAction } from "@/app/actions";
 import { Card } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { requireProfile } from "@/lib/auth/session";
+import { hasRole, requireProfile } from "@/lib/auth/session";
 import { formatDate } from "@/lib/utils";
 
 export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string }> }) {
@@ -43,6 +44,30 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           </div>
         </dl>
       </Card>
+      {hasRole(profile, "ADMIN") && (
+        <Card className="mt-4 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3.5">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                <Users className="size-5" />
+              </span>
+              <div>
+                <h2 className="font-black text-slate-950 dark:text-slate-50">User Management</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Invite workers, assign operational roles, and manage accounts.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/admin/users"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition"
+            >
+              <span>Manage users</span>
+              <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
+        </Card>
+      )}
       <Card className="mt-4 p-5">
         <h2 className="font-black text-slate-950">Change password</h2>
         <form action={updatePasswordAction} className="mt-4 grid gap-4">

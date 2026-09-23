@@ -6,17 +6,20 @@ import {
   Download,
   ExternalLink,
   FileText,
+  Trash2,
   Truck,
 } from "lucide-react";
 import { notFound } from "next/navigation";
+import { deleteOfflineOrderAction } from "@/app/offline-actions";
 import { EditOfflineOrderId } from "@/components/offline-orders/edit-offline-order-id";
 import { OfflineActionPanel } from "@/components/offline-orders/offline-action-panel";
 import { OfflineActivityTimeline } from "@/components/offline-orders/offline-activity-timeline";
 import { OfflineCommentComposer } from "@/components/offline-orders/offline-comment-composer";
 import { OfflineStatusBadge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Notice } from "@/components/ui/notice";
-import { requireProfile } from "@/lib/auth/session";
+import { hasAnyRole, requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type {
   OfflineOrder,
@@ -164,6 +167,22 @@ export default async function OfflineOrderDetailPage({
               <span>Created by {creator?.full_name ?? "Boss"} on {formatDate(order.created_at)}</span>
             </div>
           </div>
+
+          {hasAnyRole(profile, ["ADMIN", "CUSTOMER_SUPPORT"]) && (
+            <div className="flex shrink-0 items-center gap-2">
+              <form action={deleteOfflineOrderAction}>
+                <input type="hidden" name="order_id" value={order.id} />
+                <ConfirmButton
+                  variant="danger"
+                  className="h-10 px-3 text-xs"
+                  message={`Permanently delete offline order ${order.so_number}? This action cannot be undone and removes all attached files.`}
+                >
+                  <Trash2 className="size-4" />
+                  <span className="hidden sm:inline">DELETE</span>
+                </ConfirmButton>
+              </form>
+            </div>
+          )}
         </div>
       </Card>
 

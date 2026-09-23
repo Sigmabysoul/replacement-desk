@@ -13,6 +13,7 @@ export type WorkflowAction =
   | "MARK_DELIVERED"
   | "MARK_NEEDS_TOKEN"
   | "CANCEL_REPLACEMENT"
+  | "DELETE_REPLACEMENT"
   | "COMMENT";
 
 const transitions: Record<ReplacementStatus, readonly ReplacementStatus[]> = {
@@ -42,6 +43,7 @@ const permissions: Record<WorkflowAction, readonly Role[]> = {
   MARK_DELIVERED: ["LOGISTICS", "ADMIN"],
   MARK_NEEDS_TOKEN: ["PACKING", "ADMIN"],
   CANCEL_REPLACEMENT: ["ADMIN"],
+  DELETE_REPLACEMENT: ["CUSTOMER_SUPPORT", "ADMIN"],
   COMMENT: ["CUSTOMER_SUPPORT", "LOGISTICS", "PRINTING", "PACKING", "ADMIN"],
 };
 

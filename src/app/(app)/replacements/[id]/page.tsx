@@ -22,7 +22,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { requireProfile } from "@/lib/auth/session";
+import { hasAnyRole, requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { ActivityLog, Attachment, Profile, QcSubmission, Replacement, ReplacementItem } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -154,10 +154,7 @@ export default async function ReplacementDetailPage({
                         <Pencil className="size-4" />
                       </Link>
                     )}
-                  {(profile.role === "ADMIN" ||
-                    (profile.role === "CUSTOMER_SUPPORT" &&
-                      replacement.created_by === profile.id &&
-                      replacement.status === "NEW")) && (
+                  {hasAnyRole(profile, ["ADMIN", "CUSTOMER_SUPPORT"]) && (
                     <form action={deleteReplacementAction}>
                       <input type="hidden" name="replacement_id" value={replacement.id} />
                       <ConfirmButton
