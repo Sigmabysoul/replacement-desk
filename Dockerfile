@@ -19,10 +19,16 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 
+ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
-RUN --mount=type=secret,id=next_server_actions_encryption_key,required=true \
-  NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$(cat /run/secrets/next_server_actions_encryption_key)" npm run build
+RUN --mount=type=secret,id=next_server_actions_encryption_key,required=false \
+  if [ -f /run/secrets/next_server_actions_encryption_key ]; then \
+    export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$(cat /run/secrets/next_server_actions_encryption_key)"; \
+  fi; \
+  npm run build
 
 FROM node:22-alpine AS runner
 

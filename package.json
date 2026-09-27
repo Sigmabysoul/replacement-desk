@@ -19,6 +19,7 @@
     "db:status": "supabase status",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
+    "create-admin": "node scripts/create-admin.mjs",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run test:db && npm run build"
   },
   "dependencies": {

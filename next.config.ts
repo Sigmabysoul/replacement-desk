@@ -12,8 +12,7 @@ const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
 
 const nextConfig: NextConfig = {
   // Hostinger's Docker image uses the minimal standalone server. Other hosts
-  // retain their native Next.js output and deployment adapter behavior.
-  output: process.env.DOCKER_BUILD === "true" ? "standalone" : undefined,
+  output: process.env.DOCKER_BUILD === "true" || process.env.OUTPUT_STANDALONE === "true" ? "standalone" : undefined,
   images: {
     unoptimized: true,
     remotePatterns: [

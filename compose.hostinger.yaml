@@ -8,11 +8,8 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
-      secrets:
-        - next_server_actions_encryption_key
-    env_file:
-      - .env.production
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-}
     restart: unless-stopped
     expose:
       - "3000"
@@ -30,7 +27,3 @@ services:
 networks:
   coolify:
     external: true
-
-secrets:
-  next_server_actions_encryption_key:
-    environment: NEXT_SERVER_ACTIONS_ENCRYPTION_KEY

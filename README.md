@@ -129,23 +129,70 @@ Hostinger's managed Node.js web apps currently require **Business Web Hosting or
 
 GitHub integration automatically builds the latest selected branch on subsequent pushes. The application requires a Node.js server and must not be deployed as a static export.
 
-### Hostinger VPS deployment
+### Deploy to Coolify (VPS Hosting)
 
-The repository also includes a production `Dockerfile` and `compose.hostinger.yaml` for a Hostinger VPS that already runs Coolify. This deployment joins the existing external `coolify` Docker network but does not publish a host port. An existing reverse proxy can reach the stable `replacement-desk` network alias on port 3000 without exposing the Next.js server directly.
+Coolify is an open-source, self-hosted Heroku/Netlify/Vercel alternative that runs on your VPS.
 
-The workflow migration introduces Logistics and the `LABEL_UPLOADED` state while preserving existing Printing and Packing assignments. Use a short maintenance window and complete these steps in order:
+#### 1. Understanding the Database & Backend Architecture
+This application utilizes **Supabase** features directly on top of PostgreSQL:
+- **Authentication**: JWT cookies, session validation (`@supabase/ssr`, `auth.users`).
+- **PostgreSQL Database**: Custom schema, stored procedures (RPC), triggers, and Row-Level Security (`auth.uid()`).
+- **Storage**: Buckets for labels, POD documents, and photos (`storage.buckets`).
+- **Realtime**: WebSocket channels for instant dashboard updates.
 
-1. Confirm the exact Supabase project URL/reference, take a Supabase backup, and export `select id, full_name, role from public.profiles;` for rollback evidence.
-2. Apply every pending SQL migration in filename order with `npm run db:push`. Confirm the `LOGISTICS` role, `LABEL_UPLOADED` status, `PROOF_PHOTO` attachment type, `create_replacement_with_photos`, `submit_logistics_label`, and `submit_packing_qc` functions exist before proceeding.
-3. Assign at least one active Logistics profile, build and start the new container, verify `/login` and one controlled lifecycle, then switch HTTPS traffic. The old build cannot understand `LABEL_UPLOADED`, so application rollback also requires restoring the pre-migration database backup.
+> [!IMPORTANT]
+> If you deploy a plain/vanilla PostgreSQL container in Coolify, it lacks the HTTP authentication endpoints (`/auth/v1`) and object storage endpoints (`/storage/v1`).
+> **You have two supported ways to set up the backend on your VPS:**
+> 1. **Option A (Self-hosted on your VPS via Coolify - Recommended for full VPS ownership)**:
+>    In Coolify, go to **+ Create Resource → Service → Supabase**. Coolify will spin up PostgreSQL 15, GoTrue Auth, Storage, PostgREST, Realtime, Kong Gateway, and Supabase Studio on your VPS.
+> 2. **Option B (Managed Supabase Cloud + VPS Web App)**:
+>    Use a free or pro project on [supabase.com](https://supabase.com), and run the Next.js web application container in Coolify on your VPS.
 
-Keep production values in an uncommitted `.env.production` file beside the Compose file. Generate `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` once with `openssl rand -base64 32` and retain the same value across builds. Compose passes that server-only value to the BuildKit builder as a secret and also supplies runtime secrets through the env file; only `NEXT_PUBLIC_*` values are normal build arguments. Deploy with:
+---
 
+#### 2. Database Initialization
+Once your Supabase instance (Coolify Service or Supabase Cloud) is running:
+1. Open **Supabase Studio → SQL Editor**.
+2. Paste and run the complete schema from [`supabase/schema.sql`](file:///home/sigma/work/replacement-desk/supabase/schema.sql). This initializes all enums, tables, RLS policies, RPC stored procedures, and storage buckets (`replacement-photos` and `offline-documents`).
+
+---
+
+#### 3. Deploy the Web Application in Coolify
+
+##### Method A: Direct Git / Dockerfile Deployment (Recommended)
+1. In Coolify, click **+ Create Resource → Application → Public/Private Git Repository**.
+2. Select your repository and `master` (or main) branch.
+3. Under **Build Pack**, select **Dockerfile**.
+4. In the **Environment Variables** tab, add:
+   | Variable | Value | In Coolify: Check "Build Variable"? |
+   | :--- | :--- | :---: |
+   | `NEXT_PUBLIC_SUPABASE_URL` | e.g. `https://your-domain-or-ip:8000` | ✅ **YES** |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public Anon key from Supabase API settings | ✅ **YES** |
+   | `NEXT_PUBLIC_APP_URL` | Public HTTPS domain for this app | ✅ **YES** |
+   | `SUPABASE_SERVICE_ROLE_KEY` | `service_role` secret key from Supabase API settings | ❌ NO (Runtime only) |
+   | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`| Random 32-byte key (`openssl rand -base64 32`) | ❌ NO (Runtime only) |
+   | `TELEGRAM_*` (optional) | Bot token & channel IDs | ❌ NO (Runtime only) |
+5. Coolify will automatically configure Traefik / Caddy, generate free Let's Encrypt SSL, and deploy the app on port 3000.
+
+##### Method B: Docker Compose in Coolify
+If you prefer deploying via Docker Compose:
+1. Coolify will automatically detect [`docker-compose.yaml`](file:///home/sigma/work/replacement-desk/docker-compose.yaml).
+2. Enter the same environment variables in the Coolify UI.
+3. Click **Deploy**.
+
+---
+
+#### 4. Create the Initial Admin User
+Because the database is brand new, create your first superadmin account so you can log in:
 ```bash
-docker compose --env-file .env.production -f compose.hostinger.yaml up -d --build
+# Run locally or via SSH on your VPS:
+npm run create-admin <your-email@example.com> <your-password> "Super Admin"
 ```
-
-The container runs as an unprivileged user, restarts automatically, and reports health against `/login`. Route the chosen HTTPS hostname to `http://replacement-desk:3000` from the reverse proxy on the `coolify` network. Always test the proxy configuration before reloading it.
+Or execute it inside the running container in Coolify:
+```bash
+docker exec -it <container-id> node scripts/create-admin.mjs admin@example.com MyPass123! "Super Admin"
+```
+Once created, navigate to `/login` on your domain, log in, and you'll have full administrative control!
 
 ## Deploy to Vercel
 
