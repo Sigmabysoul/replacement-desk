@@ -23,7 +23,7 @@ export default async function EditReplacementPage({
   const supabase = await createClient();
   const { data } = await supabase.from("replacements").select("*").eq("id", id).single();
   if (!data) notFound();
-  const replacement = data as Replacement;
+  const replacement = data as unknown as Replacement;
   if (["SHIPPED", "CANCELLED"].includes(replacement.status)) {
     return <Notice>This completed replacement can no longer be edited.</Notice>;
   }

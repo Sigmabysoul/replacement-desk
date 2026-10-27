@@ -71,7 +71,7 @@ export default async function OfflineOrderDetailPage({
   ]);
 
   if (!orderData) notFound();
-  const order = orderData as OfflineOrder;
+  const order = orderData as unknown as OfflineOrder;
   const attachments = (attachmentData ?? []) as OfflineOrderAttachment[];
   const userRoles = profile.roles?.length ? profile.roles : [profile.role];
   const canEditOrderNumber = userRoles.some((r) =>
@@ -99,8 +99,8 @@ export default async function OfflineOrderDetailPage({
     ? await supabase.from("profiles").select("id,full_name,role,roles").in("id", actorIds)
     : { data: [] };
 
-  const names = new Map(
-    (profileRows ?? []).map((item) => [item.id, item as Pick<Profile, "full_name" | "role" | "roles">]),
+  const names = new Map<string, Pick<Profile, "full_name" | "role" | "roles">>(
+    ((profileRows as unknown as Pick<Profile, "id" | "full_name" | "role" | "roles">[]) ?? []).map((item) => [item.id, item]),
   );
 
   // Generate signed URLs for attachments

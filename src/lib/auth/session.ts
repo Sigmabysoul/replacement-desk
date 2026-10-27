@@ -2,7 +2,9 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createHash } from "node:crypto";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
+import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/auth-service";
 import type { Profile, Role } from "@/lib/types";
 
 interface CachedProfile {
@@ -10,9 +12,7 @@ interface CachedProfile {
   expiresAt: number;
 }
 
-// In-memory process cache keyed by auth cookie hash with a 60-second TTL.
-// Eliminates ~1,060ms of redundant network latency (remote getUser + profiles query)
-// on every internal App Router page transition.
+// In-memory process cache keyed by session token hash with a 300-second TTL.
 const profileCache = new Map<string, CachedProfile>();
 
 export function invalidateProfileCache(key?: string) {
@@ -24,46 +24,51 @@ export function invalidateProfileCache(key?: string) {
 }
 
 /**
- * Retrieves the currently authenticated user's profile record from Supabase.
+ * Retrieves the currently authenticated user's profile record from PostgreSQL.
  *
  * Uses `React.cache()` to memoize the profile lookup per incoming server request,
  * and an in-memory process-level cache keyed by the user's auth token to prevent
- * expensive remote network roundtrips during client-side navigation.
+ * redundant database roundtrips during client-side navigation.
  *
- * @returns The active user `Profile` if authenticated, or `null` if unauthenticated or Supabase is unconfigured.
+ * @returns The active user `Profile` if authenticated, or `null` if unauthenticated.
  */
 export const getSessionProfile = cache(async (): Promise<Profile | null> => {
   if (!isSupabaseConfigured()) return null;
 
   const cookieStore = await cookies();
-  const authCookies = cookieStore
-    .getAll()
-    .filter((c) => c.name.includes("auth-token") || c.name.startsWith("sb-"))
-    .map((c) => `${c.name}:${c.value}`)
-    .sort()
-    .join(";");
+  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  if (!sessionToken) return null;
 
-  if (!authCookies) return null;
-
-  const cacheKey = createHash("sha256").update(authCookies).digest("hex");
+  const cacheKey = createHash("sha256").update(sessionToken).digest("hex");
   const cached = profileCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.profile;
   }
 
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const userId = await verifySessionToken(sessionToken);
+    if (!userId) {
       profileCache.delete(cacheKey);
       return null;
     }
-    const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-    const profile = data as Profile | null;
-    if (profile && profile.active) {
+
+    const rows = await sql`
+      SELECT id, full_name, role, roles, active, created_at, updated_at
+      FROM public.profiles
+      WHERE id = ${userId}
+      LIMIT 1
+    `;
+
+    if (!rows || rows.length === 0) {
+      profileCache.delete(cacheKey);
+      return null;
+    }
+
+    const profile = rows[0] as Profile;
+    if (profile.active) {
       profileCache.set(cacheKey, {
         profile,
-        expiresAt: Date.now() + 300 * 1000, // 300s (5 min) TTL
+        expiresAt: Date.now() + 300 * 1000,
       });
     }
     return profile;
@@ -116,4 +121,3 @@ export async function requireProfile(allowedRoles?: readonly Role[]) {
   if (allowedRoles && !hasAnyRole(profile, allowedRoles)) redirect("/");
   return profile;
 }
-

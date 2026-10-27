@@ -57,7 +57,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
       const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").replace(/\s+/g, " ").slice(0, 100);
       if (q) {
         const { data: itemMatches } = await supabase.from("replacement_items").select("replacement_id").ilike("product_name", `%${q}%`).limit(100);
-        const itemOrderIds = [...new Set((itemMatches ?? []).map((item) => item.replacement_id))];
+        const itemOrderIds = [...new Set(((itemMatches as unknown as { replacement_id: string }[]) ?? []).map((item) => item.replacement_id))];
         const orderNumberFilter = /^\d+$/.test(q) ? `,order_number.eq.${Number(q)}` : "";
         const itemFilter = itemOrderIds.length ? `,id.in.(${itemOrderIds.join(",")})` : "";
         query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}${itemFilter}`);

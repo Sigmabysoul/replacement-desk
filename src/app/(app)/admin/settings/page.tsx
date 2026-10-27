@@ -17,6 +17,14 @@ function Setting({ label, configured }: { label: string; configured: boolean }) 
   );
 }
 
+interface NotificationDelivery {
+  id: string;
+  type: string;
+  status: string;
+  error: string | null;
+  created_at: string;
+}
+
 export default async function SettingsPage() {
   await requireProfile(["ADMIN"]);
   const bot = Boolean(process.env.TELEGRAM_BOT_TOKEN);
@@ -26,6 +34,8 @@ export default async function SettingsPage() {
     .select("id, type, status, error, created_at")
     .order("created_at", { ascending: false })
     .limit(6);
+
+  const deliveries = (recentNotifications as unknown as NotificationDelivery[]) ?? [];
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -93,7 +103,7 @@ export default async function SettingsPage() {
       </Card>
 
       {/* Recent Notification Deliveries */}
-      {recentNotifications && recentNotifications.length > 0 && (
+      {deliveries.length > 0 && (
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-xl bg-indigo-50 text-indigo-700">
@@ -105,7 +115,7 @@ export default async function SettingsPage() {
             </div>
           </div>
           <div className="divide-y divide-slate-100">
-            {recentNotifications.map((n) => (
+            {deliveries.map((n) => (
               <div key={n.id} className="flex items-center justify-between py-2.5 text-xs">
                 <div>
                   <span className="font-bold text-slate-800">{n.type}</span>

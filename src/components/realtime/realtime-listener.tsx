@@ -2,32 +2,17 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 /**
- * Headless Realtime listener that subscribes to database changes on `replacements`
- * and triggers a seamless Server Component refresh via Next.js `router.refresh()`.
- * Allows workers in printing, packing, and admin to see status updates live
- * without needing to manually refresh their browser.
+ * Headless background listener that triggers seamless Server Component updates via Next.js `router.refresh()`.
+ * Refreshes operational lists when workers refocus their tab or on a 15-second lightweight polling interval.
  */
 export function RealtimeListener() {
   const router = useRouter();
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      return;
-    }
-
-    let supabase: ReturnType<typeof createClient>;
-    try {
-      supabase = createClient();
-    } catch {
-      return;
-    }
-
     const triggerRefresh = () => {
-      // Debounce refreshes to prevent rapid refetches
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
@@ -36,60 +21,29 @@ export function RealtimeListener() {
       }, 300);
     };
 
-    const channel = supabase
-      .channel("realtime-replacements")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "replacements",
-        },
-        triggerRefresh,
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "qc_submissions",
-        },
-        triggerRefresh,
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "offline_orders",
-        },
-        triggerRefresh,
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "offline_order_activity_logs",
-        },
-        triggerRefresh,
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "customer_presets",
-        },
-        triggerRefresh,
-      )
-      .subscribe();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        triggerRefresh();
+      }
+    };
+
+    window.addEventListener("focus", triggerRefresh);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 15-second polling interval while active
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        triggerRefresh();
+      }
+    }, 15000);
 
     return () => {
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
-      supabase.removeChannel(channel);
+      window.removeEventListener("focus", triggerRefresh);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
     };
   }, [router]);
 

@@ -14,7 +14,6 @@ import {
   X,
   Play,
 } from "lucide-react";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import {
   getOfflineNotificationContent,
   NOTIFICATION_RECIPIENTS,
@@ -226,48 +225,46 @@ export function NotificationBell({ role, roles }: { role?: Role; roles?: Role[] 
     return "default";
   });
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const lastSeenRef = useRef<Set<string>>(new Set());
+  const isInitialMount = useRef(true);
 
-  // Fetch initial notifications and subscribe to live changes
+  // Fetch initial notifications and poll for live updates
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      return;
-    }
-
-    let supabase: ReturnType<typeof createClient>;
-    try {
-      supabase = createClient();
-    } catch {
-      return;
-    }
+    let isMounted = true;
 
     async function loadNotifications() {
-      const [
-        { data: repData },
-        { data: offData },
-      ] = await Promise.all([
-        supabase
-          .from("replacements")
-          .select("id, replacement_number, order_reference, product_name, status, updated_at, items:replacement_items(product_name,quantity,position)")
-          .order("updated_at", { ascending: false })
-          .limit(8),
-        supabase
-          .from("offline_orders")
-          .select("id, so_number, product_name, status, updated_at, carton_count, logistics_partner, items:offline_order_items(product_name,quantity,position)")
-          .order("updated_at", { ascending: false })
-          .limit(8),
-      ]);
+      try {
+        const res = await fetch("/api/notifications");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!isMounted) return;
 
-      const items: NotificationItem[] = [];
+        interface ItemSummary { product_name: string; quantity: number; }
+        interface NotificationRow {
+          id: string;
+          replacement_number?: string;
+          so_number?: string;
+          order_reference?: string;
+          product_name?: string;
+          status?: string;
+          updated_at?: string;
+          carton_count?: number;
+          logistics_partner?: string;
+          items?: ItemSummary[];
+        }
 
-      if (repData) {
+        const repData = (data.replacements ?? []) as NotificationRow[];
+        const offData = (data.offlineOrders ?? []) as NotificationRow[];
+        const items: NotificationItem[] = [];
+
         repData.forEach((row) => {
           const productSummary = row.items?.length
             ? row.items.map((item) => `${item.product_name} × ${item.quantity}`).join(", ")
-            : row.product_name;
+            : (row.product_name || "");
           const content = getNotificationContent(
-            row.status,
-            row.replacement_number,
-            row.order_reference,
+            row.status || "UPDATED",
+            row.replacement_number || "Order",
+            row.order_reference || "",
             productSummary,
           );
           items.push({
@@ -277,21 +274,19 @@ export function NotificationBell({ role, roles }: { role?: Role; roles?: Role[] 
             href: `/replacements/${row.id}`,
             title: content.title,
             subtitle: content.body,
-            created_at: row.updated_at,
-            status: row.status,
+            created_at: row.updated_at || new Date().toISOString(),
+            status: row.status || "UPDATED",
             tag: "REPLACEMENT",
           });
         });
-      }
 
-      if (offData) {
         offData.forEach((row) => {
           const productSummary = row.items?.length
             ? row.items.map((item) => `${item.product_name} × ${item.quantity}`).join(", ")
-            : row.product_name;
+            : (row.product_name || "");
           const content = getOfflineNotificationContent(
-            row.status,
-            row.so_number,
+            row.status || "UPDATED",
+            row.so_number || "Offline SO",
             productSummary,
             { cartonCount: row.carton_count, courier: row.logistics_partner },
           );
@@ -302,128 +297,64 @@ export function NotificationBell({ role, roles }: { role?: Role; roles?: Role[] 
             href: `/offline-orders/${row.id}`,
             title: content.title,
             subtitle: content.body,
-            created_at: row.updated_at,
-            status: row.status,
+            created_at: row.updated_at || new Date().toISOString(),
+            status: row.status || "UPDATED",
             tag: "OFFLINE SO",
           });
         });
-      }
 
-      items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setNotifications(items.slice(0, 15));
+        items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        const sliced = items.slice(0, 15);
+
+        // Detect new incoming notifications for audio / desktop alerts
+        if (!isInitialMount.current && lastSeenRef.current.size > 0) {
+          for (const item of sliced) {
+            if (!lastSeenRef.current.has(item.id)) {
+              const targetRoles =
+                item.order_type === "REPLACEMENT"
+                  ? (NOTIFICATION_RECIPIENTS as Record<string, readonly Role[]>)[item.status || ""] ?? []
+                  : getOfflineNotificationContent(item.status || "UPDATED", "", "", {}).targetRoles;
+              const isTargetRecipient =
+                isAdmin || targetRoles.length === 0 || targetRoles.some((r) => userRoles.includes(r));
+
+              if (isTargetRecipient) {
+                if (soundEnabled) {
+                  playLoudWarehouseAlert(item.status || "");
+                }
+                fireSystemNotification(item.title, item.subtitle, item.target_id, () => {
+                  router.push(item.href);
+                });
+              }
+            }
+          }
+        }
+
+        lastSeenRef.current = new Set(sliced.map((i) => i.id));
+        isInitialMount.current = false;
+        setNotifications(sliced);
+      } catch {
+        // Network errors will be retried on next poll
+      }
     }
 
     loadNotifications();
 
-    // Listen to live database changes via Supabase Realtime
-    const channel = supabase
-      .channel("notification-bell-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "replacements" },
-        (payload) => {
-          const row = payload.new as {
-            id?: string;
-            replacement_number?: string;
-            order_reference?: string;
-            product_name?: string;
-            status?: string;
-            updated_at?: string;
-          };
-          if (!row || !row.id) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadNotifications();
+      }
+    }, 15000);
 
-          const content = getNotificationContent(
-            row.status || "UPDATED",
-            row.replacement_number || "Order",
-            row.order_reference || "",
-            row.product_name || "",
-          );
+    const handleFocus = () => {
+      loadNotifications();
+    };
 
-          const newItem: NotificationItem = {
-            id: `rep-${row.id}-${row.status}-${row.updated_at || Date.now()}`,
-            order_type: "REPLACEMENT",
-            target_id: row.id,
-            href: `/replacements/${row.id}`,
-            title: content.title,
-            subtitle: content.body,
-            created_at: row.updated_at || new Date().toISOString(),
-            status: row.status,
-            tag: "REPLACEMENT",
-          };
-
-          setNotifications((prev) =>
-            [newItem, ...prev.filter((p) => p.id !== newItem.id)].slice(0, 15),
-          );
-
-          const targetRoles = (NOTIFICATION_RECIPIENTS as Record<string, readonly Role[]>)[row.status || ""] ?? [];
-          const isTargetRecipient =
-            isAdmin || targetRoles.length === 0 || targetRoles.some((r) => userRoles.includes(r));
-
-          if (isTargetRecipient) {
-            if (soundEnabled) {
-              playLoudWarehouseAlert(row.status);
-            }
-            fireSystemNotification(content.title, content.body, row.id, () => {
-              router.push(`/replacements/${row.id}`);
-            });
-          }
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "offline_orders" },
-        (payload) => {
-          const row = payload.new as {
-            id?: string;
-            so_number?: string;
-            product_name?: string;
-            status?: string;
-            carton_count?: number;
-            logistics_partner?: string;
-            updated_at?: string;
-          };
-          if (!row || !row.id) return;
-
-          const content = getOfflineNotificationContent(
-            row.status || "UPDATED",
-            row.so_number || "Offline SO",
-            row.product_name || "Materials",
-            { cartonCount: row.carton_count, courier: row.logistics_partner },
-          );
-
-          const newItem: NotificationItem = {
-            id: `off-${row.id}-${row.status}-${row.updated_at || Date.now()}`,
-            order_type: "OFFLINE",
-            target_id: row.id,
-            href: `/offline-orders/${row.id}`,
-            title: content.title,
-            subtitle: content.body,
-            created_at: row.updated_at || new Date().toISOString(),
-            status: row.status,
-            tag: "OFFLINE SO",
-          };
-
-          setNotifications((prev) =>
-            [newItem, ...prev.filter((p) => p.id !== newItem.id)].slice(0, 15),
-          );
-
-          const isTargetRecipient =
-            isAdmin || content.targetRoles.some((r) => userRoles.includes(r));
-
-          if (isTargetRecipient) {
-            if (soundEnabled) {
-              playLoudWarehouseAlert(row.status);
-            }
-            fireSystemNotification(content.title, content.body, row.id, () => {
-              router.push(`/offline-orders/${row.id}`);
-            });
-          }
-        },
-      )
-      .subscribe();
+    window.addEventListener("focus", handleFocus);
 
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [soundEnabled, router, isAdmin, userRoles]);
 

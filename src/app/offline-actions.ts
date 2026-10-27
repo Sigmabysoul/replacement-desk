@@ -467,7 +467,7 @@ export async function deleteOfflineOrderAction(formData: FormData) {
     redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(error.message)}`);
   }
 
-  const storagePaths = (attachments ?? []).map((a) => a.storage_path).filter(Boolean);
+  const storagePaths = (attachments as unknown as { storage_path: string }[] ?? []).map((a) => a.storage_path).filter(Boolean);
   let cleanupWarning = "";
   if (storagePaths.length > 0) {
     const { error: storageError } = await admin.storage.from("offline-order-files").remove(storagePaths);

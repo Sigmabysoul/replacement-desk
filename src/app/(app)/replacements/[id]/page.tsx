@@ -62,7 +62,7 @@ export default async function ReplacementDetailPage({
   ]);
 
   if (!replacementData) notFound();
-  const replacement = replacementData as Replacement;
+  const replacement = replacementData as unknown as Replacement;
   const attachments = (attachmentData ?? []) as Attachment[];
   const qcs = (qcData ?? []) as QcSubmission[];
   const activities = (activityData ?? []) as ActivityLog[];
@@ -82,8 +82,8 @@ export default async function ReplacementDetailPage({
     ? await supabase.from("profiles").select("id,full_name,role").in("id", actorIds)
     : { data: [] };
 
-  const names = new Map(
-    (profileRows ?? []).map((item) => [item.id, item as Pick<Profile, "full_name" | "role">]),
+  const names = new Map<string, Pick<Profile, "full_name" | "role">>(
+    ((profileRows as unknown as Pick<Profile, "id" | "full_name" | "role">[]) ?? []).map((item) => [item.id, item]),
   );
 
   if (attachments.length > 0) {

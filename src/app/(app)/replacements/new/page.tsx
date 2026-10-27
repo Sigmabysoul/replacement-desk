@@ -20,7 +20,7 @@ export default async function NewReplacementPage({ searchParams }: { searchParam
       .select("order_number")
       .order("order_number", { ascending: false })
       .limit(1);
-    startingOrderNumber = Number(latestOrderData?.[0]?.order_number ?? 500) + 1;
+    startingOrderNumber = Number((latestOrderData as unknown as { order_number: number }[])?.[0]?.order_number ?? 500) + 1;
   }
 
   return (

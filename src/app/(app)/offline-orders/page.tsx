@@ -36,7 +36,7 @@ export default async function OfflineOrdersPage({
       const q = params.q.trim().replace(/[%_,()"'\\]/g, " ").slice(0, 100);
       if (q) {
         const { data: itemMatches } = await supabase.from("offline_order_items").select("offline_order_id").ilike("product_name", `%${q}%`).limit(100);
-        const itemOrderIds = [...new Set((itemMatches ?? []).map((item) => item.offline_order_id))];
+        const itemOrderIds = [...new Set(((itemMatches as unknown as { offline_order_id: string }[]) ?? []).map((item) => item.offline_order_id))];
         const orderNumberFilter = /^\d+$/.test(q) ? `,order_number.eq.${Number(q)}` : "";
         const itemFilter = itemOrderIds.length ? `,id.in.(${itemOrderIds.join(",")})` : "";
         query = query.or(`so_number.ilike.%${q}%,brand.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}${itemFilter}`);

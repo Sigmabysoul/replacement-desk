@@ -619,7 +619,7 @@ export async function createUserAction(formData: FormData) {
     email_confirm: true,
     user_metadata: { full_name: fullName },
   });
-  if (error || !data.user) redirect(`/admin/users?error=${encodeURIComponent(error?.message ?? "Could not create user.")}`);
+  if (error || !data?.user) redirect(`/admin/users?error=${encodeURIComponent(error?.message ?? "Could not create user.")}`);
   const { error: profileError } = await admin
     .from("profiles")
     .update({ role: primaryRole, roles, active: true })
@@ -663,7 +663,7 @@ export async function updateUserAction(formData: FormData) {
   }
   const admin = createAdminClient();
   const { data: authRecord, error: authReadError } = await admin.auth.admin.getUserById(id);
-  if (authReadError || !authRecord.user) redirect(`/admin/users?error=${encodeURIComponent(authReadError?.message ?? "Could not load the Auth user.")}`);
+  if (authReadError || !authRecord?.user) redirect(`/admin/users?error=${encodeURIComponent(authReadError?.message ?? "Could not load the Auth user.")}`);
   const { error } = await admin
     .from("profiles")
     .update({ full_name: fullName, role: primaryRole, roles, active })
@@ -768,7 +768,7 @@ export async function deleteReplacementAction(formData: FormData) {
     redirect(`/replacements/${replacementId}?error=${encodeURIComponent(error.message)}`);
   }
 
-  const storagePaths = (attachments ?? []).map((a) => a.storage_path).filter(Boolean);
+  const storagePaths = (attachments as unknown as { storage_path: string }[] ?? []).map((a) => a.storage_path).filter(Boolean);
   let cleanupWarning = "";
   if (storagePaths.length > 0) {
     const { error: storageError } = await admin.storage.from("replacement-files").remove(storagePaths);

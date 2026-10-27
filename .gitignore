@@ -40,3 +40,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local uploads & backup data
+/uploads/*
+!/uploads/.gitkeep
+/storage_backup
+*.sql
+!supabase/schema.sql
+!supabase/migrations/*.sql
+!db/*.sql
