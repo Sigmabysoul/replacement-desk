@@ -29,7 +29,7 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-replacement_desk}
+      DATABASE_URL: postgres://postgres:iCOTQ1v8PHVJfaQevtCXtwyav4vgHMkvA8ZDIDPAT6fOk201IPM133REzqn637lI@httz3ullqh3z9ibd1sbntf0p:5432/postgres
       AUTH_SECRET: ${AUTH_SECRET:-tbc-kart-default-secure-auth-secret-key-min-32-chars}
       UPLOAD_DIR: /app/uploads
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
