@@ -86,6 +86,7 @@ export async function signInWithPassword(email: string, password: string): Promi
       error: null,
     };
   } catch (err: unknown) {
+    console.error("[Auth] signInWithPassword DB exception:", err);
     const message = err instanceof Error ? err.message : "Login failed";
     return { data: null, error: { message } };
   }

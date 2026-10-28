@@ -9,6 +9,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { invalidateProfileCache, requireProfile } from "@/lib/auth/session";
 import { invalidateDashboardCache } from "@/lib/cache/dashboard-cache";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { ALLOWED_MIME_TYPES, cancelReplacementSchema, commentSchema, dimensionPresetSchema, MAX_FILE_SIZE, replacementEditSchema, replacementItemsSchema, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
 import { safeFileName } from "@/lib/utils";
 import { notifyTelegram } from "@/lib/notifications/telegram";
@@ -20,6 +21,7 @@ import { ROLES, type AttachmentType, type Replacement, type Role } from "@/lib/t
  * Extracts a user-friendly error message string from an unknown caught error.
  */
 function messageFrom(error: unknown): string {
+  if (isRedirectError(error)) throw error;
   return error instanceof Error ? error.message : "Something went wrong. Your change was not saved.";
 }
 
@@ -119,15 +121,20 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(`Too many failed login attempts. Please wait ${waitMinutes} minute${waitMinutes > 1 ? "s" : ""}.`)}`);
   }
 
+  let redirectTarget = "/";
   try {
     const supabase = await createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) redirect(`/login?error=${encodeURIComponent(error.message || "Email or password is incorrect.")}`);
-    resetRateLimit(rateLimitKey);
-  } catch (err) {
-    redirect(`/login?error=${encodeURIComponent(messageFrom(err))}`);
+    if (error) {
+      redirectTarget = `/login?error=${encodeURIComponent(error.message || "Email or password is incorrect.")}`;
+    } else {
+      resetRateLimit(rateLimitKey);
+    }
+  } catch (err: unknown) {
+    if (isRedirectError(err)) throw err;
+    redirectTarget = `/login?error=${encodeURIComponent(messageFrom(err))}`;
   }
-  redirect("/");
+  redirect(redirectTarget);
 }
 
 /**

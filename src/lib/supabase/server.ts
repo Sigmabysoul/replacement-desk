@@ -139,9 +139,10 @@ export async function createClient() {
         if (result.error || !result.data) {
           return { data: { user: null, session: null }, error: result.error };
         }
+        const isHttps = process.env.NEXT_PUBLIC_APP_URL?.startsWith("https://") ?? false;
         cookieStore.set(SESSION_COOKIE_NAME, result.data.session.access_token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
+          secure: isHttps,
           sameSite: "lax",
           maxAge: 30 * 24 * 60 * 60,
           path: "/",
