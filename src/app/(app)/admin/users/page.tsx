@@ -6,15 +6,12 @@ import { Field, Input, Select } from "@/components/ui/field";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { requireProfile } from "@/lib/auth/session";
+import { getProfileRoles, requireProfile } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ROLES, type Profile, type Role } from "@/lib/types";
 
 function getUserRoles(user: Profile): Role[] {
-  if (user.roles && user.roles.length > 0) {
-    return user.roles;
-  }
-  return user.role ? [user.role] : [];
+  return getProfileRoles(user);
 }
 
 export default async function UsersPage({

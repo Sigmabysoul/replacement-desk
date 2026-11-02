@@ -26,7 +26,7 @@ export function OfflineCommentComposer({
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const roleLabel = profile.roles?.length
+  const roleLabel = Array.isArray(profile.roles) && profile.roles.length
     ? profile.roles.join(" + ")
     : profile.role;
 

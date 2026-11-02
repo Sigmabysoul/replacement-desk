@@ -5,6 +5,7 @@ import {
   signInWithPassword,
 } from "@/lib/auth/auth-service";
 import { sql, ensureDatabaseReady } from "@/lib/db";
+import { normalizeRoles } from "@/lib/auth/roles";
 
 const TEST_ADMIN_EMAIL = "testenvadmin@example.com";
 const TEST_ADMIN_PASSWORD = "SuperAdminPassword123!";
@@ -98,6 +99,18 @@ describe("Environment Admin Credentials", () => {
     await expect(ensureDatabaseReady()).resolves.toBeUndefined();
     const [tableCheck] = await sql`SELECT to_regclass('auth.users') as exists`;
     expect(tableCheck.exists).toBeTruthy();
+  });
+
+  it("normalizes postgres array string and native array roles safely", () => {
+    expect(normalizeRoles("{ADMIN}")).toEqual(["ADMIN"]);
+    expect(normalizeRoles("{CUSTOMER_SUPPORT,LOGISTICS,HR}")).toEqual([
+      "CUSTOMER_SUPPORT",
+      "LOGISTICS",
+      "HR",
+    ]);
+    expect(normalizeRoles(["ADMIN", "BOSS"])).toEqual(["ADMIN", "BOSS"]);
+    expect(normalizeRoles(null, "PRINTING")).toEqual(["PRINTING"]);
+    expect(normalizeRoles(undefined, "CUSTOMER_SUPPORT")).toEqual(["CUSTOMER_SUPPORT"]);
   });
 });
 

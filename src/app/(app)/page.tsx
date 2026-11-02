@@ -17,7 +17,7 @@ import { ReplacementCard } from "@/components/replacements/replacement-card";
 import { OfflineOrderCard } from "@/components/offline-orders/offline-order-card";
 import { UniversalSearch } from "@/components/dashboard/universal-search";
 import { FloatingWorkButton } from "@/components/dashboard/floating-work-button";
-import { hasAnyRole, requireProfile } from "@/lib/auth/session";
+import { getProfileRoles, hasAnyRole, requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type {
   OfflineOrder,
@@ -83,7 +83,7 @@ export default async function DashboardPage() {
     }
   }
 
-  const userRoles = profile.roles?.length ? profile.roles : [profile.role];
+  const userRoles = getProfileRoles(profile);
   const priorityOrder: Role[] = [
     "ADMIN",
     "BOSS",

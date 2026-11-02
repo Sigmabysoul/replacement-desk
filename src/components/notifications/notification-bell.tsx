@@ -203,7 +203,7 @@ function getNotificationContent(
 export function NotificationBell({ role, roles }: { role?: Role; roles?: Role[] }) {
   const router = useRouter();
   const userRoles = useMemo(() => {
-    return roles?.length ? roles : role ? [role] : [];
+    return Array.isArray(roles) && roles.length ? roles : role ? [role] : [];
   }, [roles, role]);
   const isAdmin = userRoles.includes("ADMIN");
   const [isOpen, setIsOpen] = useState(false);

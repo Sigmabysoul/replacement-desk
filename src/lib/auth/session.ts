@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { sql, ensureDatabaseReady } from "@/lib/db";
 import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/auth-service";
+import { normalizeRoles, hasAnyRole } from "@/lib/auth/roles";
 import type { Profile, Role } from "@/lib/types";
 
 interface CachedProfile {
@@ -65,7 +66,21 @@ export const getSessionProfile = cache(async (): Promise<Profile | null> => {
       return null;
     }
 
-    const profile = rows[0] as Profile;
+    const raw = rows[0] as unknown as {
+      id: string;
+      full_name: string;
+      role: Role;
+      roles: unknown;
+      active: boolean;
+      created_at: string;
+      updated_at: string;
+    };
+
+    const profile: Profile = {
+      ...raw,
+      roles: normalizeRoles(raw.roles, raw.role),
+    };
+
     if (profile.active) {
       profileCache.set(cacheKey, {
         profile,
@@ -78,31 +93,7 @@ export const getSessionProfile = cache(async (): Promise<Profile | null> => {
   }
 });
 
-/**
- * Extracts all effective roles for a user profile, falling back to the primary role.
- */
-export function getProfileRoles(profile: Profile): Role[] {
-  if (profile.roles && profile.roles.length > 0) {
-    return profile.roles;
-  }
-  return profile.role ? [profile.role] : [];
-}
-
-/**
- * Checks if a profile has a given role (or is an ADMIN).
- */
-export function hasRole(profile: Profile, role: Role): boolean {
-  const roles = getProfileRoles(profile);
-  return roles.includes("ADMIN") || roles.includes(role);
-}
-
-/**
- * Checks if a profile has ANY of the given roles (or is an ADMIN).
- */
-export function hasAnyRole(profile: Profile, targetRoles: readonly Role[]): boolean {
-  const roles = getProfileRoles(profile);
-  return roles.includes("ADMIN") || targetRoles.some((r) => roles.includes(r));
-}
+export { normalizeRoles, getProfileRoles, hasRole, hasAnyRole } from "@/lib/auth/roles";
 
 /**
  * Route / action guard that enforces authentication, account activity, and optional role checks.

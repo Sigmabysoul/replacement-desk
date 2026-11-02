@@ -65,7 +65,7 @@ export function OfflineActivityTimeline({ activities }: { activities: OfflineOrd
         const isDelivered = activity.action === "DELIVERY_CONFIRMED";
         const isAcknowledged = activity.action === "ORDER_ACKNOWLEDGED";
 
-        const actorRoleLabel = activity.actor?.roles?.length
+        const actorRoleLabel = Array.isArray(activity.actor?.roles) && activity.actor.roles.length
           ? activity.actor.roles.join(" + ")
           : activity.actor?.role;
         const actorName = activity.actor?.full_name ?? "System";

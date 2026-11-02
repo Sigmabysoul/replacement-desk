@@ -51,7 +51,7 @@ function findSqlFile(filename: string): string | null {
     path.resolve(process.cwd(), "..", "db", filename),
   ];
   for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
+    if (fs.existsSync(/*turbopackIgnore: true*/ c)) return c;
   }
   return null;
 }

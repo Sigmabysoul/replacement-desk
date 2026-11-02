@@ -71,15 +71,15 @@ export function Navigation({
     setPendingHref(null);
   }
 
-  const userRoles = roles?.length
+  const userRoles = (Array.isArray(roles) && roles.length
     ? roles
+    : Array.isArray(profile?.roles) && profile.roles.length
+    ? profile.roles
     : role
     ? [role]
-    : profile?.roles?.length
-    ? profile.roles
     : profile?.role
     ? [profile.role]
-    : [];
+    : []) as Role[];
   const isAdmin = userRoles.includes("ADMIN");
 
   // Operational items filtered by user role
