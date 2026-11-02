@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createHash } from "node:crypto";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
-import { sql } from "@/lib/db";
+import { sql, ensureDatabaseReady } from "@/lib/db";
 import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/auth-service";
 import type { Profile, Role } from "@/lib/types";
 
@@ -46,6 +46,7 @@ export const getSessionProfile = cache(async (): Promise<Profile | null> => {
   }
 
   try {
+    await ensureDatabaseReady().catch(() => {});
     const userId = await verifySessionToken(sessionToken);
     if (!userId) {
       profileCache.delete(cacheKey);

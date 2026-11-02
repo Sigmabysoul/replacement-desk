@@ -1,4 +1,6 @@
 import postgres from "postgres";
+import fs from "node:fs";
+import path from "node:path";
 
 function getDatabaseUrl(): string {
   // 1. Direct single DATABASE_URL (takes priority)
@@ -41,6 +43,66 @@ export const sql = globalForDb.sql ?? postgres(getDatabaseUrl(), {
 
 if (process.env.NODE_ENV !== "production") {
   globalForDb.sql = sql;
+}
+
+function findSqlFile(filename: string): string | null {
+  const candidates = [
+    path.resolve(process.cwd(), "db", filename),
+    path.resolve(process.cwd(), "..", "db", filename),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
+let dbReadyPromise: Promise<void> | null = null;
+
+/**
+ * Ensures that the core database tables exist.
+ * If the database is completely empty (no auth.users), it automatically
+ * applies db/schema.sql and db/seed-data.sql so the app is ready immediately.
+ */
+export async function ensureDatabaseReady(): Promise<void> {
+  if (dbReadyPromise) return dbReadyPromise;
+
+  dbReadyPromise = (async () => {
+    try {
+      const [tableCheck] = await sql`
+        SELECT to_regclass('auth.users') as exists;
+      `;
+
+      if (tableCheck && tableCheck.exists) {
+        return;
+      }
+
+      console.log("[DB] Core relation 'auth.users' not found. Auto-bootstrapping schema...");
+      const schemaPath = findSqlFile("schema.sql");
+      if (schemaPath) {
+        await sql.file(schemaPath);
+        console.log("[DB] Database schema created successfully!");
+      } else {
+        console.warn("[DB] Could not locate db/schema.sql for automatic migration.");
+      }
+
+      const seedPath = findSqlFile("seed-data.sql");
+      if (seedPath) {
+        console.log("[DB] Auto-seeding existing data into database...");
+        try {
+          await sql.file(seedPath);
+          console.log("[DB] Existing database data seeded successfully!");
+        } catch (seedErr) {
+          console.warn("[DB] Warning during data seed (non-fatal):", seedErr);
+        }
+      }
+    } catch (err) {
+      console.error("[DB] Failed to auto-bootstrap database:", err);
+      dbReadyPromise = null;
+      throw err;
+    }
+  })();
+
+  return dbReadyPromise;
 }
 
 export default sql;

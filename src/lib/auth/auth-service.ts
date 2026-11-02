@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { sql, ensureDatabaseReady } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import crypto from "node:crypto";
@@ -141,6 +141,7 @@ export async function ensureEnvAdminUser(): Promise<void> {
   if (!config) return;
 
   try {
+    await ensureDatabaseReady();
     await syncAdminUserToDatabase(config.email, config.password, config.name);
     envAdminSynced = true;
     console.log(`[Auth] Env admin user synchronized: ${config.email}`);
@@ -154,6 +155,7 @@ export async function signInWithPassword(email: string, password: string): Promi
   error: { message: string } | null;
 }> {
   try {
+    await ensureDatabaseReady();
     const cleanEmail = email.trim().toLowerCase();
     const envAdmin = getEnvAdminConfig();
 

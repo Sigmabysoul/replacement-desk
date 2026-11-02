@@ -4,7 +4,7 @@ import {
   syncAdminUserToDatabase,
   signInWithPassword,
 } from "@/lib/auth/auth-service";
-import { sql } from "@/lib/db";
+import { sql, ensureDatabaseReady } from "@/lib/db";
 
 const TEST_ADMIN_EMAIL = "testenvadmin@example.com";
 const TEST_ADMIN_PASSWORD = "SuperAdminPassword123!";
@@ -92,6 +92,12 @@ describe("Environment Admin Credentials", () => {
     const result = await signInWithPassword(TEST_ADMIN_EMAIL, "WrongPassword999!");
     expect(result.data).toBeNull();
     expect(result.error?.message).toBe("Invalid login credentials.");
+  });
+
+  it("ensures database readiness without error when schema exists", async () => {
+    await expect(ensureDatabaseReady()).resolves.toBeUndefined();
+    const [tableCheck] = await sql`SELECT to_regclass('auth.users') as exists`;
+    expect(tableCheck.exists).toBeTruthy();
   });
 });
 
