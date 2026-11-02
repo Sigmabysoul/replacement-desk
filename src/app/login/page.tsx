@@ -7,6 +7,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { Notice } from "@/components/ui/notice";
 import { Card } from "@/components/ui/card";
 import { getSessionProfile } from "@/lib/auth/session";
+import { ensureEnvAdminUser } from "@/lib/auth/auth-service";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export default async function LoginPage({
@@ -18,6 +19,9 @@ export default async function LoginPage({
   if (profile?.active) redirect("/");
   const { error } = await searchParams;
   const configured = isSupabaseConfigured();
+
+  // Lazily ensure environment-configured admin account exists in database
+  ensureEnvAdminUser().catch(() => {});
 
   return (
     <main className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_top_left,#e0e7ff,transparent_40%),#f8fafc] px-3.5 py-4 sm:px-4 sm:py-12">

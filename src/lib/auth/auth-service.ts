@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
+import crypto from "node:crypto";
 
 const SESSION_COOKIE_NAME = "app_session";
 
@@ -35,12 +36,146 @@ export async function verifySessionToken(token: string): Promise<string | null> 
   }
 }
 
+/**
+ * Reads admin credentials defined via environment variables.
+ * Allows instant, zero-setup admin login and auto-creation.
+ */
+export function getEnvAdminConfig(): { email: string; password: string; name: string } | null {
+  const email = (
+    process.env.ADMIN_EMAIL ||
+    process.env.INITIAL_ADMIN_EMAIL ||
+    process.env.DEFAULT_ADMIN_EMAIL
+  )?.trim().toLowerCase();
+
+  const password =
+    process.env.ADMIN_PASSWORD ||
+    process.env.INITIAL_ADMIN_PASSWORD ||
+    process.env.DEFAULT_ADMIN_PASSWORD;
+
+  if (!email || !password) return null;
+
+  const name =
+    process.env.ADMIN_NAME ||
+    process.env.INITIAL_ADMIN_NAME ||
+    process.env.DEFAULT_ADMIN_NAME ||
+    "System Admin";
+
+  return { email, password, name };
+}
+
+/**
+ * Creates or updates an admin account in both auth.users and public.profiles.
+ * Sets role = 'ADMIN', roles = ['ADMIN'], active = true.
+ */
+export async function syncAdminUserToDatabase(
+  email: string,
+  password: string,
+  fullName: string = "System Admin"
+): Promise<{ id: string }> {
+  const cleanEmail = email.trim().toLowerCase();
+  const encrypted = bcrypt.hashSync(password, 10);
+  const metadata = { full_name: fullName };
+
+  const existing = await sql`
+    SELECT id FROM auth.users WHERE lower(email) = ${cleanEmail} LIMIT 1
+  `;
+
+  let userId: string;
+  if (existing && existing.length > 0) {
+    userId = existing[0].id;
+    await sql`
+      UPDATE auth.users
+      SET encrypted_password = ${encrypted},
+          raw_user_meta_data = ${JSON.stringify(metadata)}::jsonb,
+          email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
+          updated_at = NOW()
+      WHERE id = ${userId}
+    `;
+  } else {
+    userId = crypto.randomUUID();
+    await sql`
+      INSERT INTO auth.users (
+        id, email, encrypted_password, raw_user_meta_data, email_confirmed_at, created_at, updated_at
+      )
+      VALUES (
+        ${userId},
+        ${cleanEmail},
+        ${encrypted},
+        ${JSON.stringify(metadata)}::jsonb,
+        NOW(),
+        NOW(),
+        NOW()
+      )
+    `;
+  }
+
+  await sql`
+    INSERT INTO public.profiles (
+      id, full_name, role, roles, active, created_at, updated_at
+    )
+    VALUES (
+      ${userId},
+      ${fullName},
+      'ADMIN'::public.app_role,
+      ARRAY['ADMIN']::public.app_role[],
+      true,
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (id) DO UPDATE
+    SET role = 'ADMIN'::public.app_role,
+        roles = ARRAY['ADMIN']::public.app_role[],
+        active = true,
+        full_name = EXCLUDED.full_name,
+        updated_at = NOW()
+  `;
+
+  return { id: userId };
+}
+
+let envAdminSynced = false;
+
+export async function ensureEnvAdminUser(): Promise<void> {
+  if (envAdminSynced) return;
+  const config = getEnvAdminConfig();
+  if (!config) return;
+
+  try {
+    await syncAdminUserToDatabase(config.email, config.password, config.name);
+    envAdminSynced = true;
+    console.log(`[Auth] Env admin user synchronized: ${config.email}`);
+  } catch (err) {
+    console.warn("[Auth] Could not auto-sync env admin user yet:", err);
+  }
+}
+
 export async function signInWithPassword(email: string, password: string): Promise<{
   data: { user: AuthUser; session: { access_token: string } } | null;
   error: { message: string } | null;
 }> {
   try {
     const cleanEmail = email.trim().toLowerCase();
+    const envAdmin = getEnvAdminConfig();
+
+    // 1. Direct match with configured ADMIN_EMAIL & ADMIN_PASSWORD in environment
+    if (envAdmin && cleanEmail === envAdmin.email && password === envAdmin.password) {
+      console.log(`[Auth] Signing in via environment admin credentials: ${cleanEmail}`);
+      const { id } = await syncAdminUserToDatabase(cleanEmail, password, envAdmin.name);
+      const token = await createSessionToken(id);
+      return {
+        data: {
+          user: {
+            id,
+            email: cleanEmail,
+            user_metadata: { full_name: envAdmin.name },
+          },
+          session: { access_token: token },
+        },
+        error: null,
+      };
+    }
+
+    // 2. Standard database lookup
     const users = await sql`
       SELECT id, email, encrypted_password, raw_user_meta_data
       FROM auth.users

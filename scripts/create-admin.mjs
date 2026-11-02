@@ -37,15 +37,16 @@ function loadEnvFile(path) {
 loadEnvFile(resolve(process.cwd(), ".env.local"));
 loadEnvFile(resolve(process.cwd(), ".env"));
 
-const email = process.argv[2];
-const password = process.argv[3];
-const fullName = process.argv[4] || "Administrator";
+const email = process.argv[2] || process.env.ADMIN_EMAIL || process.env.INITIAL_ADMIN_EMAIL;
+const password = process.argv[3] || process.env.ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD;
+const fullName = process.argv[4] || process.env.ADMIN_NAME || process.env.INITIAL_ADMIN_NAME || "Administrator";
 const dbUrl = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/replacement_desk";
 
 if (!email || !password) {
   console.log(`
 Usage:
   node scripts/create-admin.mjs <email> <password> [fullName]
+  or define ADMIN_EMAIL and ADMIN_PASSWORD in your environment / .env file
 
 Example:
   node scripts/create-admin.mjs admin@example.com AdminPass123 "Admin User"
