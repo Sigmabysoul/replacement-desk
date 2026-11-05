@@ -1,11 +1,15 @@
 import Link from "next/link";
 import {
+  AlertCircle,
+  Ban,
   Boxes,
   Camera,
+  CheckCheck,
   CheckCircle2,
   CirclePlus,
   Clock3,
   FileCheck,
+  KeyRound,
   PackageCheck,
   Printer,
   Radar,
@@ -57,12 +61,12 @@ export default async function DashboardPage() {
         .select(REPLACEMENT_DASHBOARD_COLUMNS)
         .is("archived_at", null)
         .order("created_at", { ascending: false })
-        .limit(60),
+        .limit(500),
       supabase
         .from("offline_orders")
         .select(OFFLINE_DASHBOARD_COLUMNS)
         .order("created_at", { ascending: false })
-        .limit(60),
+        .limit(500),
     ]);
 
     replacementError = rErr;
@@ -97,7 +101,7 @@ export default async function DashboardPage() {
   const primaryRole =
     priorityOrder.find((r) => userRoles.includes(r)) ?? userRoles[0] ?? profile.role;
 
-  // Replacement Metrics with high-contrast, theme-aware accent colors
+  // Replacement Metrics with high-contrast, theme-aware accent colors - all 11 statuses
   const replacementMetrics: {
     label: string;
     count: number;
@@ -112,7 +116,7 @@ export default async function DashboardPage() {
       statuses: ["NEW"],
       icon: PackageCheck,
       tone: "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 dark:ring-1 dark:ring-blue-800/60",
-      href: "/replacements?scope=all&status=AWAITING_LOGISTICS",
+      href: "/replacements?scope=all&status=NEW",
     },
     {
       label: "Awaiting printing",
@@ -123,12 +127,28 @@ export default async function DashboardPage() {
       href: "/replacements?scope=all&status=LABEL_UPLOADED",
     },
     {
+      label: "Label printed",
+      count: replacements.filter((r) => r.status === "LABEL_PRINTED").length,
+      statuses: ["LABEL_PRINTED"],
+      icon: FileCheck,
+      tone: "bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 dark:ring-1 dark:ring-violet-800/60",
+      href: "/replacements?scope=all&status=LABEL_PRINTED",
+    },
+    {
       label: "QC review pending",
       count: replacements.filter((r) => r.status === "QC_PENDING").length,
       statuses: ["QC_PENDING"],
       icon: ScanLine,
       tone: "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-1 dark:ring-amber-800/60",
-      href: "/replacements?status=QC_PENDING",
+      href: "/replacements?scope=all&status=QC_PENDING",
+    },
+    {
+      label: "QC rejected",
+      count: replacements.filter((r) => r.status === "QC_REJECTED").length,
+      statuses: ["QC_REJECTED"],
+      icon: AlertCircle,
+      tone: "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 dark:ring-1 dark:ring-rose-800/60",
+      href: "/replacements?scope=all&status=QC_REJECTED",
     },
     {
       label: "Ready to pack",
@@ -136,7 +156,15 @@ export default async function DashboardPage() {
       statuses: ["QC_APPROVED"],
       icon: Camera,
       tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-1 dark:ring-emerald-800/60",
-      href: "/replacements?status=QC_APPROVED",
+      href: "/replacements?scope=all&status=QC_APPROVED",
+    },
+    {
+      label: "Packed",
+      count: replacements.filter((r) => r.status === "PACKED").length,
+      statuses: ["PACKED"],
+      icon: Boxes,
+      tone: "bg-cyan-50 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300 dark:ring-1 dark:ring-cyan-800/60",
+      href: "/replacements?scope=all&status=PACKED",
     },
     {
       label: "In transit tracking",
@@ -152,11 +180,27 @@ export default async function DashboardPage() {
       statuses: ["DELIVERED"],
       icon: CheckCircle2,
       tone: "bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 dark:ring-1 dark:ring-teal-800/60",
-      href: "/replacements?status=DELIVERED",
+      href: "/replacements?scope=all&status=DELIVERED",
+    },
+    {
+      label: "Needs token",
+      count: replacements.filter((r) => r.status === "NEEDS_TOKEN").length,
+      statuses: ["NEEDS_TOKEN"],
+      icon: KeyRound,
+      tone: "bg-orange-50 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 dark:ring-1 dark:ring-orange-800/60",
+      href: "/replacements?scope=all&status=NEEDS_TOKEN",
+    },
+    {
+      label: "Cancelled",
+      count: replacements.filter((r) => r.status === "CANCELLED").length,
+      statuses: ["CANCELLED"],
+      icon: Ban,
+      tone: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:ring-1 dark:ring-slate-700",
+      href: "/replacements?scope=all&status=CANCELLED",
     },
   ];
 
-  // Offline Orders Metrics with high-contrast, theme-aware accent colors
+  // Offline Orders Metrics with high-contrast, theme-aware accent colors - all 8 statuses
   const offlineMetrics: {
     label: string;
     count: number;
@@ -212,6 +256,22 @@ export default async function DashboardPage() {
       icon: CheckCircle2,
       tone: "bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 dark:ring-1 dark:ring-teal-800/60",
       href: "/offline-orders?status=DELIVERED",
+    },
+    {
+      label: "Acknowledged",
+      count: offlineOrders.filter((o) => o.status === "ACKNOWLEDGED").length,
+      statuses: ["ACKNOWLEDGED"],
+      icon: CheckCheck,
+      tone: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:ring-1 dark:ring-slate-700",
+      href: "/offline-orders?status=ACKNOWLEDGED",
+    },
+    {
+      label: "Cancelled",
+      count: offlineOrders.filter((o) => o.status === "CANCELLED").length,
+      statuses: ["CANCELLED"],
+      icon: Ban,
+      tone: "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 dark:ring-1 dark:ring-rose-800/60",
+      href: "/offline-orders?status=CANCELLED",
     },
   ];
 
@@ -302,7 +362,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
             {offlineMetrics.map((metric) => (
               <Link
                 key={metric.label}
@@ -336,14 +396,14 @@ export default async function DashboardPage() {
               </div>
             </div>
             <Link
-              href="/replacements"
+              href="/replacements?scope=all"
               className="shrink-0 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
             >
               View All ({replacements.length})
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
             {replacementMetrics.map((metric) => (
               <Link
                 key={metric.label}
@@ -409,7 +469,7 @@ export default async function DashboardPage() {
               <h2 className="text-base font-black text-foreground">Recent Replacements</h2>
             </div>
             <Link
-              href="/replacements"
+              href="/replacements?scope=all"
               className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
             >
               View full list

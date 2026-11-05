@@ -26,8 +26,8 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
   const profile = await requireProfile();
   const params = await searchParams;
   const scope: TimeScope = scopeOptions.some((item) => item.value === params.scope)
-    ? params.scope as TimeScope
-    : "recent_30";
+    ? (params.scope as TimeScope)
+    : "all";
 
   const cacheKey = `replacements:${scope}:${params.status || "all"}:${params.date || ""}:${params.q?.trim() || ""}`;
   let replacements = getCachedOperationalData<Replacement[]>(cacheKey);
@@ -43,8 +43,10 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
       query = query.is("archived_at", null).gte("created_at", new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
     } else if (scope === "archived") {
       query = query.not("archived_at", "is", null);
+    } else {
+      query = query.is("archived_at", null);
     }
-    if (params.status === "AWAITING_LOGISTICS") {
+    if (params.status === "AWAITING_LOGISTICS" || params.status === "NEW") {
       query = query.eq("status", "NEW");
     } else if (params.status === "AWAITING_QC") {
       query = query.in("status", ["LABEL_PRINTED", "QC_REJECTED"]);
@@ -63,7 +65,7 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
         query = query.or(`replacement_number.ilike.%${q}%,order_reference.ilike.%${q}%,product_name.ilike.%${q}%${orderNumberFilter}${itemFilter}`);
       }
     }
-    const { data, error: qErr } = await query.limit(100);
+    const { data, error: qErr } = await query.limit(500);
     replacements = (data ?? []) as Replacement[];
     error = qErr;
     if (!qErr) {
@@ -137,9 +139,8 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
               aria-label="Search orders"
             />
           </div>
-          <Select name="status" defaultValue={params.status ?? ""} aria-label="Filter by status">
+          <Select name="status" defaultValue={params.status === "AWAITING_LOGISTICS" ? "NEW" : (params.status ?? "")} aria-label="Filter by status">
             <option value="">All statuses</option>
-            <option value="AWAITING_LOGISTICS">Awaiting logistics</option>
             <option value="AWAITING_QC">Awaiting Packing QC</option>
             {STATUSES.map((status) => (
               <option key={status} value={status}>{statusLabel[status]}</option>

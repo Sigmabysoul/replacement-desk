@@ -43,7 +43,7 @@ export default async function OfflineOrdersPage({
       }
     }
 
-    const { data, error: qErr } = await query.limit(100);
+    const { data, error: qErr } = await query.limit(500);
     orders = (data ?? []) as OfflineOrder[];
     error = qErr;
     if (!qErr) {

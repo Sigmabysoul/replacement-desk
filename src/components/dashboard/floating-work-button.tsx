@@ -106,7 +106,7 @@ export function FloatingWorkButton({
         title: "Packing: Approved Orders",
         description: "Pack orders and prepare for dispatch",
         count: readyToPack,
-        href: "/replacements?status=QC_APPROVED",
+        href: "/replacements?scope=all&status=QC_APPROVED",
         icon: Camera,
         tone: "bg-emerald-600 text-white",
       });
@@ -184,7 +184,7 @@ export function FloatingWorkButton({
         title: "Support: QC Review",
         description: "Review packing quality photos",
         count: qcPending,
-        href: "/replacements?status=QC_PENDING",
+        href: "/replacements?scope=all&status=QC_PENDING",
         icon: ScanLine,
         tone: "bg-amber-600 text-white",
       });
