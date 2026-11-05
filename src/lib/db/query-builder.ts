@@ -245,6 +245,28 @@ export class QueryBuilder<T = Record<string, unknown>> implements PromiseLike<Qu
       .join(", ");
   }
 
+  private formatValue(column: string, val: unknown): string {
+    if (val === null || val === undefined) return "NULL";
+    if (typeof val === "boolean" || typeof val === "number") return String(val);
+
+    // PostgreSQL native array columns (e.g. profiles.roles: app_role[])
+    if (column === "roles" || column === "allowedFields" || column === "visibleColumns") {
+      if (Array.isArray(val)) {
+        const escaped = val.map((item) => `"${String(item).replace(/"/g, '\\"')}"`).join(",");
+        return `'${`{${escaped}}`}'`;
+      }
+      if (typeof val === "string") {
+        return `'${this.escape(val)}'`;
+      }
+    }
+
+    if (typeof val === "object") {
+      return `'${this.escape(JSON.stringify(val))}'::jsonb`;
+    }
+
+    return `'${this.escape(val)}'`;
+  }
+
   async execute(): Promise<QueryResult<T>> {
     try {
       const runQuery = async (executor: { unsafe: (q: string) => Promise<Record<string, unknown>[]> }) => {
@@ -312,13 +334,7 @@ export class QueryBuilder<T = Record<string, unknown>> implements PromiseLike<Qu
           const colsFormatted = columns.map((c) => `"${c}"`).join(", ");
 
           const valuesClauses = items.map((item) => {
-            const vals = columns.map((col) => {
-              const v = item[col];
-              if (v === null || v === undefined) return "NULL";
-              if (typeof v === "boolean" || typeof v === "number") return String(v);
-              if (typeof v === "object") return `'${this.escape(JSON.stringify(v))}'::jsonb`;
-              return `'${this.escape(v)}'`;
-            });
+            const vals = columns.map((col) => this.formatValue(col, item[col]));
             return `(${vals.join(", ")})`;
           });
 
@@ -339,11 +355,7 @@ export class QueryBuilder<T = Record<string, unknown>> implements PromiseLike<Qu
           }
 
           const setClauses = keys.map((key) => {
-            const v = updateObj[key];
-            if (v === null || v === undefined) return `"${key}" = NULL`;
-            if (typeof v === "boolean" || typeof v === "number") return `"${key}" = ${v}`;
-            if (typeof v === "object") return `"${key}" = '${this.escape(JSON.stringify(v))}'::jsonb`;
-            return `"${key}" = '${this.escape(v)}'`;
+            return `"${key}" = ${this.formatValue(key, updateObj[key])}`;
           });
 
           queryStr = `UPDATE public.${this.tableName} SET ${setClauses.join(", ")}`;

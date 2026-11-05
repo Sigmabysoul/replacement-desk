@@ -74,6 +74,28 @@ describe("Admin User Management: Password Edit and User Deletion", () => {
     expect(newLogin.data?.user.id).toBe(createdUserId);
   });
 
+  it("updates roles array on profile without jsonb casting error", async () => {
+    expect(createdUserId).toBeDefined();
+
+    // Verify updating roles array directly via QueryBuilder (what updateUserAction does)
+    const { QueryBuilder } = await import("@/lib/db/query-builder");
+    const qb = new QueryBuilder("profiles");
+    const { error } = await qb
+      .update({
+        full_name: "Test Worker Updated",
+        role: "PACKING",
+        roles: ["PACKING", "PRINTING"],
+        active: true,
+      })
+      .eq("id", createdUserId!);
+
+    expect(error).toBeNull();
+
+    const check = await sql`SELECT full_name, role, roles FROM public.profiles WHERE id = ${createdUserId}`;
+    expect(check.length).toBe(1);
+    expect(check[0].full_name).toBe("Test Worker Updated");
+  });
+
   it("deletes user and reassigns records cleanly", async () => {
     expect(createdUserId).toBeDefined();
 
