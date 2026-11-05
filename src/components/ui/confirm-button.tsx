@@ -8,12 +8,14 @@ export function ConfirmButton({
   children,
   message,
   variant = "primary",
+  size = "large",
   pendingText = "Processing…",
   className,
 }: {
   children: React.ReactNode;
   message: string;
   variant?: "primary" | "danger" | "warning" | "secondary";
+  size?: "default" | "large" | "icon";
   pendingText?: string;
   className?: string;
 }) {
@@ -22,7 +24,7 @@ export function ConfirmButton({
   return (
     <Button
       type="submit"
-      size="large"
+      size={size}
       variant={variant}
       className={className}
       disabled={pending}

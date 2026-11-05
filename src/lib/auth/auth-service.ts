@@ -311,9 +311,79 @@ export async function adminUpdateUserById(
   }
 }
 
-export async function adminDeleteUser(id: string): Promise<{ error: { message: string } | null }> {
+export async function adminDeleteUser(
+  id: string,
+  reassignToId?: string,
+): Promise<{ error: { message: string } | null }> {
   try {
-    await sql`DELETE FROM auth.users WHERE id = ${id}`;
+    const existing = await sql`SELECT id, email FROM auth.users WHERE id = ${id} LIMIT 1`;
+    if (!existing || existing.length === 0) {
+      return { error: { message: "User not found" } };
+    }
+
+    // Protect environment admin account if defined
+    const envAdmin = getEnvAdminConfig();
+    if (envAdmin && existing[0].email.toLowerCase() === envAdmin.email.toLowerCase()) {
+      return {
+        error: {
+          message:
+            "Cannot delete the primary system administrator account configured in environment variables.",
+        },
+      };
+    }
+
+    await sql.begin(async (tx) => {
+      if (reassignToId && reassignToId !== id) {
+        // Reassign foreign key references to the designated admin
+        await tx`UPDATE public.replacements SET created_by = ${reassignToId} WHERE created_by = ${id}`;
+        await tx`UPDATE public.replacements SET archived_by = ${reassignToId} WHERE archived_by = ${id}`;
+        await tx`UPDATE public.replacements SET delivered_by = ${reassignToId} WHERE delivered_by = ${id}`;
+        await tx`UPDATE public.replacements SET rta_by = ${reassignToId} WHERE rta_by = ${id}`;
+
+        await tx`UPDATE public.offline_orders SET created_by = ${reassignToId} WHERE created_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET packing_confirmed_by = ${reassignToId} WHERE packing_confirmed_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET dispatched_by = ${reassignToId} WHERE dispatched_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET printing_confirmed_by = ${reassignToId} WHERE printing_confirmed_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET picked_up_by = ${reassignToId} WHERE picked_up_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET delivered_by = ${reassignToId} WHERE delivered_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET acknowledged_by = ${reassignToId} WHERE acknowledged_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET cancelled_by = ${reassignToId} WHERE cancelled_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET rta_by = ${reassignToId} WHERE rta_by = ${id}`;
+
+        await tx`UPDATE public.attachments SET uploaded_by = ${reassignToId} WHERE uploaded_by = ${id}`;
+        await tx`UPDATE public.offline_order_attachments SET uploaded_by = ${reassignToId} WHERE uploaded_by = ${id}`;
+
+        await tx`UPDATE public.qc_submissions SET submitted_by = ${reassignToId} WHERE submitted_by = ${id}`;
+        await tx`UPDATE public.qc_submissions SET reviewed_by = ${reassignToId} WHERE reviewed_by = ${id}`;
+
+        await tx`UPDATE public.customer_presets SET created_by = ${reassignToId} WHERE created_by = ${id}`;
+        await tx`UPDATE public.dimension_presets SET created_by = ${reassignToId} WHERE created_by = ${id}`;
+
+        await tx`UPDATE public.activity_logs SET actor_id = ${reassignToId} WHERE actor_id = ${id}`;
+        await tx`UPDATE public.offline_order_activity_logs SET actor_id = ${reassignToId} WHERE actor_id = ${id}`;
+      } else {
+        await tx`UPDATE public.replacements SET archived_by = NULL WHERE archived_by = ${id}`;
+        await tx`UPDATE public.replacements SET delivered_by = NULL WHERE delivered_by = ${id}`;
+        await tx`UPDATE public.replacements SET rta_by = NULL WHERE rta_by = ${id}`;
+
+        await tx`UPDATE public.offline_orders SET packing_confirmed_by = NULL WHERE packing_confirmed_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET dispatched_by = NULL WHERE dispatched_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET printing_confirmed_by = NULL WHERE printing_confirmed_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET picked_up_by = NULL WHERE picked_up_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET delivered_by = NULL WHERE delivered_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET acknowledged_by = NULL WHERE acknowledged_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET cancelled_by = NULL WHERE cancelled_by = ${id}`;
+        await tx`UPDATE public.offline_orders SET rta_by = NULL WHERE rta_by = ${id}`;
+
+        await tx`UPDATE public.qc_submissions SET reviewed_by = NULL WHERE reviewed_by = ${id}`;
+        await tx`UPDATE public.activity_logs SET actor_id = NULL WHERE actor_id = ${id}`;
+        await tx`UPDATE public.offline_order_activity_logs SET actor_id = NULL WHERE actor_id = ${id}`;
+      }
+
+      await tx`DELETE FROM auth.users WHERE id = ${id}`;
+      await tx`DELETE FROM public.profiles WHERE id = ${id}`;
+    });
+
     return { error: null };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to delete user";

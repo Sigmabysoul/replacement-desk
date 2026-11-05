@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { invalidateProfileCache, requireProfile } from "@/lib/auth/session";
+import { getProfileRoles, invalidateProfileCache, requireProfile } from "@/lib/auth/session";
 import { invalidateDashboardCache } from "@/lib/cache/dashboard-cache";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { ALLOWED_MIME_TYPES, cancelReplacementSchema, commentSchema, dimensionPresetSchema, MAX_FILE_SIZE, replacementEditSchema, replacementItemsSchema, replacementSchema, transitionSchema } from "@/lib/replacements/validation";
@@ -15,7 +15,7 @@ import { safeFileName } from "@/lib/utils";
 import { notifyTelegram } from "@/lib/notifications/telegram";
 import { verifyFileSignature } from "@/lib/security/magic-bytes";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rate-limit";
-import { ROLES, type AttachmentType, type Replacement, type Role } from "@/lib/types";
+import { ROLES, type AttachmentType, type Profile, type Replacement, type Role } from "@/lib/types";
 
 /**
  * Extracts a user-friendly error message string from an unknown caught error.
@@ -680,8 +680,103 @@ export async function updateUserAction(formData: FormData) {
     user_metadata: { ...authRecord.user.user_metadata, full_name: fullName },
   });
   if (authError) redirect(`/admin/users?error=${encodeURIComponent(`Profile name was saved, but Auth metadata could not be updated: ${authError.message}`)}`);
+
+  const newPassword = String(formData.get("new_password") ?? "").trim();
+  if (newPassword) {
+    if (newPassword.length < 6) {
+      redirect("/admin/users?error=New%20password%20must%20be%20at%20least%206%20characters.");
+    }
+    const { error: passError } = await admin.auth.admin.updateUserById(id, { password: newPassword });
+    if (passError) redirect(`/admin/users?error=${encodeURIComponent(passError.message)}`);
+  }
+
   invalidateProfileCache();
   revalidatePath("/admin/users");
+  redirect("/admin/users?success=User%20updated%20successfully.");
+}
+
+/**
+ * Resets / updates any team member's password directly from the admin panel.
+ *
+ * Authorization: ADMIN only
+ */
+export async function adminResetPasswordAction(formData: FormData) {
+  await requireProfile(["ADMIN"]);
+  const id = String(formData.get("id") ?? "").trim();
+  const password = String(formData.get("password") ?? "").trim();
+
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    redirect("/admin/users?error=Invalid%20user%20ID.");
+  }
+
+  if (password.length < 6) {
+    redirect("/admin/users?error=Password%20must%20be%20at%20least%206%20characters.");
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(id, { password });
+  if (error) {
+    redirect(`/admin/users?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/admin/users");
+  redirect("/admin/users?success=User%20password%20updated%20successfully.");
+}
+
+/**
+ * Deletes a team member profile and their auth credentials.
+ * Reassigns existing operational history (orders, attachments) to the deleting admin.
+ *
+ * Authorization: ADMIN only
+ */
+export async function deleteUserAction(formData: FormData) {
+  const actor = await requireProfile(["ADMIN"]);
+  const id = String(formData.get("id") ?? "").trim();
+
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    redirect("/admin/users?error=Invalid%20user%20ID.");
+  }
+
+  if (id === actor.id) {
+    redirect("/admin/users?error=You%20cannot%20delete%20your%20own%20account.");
+  }
+
+  const admin = createAdminClient();
+  const { data: targetProfile } = await admin
+    .from("profiles")
+    .select("role, roles")
+    .eq("id", id)
+    .single();
+
+  if (targetProfile) {
+    const targetRoles = getProfileRoles(targetProfile as unknown as Profile);
+    if (targetRoles.includes("ADMIN")) {
+      const { data: allUsers } = await admin
+        .from<Profile>("profiles")
+        .select("id, role, roles, active")
+        .eq("active", true);
+
+      const activeAdmins = ((allUsers ?? []) as Profile[]).filter(
+        (u) => {
+          if (u.id === id) return false;
+          return getProfileRoles(u).includes("ADMIN");
+        },
+      );
+
+      if (activeAdmins.length === 0) {
+        redirect("/admin/users?error=You%20cannot%20delete%20the%20last%20active%20administrator.");
+      }
+    }
+  }
+
+  const { error } = await admin.auth.admin.deleteUser(id, actor.id);
+  if (error) {
+    redirect(`/admin/users?error=${encodeURIComponent(error.message)}`);
+  }
+
+  invalidateProfileCache();
+  revalidatePath("/admin/users");
+  redirect("/admin/users?success=User%20deleted%20successfully.");
 }
 
 /**
