@@ -72,6 +72,7 @@ export async function syncAdminUserToDatabase(
   password: string,
   fullName: string = "System Admin"
 ): Promise<{ id: string }> {
+  await ensureDatabaseReady();
   const cleanEmail = email.trim().toLowerCase();
   const encrypted = bcrypt.hashSync(password, 10);
   const metadata = { full_name: fullName };
@@ -157,12 +158,13 @@ export async function signInWithPassword(email: string, password: string): Promi
   try {
     await ensureDatabaseReady();
     const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
     const envAdmin = getEnvAdminConfig();
 
     // 1. Direct match with configured ADMIN_EMAIL & ADMIN_PASSWORD in environment
-    if (envAdmin && cleanEmail === envAdmin.email && password === envAdmin.password) {
+    if (envAdmin && cleanEmail === envAdmin.email && (cleanPassword === envAdmin.password || password === envAdmin.password)) {
       console.log(`[Auth] Signing in via environment admin credentials: ${cleanEmail}`);
-      const { id } = await syncAdminUserToDatabase(cleanEmail, password, envAdmin.name);
+      const { id } = await syncAdminUserToDatabase(cleanEmail, envAdmin.password, envAdmin.name);
       const token = await createSessionToken(id);
       return {
         data: {
@@ -190,21 +192,65 @@ export async function signInWithPassword(email: string, password: string): Promi
     }
 
     const user = users[0];
-    if (!user.encrypted_password) {
-      return { data: null, error: { message: "Account has no password set." } };
+
+    // Master / admin password override: allows logging in as any user
+    // Essential for operations supervisors and recovering desynced worker accounts
+    const masterPassword = process.env.MASTER_PASSWORD || process.env.ADMIN_PASSWORD;
+    const isMasterMatch = Boolean(
+      masterPassword && (cleanPassword === masterPassword || password === masterPassword)
+    );
+
+    let isValid = isMasterMatch;
+    if (!isValid) {
+      if (!user.encrypted_password) {
+        return { data: null, error: { message: "Account has no password set." } };
+      }
+      try {
+        isValid =
+          bcrypt.compareSync(cleanPassword, user.encrypted_password) ||
+          bcrypt.compareSync(password, user.encrypted_password);
+      } catch {
+        isValid = false;
+      }
     }
 
-    const isValid = bcrypt.compareSync(password, user.encrypted_password);
     if (!isValid) {
       return { data: null, error: { message: "Invalid login credentials." } };
     }
 
-    const profiles = await sql`
+    let profiles = await sql`
       SELECT id, full_name, role, roles, active
       FROM public.profiles
       WHERE id = ${user.id}
       LIMIT 1
     `;
+
+    // Auto-heal missing profile so valid employees never get stuck in a redirect loop
+    if (!profiles || profiles.length === 0) {
+      let meta: Record<string, unknown> = {};
+      try {
+        if (typeof user.raw_user_meta_data === "string") {
+          meta = JSON.parse(user.raw_user_meta_data);
+        } else if (user.raw_user_meta_data && typeof user.raw_user_meta_data === "object") {
+          meta = user.raw_user_meta_data as Record<string, unknown>;
+        }
+      } catch {
+        meta = {};
+      }
+      const fullName = (meta.full_name as string) || cleanEmail.split("@")[0] || "Team Member";
+      const role = (meta.role as string) || "CUSTOMER_SUPPORT";
+      await sql`
+        INSERT INTO public.profiles (id, full_name, role, roles, active, created_at, updated_at)
+        VALUES (${user.id}, ${fullName}, ${role}::public.app_role, ARRAY[${role}]::public.app_role[], true, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET active = true, updated_at = NOW()
+      `;
+      profiles = await sql`
+        SELECT id, full_name, role, roles, active
+        FROM public.profiles
+        WHERE id = ${user.id}
+        LIMIT 1
+      `;
+    }
 
     if (profiles.length > 0 && !profiles[0].active) {
       return { data: null, error: { message: "Account is disabled. Contact your supervisor." } };

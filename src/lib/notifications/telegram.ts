@@ -107,3 +107,32 @@ export async function notifyTelegram(
   }
   return { ok: !failed, skipped: false };
 }
+
+/**
+ * Sends a direct operational text message to all configured chats for a given role.
+ */
+export async function sendDepartmentTelegramAlert(role: Role, text: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { ok: true, skipped: true };
+  const targets = chatIds(role);
+  if (targets.length === 0) return { ok: true, skipped: true };
+
+  let failed = false;
+  for (const target of targets) {
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          chat_id: target,
+          text,
+          disable_web_page_preview: true,
+        }),
+      });
+      if (!response.ok) failed = true;
+    } catch {
+      failed = true;
+    }
+  }
+  return { ok: !failed, skipped: false };
+}

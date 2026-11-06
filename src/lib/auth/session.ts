@@ -54,12 +54,48 @@ export const getSessionProfile = cache(async (): Promise<Profile | null> => {
       return null;
     }
 
-    const rows = await sql`
+    let rows = await sql`
       SELECT id, full_name, role, roles, active, created_at, updated_at
       FROM public.profiles
       WHERE id = ${userId}
       LIMIT 1
     `;
+
+    if (!rows || rows.length === 0) {
+      // Auto-heal missing profile from auth.users record
+      const users = await sql`
+        SELECT email, raw_user_meta_data
+        FROM auth.users
+        WHERE id = ${userId}
+        LIMIT 1
+      `;
+      if (users && users.length > 0) {
+        const u = users[0];
+        let meta: Record<string, unknown> = {};
+        try {
+          if (typeof u.raw_user_meta_data === "string") {
+            meta = JSON.parse(u.raw_user_meta_data);
+          } else if (u.raw_user_meta_data && typeof u.raw_user_meta_data === "object") {
+            meta = u.raw_user_meta_data as Record<string, unknown>;
+          }
+        } catch {
+          meta = {};
+        }
+        const fullName = (meta.full_name as string) || (u.email as string)?.split("@")[0] || "Team Member";
+        const role = (meta.role as Role) || "CUSTOMER_SUPPORT";
+        await sql`
+          INSERT INTO public.profiles (id, full_name, role, roles, active, created_at, updated_at)
+          VALUES (${userId}, ${fullName}, ${role}::public.app_role, ARRAY[${role}]::public.app_role[], true, NOW(), NOW())
+          ON CONFLICT (id) DO UPDATE SET active = true, updated_at = NOW()
+        `;
+        rows = await sql`
+          SELECT id, full_name, role, roles, active, created_at, updated_at
+          FROM public.profiles
+          WHERE id = ${userId}
+          LIMIT 1
+        `;
+      }
+    }
 
     if (!rows || rows.length === 0) {
       profileCache.delete(cacheKey);

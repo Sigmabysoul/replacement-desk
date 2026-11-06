@@ -2,6 +2,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { Navigation } from "@/components/layout/navigation";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { RealtimeListener } from "@/components/realtime/realtime-listener";
+import { ForceWorkNotification } from "@/components/notifications/force-work-notification";
 import { requireProfile } from "@/lib/auth/session";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -10,6 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <ThemeProvider>
       <div className="min-h-dvh w-full max-w-full overflow-x-clip">
         <RealtimeListener />
+        <ForceWorkNotification />
         <Navigation profile={profile} role={profile.role} roles={profile.roles} />
         <div className="lg:pl-64 min-w-0 w-full">
           <AppHeader profile={profile} />

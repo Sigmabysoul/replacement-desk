@@ -138,6 +138,39 @@ docker cp ./uploads/. replacement-desk-web:/app/uploads/
 
 ---
 
+## 🔄 Syncing Fresh Data from Supabase Cloud to VPS
+
+If staff continued using the old Supabase app and created new orders, replacements, or account changes, sync everything directly into your VPS database in one command:
+
+```bash
+# 1. Run the auto-sync script (connects to Supabase Cloud, fetches all new data, and updates VPS DB + seed-data.sql):
+npm run db:sync "postgresql://postgres:[SUPABASE_PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres" "postgresql://postgres:[VPS_PASSWORD]@[VPS_IP]:5432/replacement_desk"
+```
+
+This single command:
+1. Connects to Supabase Cloud and pulls all latest `auth.users`, `public.profiles`, `replacements`, `items`, `qc_submissions`, `attachments`, and `offline_orders`.
+2. Safely inserts/upserts all records into your VPS PostgreSQL using `session_replication_role = replica`.
+3. Auto-generates the updated `db/seed-data.sql` so container restarts always keep the fresh data.
+4. Synchronizes newly uploaded photos and documents into `./uploads` (if Supabase credentials are configured).
+
+---
+
+## 🔑 Login Fixes & Master Password Override
+
+1. **Auto-Healed Profiles**: Any authenticated user present in `auth.users` who is missing a corresponding `public.profiles` row will now have their profile automatically generated with active access on sign in, eliminating redirect loops.
+2. **HTTP vs HTTPS Cookie Resilience**: The session cookie (`app_session`) now automatically detects the incoming protocol. Accessing the VPS via direct IP or HTTP (`http://<vps-ip>:3000`) will never drop the cookie.
+3. **Master Override Password**: If any employee's password was forgotten or desynced, admins can sign into **any** employee account using the master/admin password (`MASTER_PASSWORD` or `ADMIN_PASSWORD` in `.env`).
+
+---
+
+## 🚨 On-Screen Force Notification & Hourly Reminders
+
+1. **Desktop & Mobile Force Modal**: When staff have incomplete tasks in their queue (e.g. shipping labels to add, labels to print, orders to pack, QC to approve), a high-priority, full-screen notification appears on screen with loud audio chimes and phone vibration.
+2. **1-Hour Recurring Reminders**: If the user leaves their work unfinished, the application forcibly re-triggers the notification modal, audio alarm, and browser push alert **every 1 hour** until all their assigned tasks are completed.
+3. **Automated Hourly Cron (Optional)**: Ping `/api/cron/hourly-reminders` via cron to broadcast hourly departmental reminders over Telegram.
+
+---
+
 ## 🛡️ Health & Verification Commands
 
 Once deployed on your VPS, you can run verification checks:

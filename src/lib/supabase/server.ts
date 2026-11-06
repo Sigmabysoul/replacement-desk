@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { QueryBuilder } from "@/lib/db/query-builder";
 import { executeRpc } from "@/lib/db/rpc";
 import {
@@ -139,7 +139,14 @@ export async function createClient() {
         if (result.error || !result.data) {
           return { data: { user: null, session: null }, error: result.error };
         }
-        const isHttps = process.env.NEXT_PUBLIC_APP_URL?.startsWith("https://") ?? false;
+        let isHttps = false;
+        try {
+          const reqHeaders = await headers();
+          const proto = reqHeaders.get("x-forwarded-proto");
+          isHttps = proto === "https";
+        } catch {
+          isHttps = false;
+        }
         cookieStore.set(SESSION_COOKIE_NAME, result.data.session.access_token, {
           httpOnly: true,
           secure: isHttps,

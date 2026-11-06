@@ -19,6 +19,7 @@
     "db:status": "supabase status",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
+    "db:sync": "node scripts/sync-from-supabase.mjs",
     "create-admin": "node scripts/create-admin.mjs",
     "backup-storage": "node scripts/backup-storage.mjs",
     "restore-storage": "node scripts/restore-storage.mjs",
