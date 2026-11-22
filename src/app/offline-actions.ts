@@ -7,6 +7,7 @@ import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { invalidateDashboardCache } from "@/lib/cache/dashboard-cache";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "@/lib/replacements/validation";
 import {
   cancelOfflineOrderSchema,
@@ -24,7 +25,22 @@ import { verifyFileSignature } from "@/lib/security/magic-bytes";
 import type { OfflineOrder, OfflineOrderAttachmentType } from "@/lib/types";
 
 function messageFrom(error: unknown): string {
-  return error instanceof Error ? error.message : "Something went wrong. Your change was not saved.";
+  if (isRedirectError(error)) throw error;
+  console.error("[Offline Action Error]", error);
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null) {
+    if ("message" in error && typeof (error as { message: unknown }).message === "string") {
+      return (error as { message: string }).message;
+    }
+    if ("details" in error && typeof (error as { details: unknown }).details === "string") {
+      return (error as { details: string }).details;
+    }
+    if ("error_description" in error && typeof (error as { error_description: unknown }).error_description === "string") {
+      return (error as { error_description: string }).error_description;
+    }
+  }
+  if (typeof error === "string") return error;
+  return "Something went wrong. Your change was not saved.";
 }
 
 function formFiles(formData: FormData, key: string): File[] {
@@ -58,7 +74,7 @@ async function uploadOfflineFiles(
     });
     if (error) {
       if (uploaded.length) await supabase.storage.from("offline-order-files").remove(uploaded);
-      throw new Error(`Could not upload ${file.name}. Try again.`);
+      throw new Error(`Could not upload ${file.name}: ${error.message || "Storage error"}`);
     }
     uploaded.push(path);
     rows.push({
@@ -261,7 +277,7 @@ export async function dispatchPrepareOfflineOrderAction(formData: FormData) {
       p_attachments: attachmentRows,
     });
 
-    if (error) throw error;
+    if (error) throw new Error(error.message ?? "Could not prepare dispatch details.");
   } catch (error) {
     await cleanupUncommittedOfflineUploads(supabase, uploaded);
     redirect(`/offline-orders/${orderId}?error=${encodeURIComponent(messageFrom(error))}`);
@@ -346,7 +362,7 @@ export async function confirmDeliveryAction(formData: FormData) {
       p_attachments: attachmentRows,
     });
 
-    if (error) throw error;
+    if (error) throw new Error(error.message ?? "Could not confirm delivery.");
   } catch (error) {
     await cleanupUncommittedOfflineUploads(supabase, uploaded);
     const errorMsg = messageFrom(error);

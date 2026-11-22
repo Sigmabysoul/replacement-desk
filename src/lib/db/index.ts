@@ -72,29 +72,107 @@ export async function ensureDatabaseReady(): Promise<void> {
         SELECT to_regclass('auth.users') as exists;
       `;
 
-      if (tableCheck && tableCheck.exists) {
-        return;
-      }
+      if (!tableCheck || !tableCheck.exists) {
+        console.log("[DB] Core relation 'auth.users' not found. Auto-bootstrapping schema...");
+        const schemaPath = findSqlFile("schema.sql");
+        if (schemaPath) {
+          await sql.file(schemaPath);
+          console.log("[DB] Database schema created successfully!");
+        } else {
+          console.warn("[DB] Could not locate db/schema.sql for automatic migration.");
+        }
 
-      console.log("[DB] Core relation 'auth.users' not found. Auto-bootstrapping schema...");
-      const schemaPath = findSqlFile("schema.sql");
-      if (schemaPath) {
-        await sql.file(schemaPath);
-        console.log("[DB] Database schema created successfully!");
-      } else {
-        console.warn("[DB] Could not locate db/schema.sql for automatic migration.");
-      }
-
-      const seedPath = findSqlFile("seed-data.sql");
-      if (seedPath) {
-        console.log("[DB] Auto-seeding existing data into database...");
-        try {
-          await sql.file(seedPath);
-          console.log("[DB] Existing database data seeded successfully!");
-        } catch (seedErr) {
-          console.warn("[DB] Warning during data seed (non-fatal):", seedErr);
+        const seedPath = findSqlFile("seed-data.sql");
+        if (seedPath) {
+          console.log("[DB] Auto-seeding existing data into database...");
+          try {
+            await sql.file(seedPath);
+            console.log("[DB] Existing database data seeded successfully!");
+          } catch (seedErr) {
+            console.warn("[DB] Warning during data seed (non-fatal):", seedErr);
+          }
         }
       }
+
+      // Ensure storage schema & tables exist
+      await sql.unsafe(`
+        CREATE SCHEMA IF NOT EXISTS storage;
+        CREATE TABLE IF NOT EXISTS storage.buckets (
+          id text NOT NULL PRIMARY KEY,
+          name text NOT NULL,
+          owner text,
+          created_at timestamp with time zone DEFAULT now(),
+          updated_at timestamp with time zone DEFAULT now(),
+          public boolean DEFAULT false,
+          avif_autodetection boolean DEFAULT false,
+          file_size_limit bigint,
+          allowed_mime_types text[],
+          owner_id text,
+          type text DEFAULT 'STANDARD'::text,
+          versioning_status text DEFAULT 'DISABLED'::text,
+          lifecycle_configuration jsonb,
+          lifecycle_configuration_generation bigint
+        );
+        CREATE TABLE IF NOT EXISTS storage.objects (
+          id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+          bucket_id text NOT NULL,
+          name text NOT NULL,
+          owner text,
+          created_at timestamp with time zone DEFAULT now(),
+          updated_at timestamp with time zone DEFAULT now(),
+          last_accessed_at timestamp with time zone,
+          metadata jsonb,
+          version text,
+          owner_id text,
+          user_metadata jsonb,
+          archived_at timestamp with time zone,
+          is_delete_marker boolean DEFAULT false,
+          is_versioned boolean DEFAULT false
+        );
+        INSERT INTO storage.buckets (id, name, public)
+        VALUES ('replacement-files', 'replacement-files', false),
+               ('offline-order-files', 'offline-order-files', false)
+        ON CONFLICT (id) DO NOTHING;
+      `).catch((e: Error) => console.warn("[DB] Storage schema ensure notice:", e.message));
+
+      // Auto-heal missing storage.objects rows for existing attachments
+      await sql`
+        INSERT INTO storage.objects (id, bucket_id, name, owner, owner_id, metadata, created_at, updated_at)
+        SELECT
+          gen_random_uuid(),
+          'replacement-files',
+          a.storage_path,
+          a.uploaded_by::text,
+          a.uploaded_by::text,
+          jsonb_build_object('mimetype', a.mime_type),
+          a.created_at,
+          a.created_at
+        FROM public.attachments a
+        WHERE a.storage_path IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM storage.objects s
+            WHERE s.bucket_id = 'replacement-files' AND s.name = a.storage_path
+          );
+      `.catch(() => {});
+
+      await sql`
+        INSERT INTO storage.objects (id, bucket_id, name, owner, owner_id, metadata, created_at, updated_at)
+        SELECT
+          gen_random_uuid(),
+          'offline-order-files',
+          o.storage_path,
+          o.uploaded_by::text,
+          o.uploaded_by::text,
+          jsonb_build_object('mimetype', o.mime_type),
+          o.created_at,
+          o.created_at
+        FROM public.offline_order_attachments o
+        WHERE o.storage_path IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM storage.objects s
+            WHERE s.bucket_id = 'offline-order-files' AND s.name = o.storage_path
+          );
+      `.catch(() => {});
     } catch (err) {
       console.error("[DB] Failed to auto-bootstrap database:", err);
       dbReadyPromise = null;

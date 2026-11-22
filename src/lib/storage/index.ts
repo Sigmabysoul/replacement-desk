@@ -4,7 +4,11 @@ import { dirname, join, normalize, resolve } from "node:path";
 export function getUploadDir(): string {
   const dir = process.env.UPLOAD_DIR || join(process.cwd(), "uploads");
   if (!existsSync(/*turbopackIgnore: true*/ dir)) {
-    mkdirSync(dir, { recursive: true });
+    try {
+      mkdirSync(dir, { recursive: true });
+    } catch (err) {
+      console.error(`[Storage] Failed to create upload directory at ${dir}:`, err);
+    }
   }
   return dir;
 }
@@ -33,6 +37,7 @@ export async function uploadFile(
     writeFileSync(fullPath, buffer);
     return { error: null };
   } catch (err) {
+    console.error(`[Storage] Failed to write file to disk (${bucket}/${path}):`, err);
     return { error: err as Error };
   }
 }
@@ -50,6 +55,7 @@ export async function removeFiles(
     }
     return { error: null };
   } catch (err) {
+    console.error(`[Storage] Failed to remove files from disk (${bucket}):`, err);
     return { error: err as Error };
   }
 }

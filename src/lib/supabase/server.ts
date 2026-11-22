@@ -75,6 +75,33 @@ export async function createClient() {
           if (error) {
             return { data: null, error: { message: error.message } };
           }
+
+          try {
+            const ownerId = activeUserId || null;
+            await sql`
+              DELETE FROM storage.objects WHERE bucket_id = ${bucket} AND name = ${path}
+            `;
+            await sql`
+              INSERT INTO storage.objects (
+                id, bucket_id, name, owner, owner_id, metadata, created_at, updated_at
+              ) VALUES (
+                gen_random_uuid(),
+                ${bucket},
+                ${path},
+                ${ownerId},
+                ${ownerId},
+                ${JSON.stringify({
+                  size: buffer.length,
+                  mimetype: options?.contentType || "application/octet-stream",
+                })}::jsonb,
+                NOW(),
+                NOW()
+              )
+            `;
+          } catch (dbErr: unknown) {
+            console.error(`[Storage] Failed to record storage object in database for ${bucket}/${path}:`, dbErr);
+          }
+
           return { data: { path }, error: null };
         },
 
@@ -82,6 +109,15 @@ export async function createClient() {
           const { error } = await removeFiles(bucket, paths);
           if (error) {
             return { data: null, error: { message: error.message } };
+          }
+          try {
+            if (paths.length > 0) {
+              await sql`
+                DELETE FROM storage.objects WHERE bucket_id = ${bucket} AND name = ANY(${paths})
+              `;
+            }
+          } catch (dbErr: unknown) {
+            console.error(`[Storage] Failed to delete storage objects from database:`, dbErr);
           }
           return { data: null, error: null };
         },

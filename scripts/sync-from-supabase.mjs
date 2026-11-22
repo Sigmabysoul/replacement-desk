@@ -111,101 +111,32 @@ async function runSync() {
   try {
     console.log("📥 Fetching latest data from Supabase Cloud...");
 
-    // 1. Fetch Users
-    const users = await sourceSql`
-      SELECT id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
-             invited_at, confirmation_token, confirmation_sent_at, recovery_token,
-             recovery_sent_at, email_change_token_new, email_change, email_change_sent_at,
-             last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin,
-             created_at, updated_at, phone, phone_confirmed_at, phone_change,
-             phone_change_token, phone_change_sent_at, email_change_token_current,
-             email_change_confirm_status, banned_until, reauthentication_token,
-             reauthentication_sent_at, is_sso_user, deleted_at, is_anonymous
-      FROM auth.users
-      ORDER BY created_at ASC
-    `;
-    console.log(`  • Found ${users.length} auth.users`);
+    // Helper to safely fetch all rows from a table
+    async function safeFetch(queryFn, label) {
+      try {
+        const rows = await queryFn();
+        console.log(`  • Found ${rows.length} ${label}`);
+        return rows;
+      } catch (err) {
+        console.warn(`  • [Notice] Could not fetch ${label}: ${err.message}`);
+        return [];
+      }
+    }
 
-    // 2. Fetch Profiles
-    const profiles = await sourceSql`
-      SELECT id, full_name, role, roles, active, created_at, updated_at
-      FROM public.profiles
-      ORDER BY created_at ASC
-    `;
-    console.log(`  • Found ${profiles.length} public.profiles`);
-
-    // 3. Fetch Dimension Presets
-    const presets = await sourceSql`
-      SELECT id, name, length_cm, width_cm, height_cm, created_at, updated_at
-      FROM public.dimension_presets
-      ORDER BY created_at ASC
-    `;
-    console.log(`  • Found ${presets.length} public.dimension_presets`);
-
-    // 4. Fetch Replacements
-    const replacements = await sourceSql`
-      SELECT id, replacement_number, order_reference, order_number, order_type,
-             customer_name, customer_phone, courier_partner, tracking_id, tracking_url,
-             status, brand, product_name, quantity, dimensions_cm, weight_kg,
-             notes, archived_at, created_at, updated_at, created_by
-      FROM public.replacements
-      ORDER BY created_at ASC
-    `;
-    console.log(`  • Found ${replacements.length} public.replacements`);
-
-    // 5. Fetch Replacement Items
-    const replacementItems = await sourceSql`
-      SELECT id, replacement_id, product_name, quantity, position, created_at
-      FROM public.replacement_items
-      ORDER BY position ASC
-    `;
-    console.log(`  • Found ${replacementItems.length} public.replacement_items`);
-
-    // 6. Fetch QC Submissions
-    const qcSubmissions = await sourceSql`
-      SELECT id, replacement_id, attempt_number, status, decision, reviewer_id,
-             rejection_reason, feedback, notes, created_at, reviewed_at
-      FROM public.qc_submissions
-      ORDER BY attempt_number ASC
-    `;
-    console.log(`  • Found ${qcSubmissions.length} public.qc_submissions`);
-
-    // 7. Fetch Attachments
-    const attachments = await sourceSql`
-      SELECT id, replacement_id, qc_submission_id, file_path, file_name, file_size,
-             mime_type, attachment_type, uploader_id, created_at
-      FROM public.attachments
-      ORDER BY created_at ASC
-    `;
-    console.log(`  • Found ${attachments.length} public.attachments`);
-
-    // 8. Fetch Activity Logs
-    const activities = await sourceSql`
-      SELECT id, replacement_id, offline_order_id, actor_id, event_type, old_status,
-             new_status, comment, metadata, created_at
-      FROM public.activity_logs
-      ORDER BY created_at ASC
-    `;
-    console.log(`  • Found ${activities.length} public.activity_logs`);
-
-    // 9. Fetch Offline Orders
-    const offlineOrders = await sourceSql`
-      SELECT id, so_number, order_number, brand, product_name, quantity, unit,
-             customer_name, customer_phone, customer_address, logistics_partner,
-             tracking_url, lr_number, carton_count, carton_dimensions, carton_weight_kg,
-             dispatch_date, status, notes, created_by, created_at, updated_at
-      FROM public.offline_orders
-      ORDER BY created_at ASC
-    `;
-    console.log(`  • Found ${offlineOrders.length} public.offline_orders`);
-
-    // 10. Fetch Offline Order Items
-    const offlineItems = await sourceSql`
-      SELECT id, offline_order_id, product_name, quantity, position, created_at
-      FROM public.offline_order_items
-      ORDER BY position ASC
-    `;
-    console.log(`  • Found ${offlineItems.length} public.offline_order_items`);
+    const users = await safeFetch(() => sourceSql`SELECT * FROM auth.users ORDER BY created_at ASC`, "auth.users");
+    const profiles = await safeFetch(() => sourceSql`SELECT * FROM public.profiles ORDER BY created_at ASC`, "public.profiles");
+    const presets = await safeFetch(() => sourceSql`SELECT * FROM public.dimension_presets ORDER BY created_at ASC`, "public.dimension_presets");
+    const customerPresets = await safeFetch(() => sourceSql`SELECT * FROM public.customer_presets ORDER BY created_at ASC`, "public.customer_presets");
+    const replacements = await safeFetch(() => sourceSql`SELECT * FROM public.replacements ORDER BY created_at ASC`, "public.replacements");
+    const replacementItems = await safeFetch(() => sourceSql`SELECT * FROM public.replacement_items ORDER BY "position" ASC`, "public.replacement_items");
+    const qcSubmissions = await safeFetch(() => sourceSql`SELECT * FROM public.qc_submissions ORDER BY submission_number ASC`, "public.qc_submissions");
+    const attachments = await safeFetch(() => sourceSql`SELECT * FROM public.attachments ORDER BY created_at ASC`, "public.attachments");
+    const activities = await safeFetch(() => sourceSql`SELECT * FROM public.activity_logs ORDER BY created_at ASC`, "public.activity_logs");
+    const offlineOrders = await safeFetch(() => sourceSql`SELECT * FROM public.offline_orders ORDER BY created_at ASC`, "public.offline_orders");
+    const offlineItems = await safeFetch(() => sourceSql`SELECT * FROM public.offline_order_items ORDER BY "position" ASC`, "public.offline_order_items");
+    const offlineAttachments = await safeFetch(() => sourceSql`SELECT * FROM public.offline_order_attachments ORDER BY created_at ASC`, "public.offline_order_attachments");
+    const buckets = await safeFetch(() => sourceSql`SELECT * FROM storage.buckets`, "storage.buckets");
+    const storageObjects = await safeFetch(() => sourceSql`SELECT * FROM storage.objects ORDER BY created_at ASC`, "storage.objects");
 
     // Helper to format values for SQL output
     function sqlVal(v) {
@@ -252,9 +183,12 @@ SET standard_conforming_strings = on;
       sqlDump += "\n";
     }
 
+    appendTable("storage.buckets", buckets);
+    appendTable("storage.objects", storageObjects);
     appendTable("auth.users", users);
     appendTable("public.profiles", profiles);
     appendTable("public.dimension_presets", presets);
+    appendTable("public.customer_presets", customerPresets);
     appendTable("public.replacements", replacements);
     appendTable("public.replacement_items", replacementItems);
     appendTable("public.qc_submissions", qcSubmissions);
@@ -262,6 +196,7 @@ SET standard_conforming_strings = on;
     appendTable("public.activity_logs", activities);
     appendTable("public.offline_orders", offlineOrders);
     appendTable("public.offline_order_items", offlineItems);
+    appendTable("public.offline_order_attachments", offlineAttachments);
 
     sqlDump += `
 -- Reset sequences and replication role
@@ -292,9 +227,12 @@ SET session_replication_role = DEFAULT;
         console.log(`  • Synced ${inserted}/${rows.length} rows to ${name}`);
       }
 
+      await insertBatch("storage.buckets", buckets);
+      await insertBatch("storage.objects", storageObjects);
       await insertBatch("auth.users", users);
       await insertBatch("public.profiles", profiles);
       await insertBatch("public.dimension_presets", presets);
+      await insertBatch("public.customer_presets", customerPresets);
       await insertBatch("public.replacements", replacements);
       await insertBatch("public.replacement_items", replacementItems);
       await insertBatch("public.qc_submissions", qcSubmissions);
@@ -302,6 +240,7 @@ SET session_replication_role = DEFAULT;
       await insertBatch("public.activity_logs", activities);
       await insertBatch("public.offline_orders", offlineOrders);
       await insertBatch("public.offline_order_items", offlineItems);
+      await insertBatch("public.offline_order_attachments", offlineAttachments);
 
       await targetSql.unsafe("SET session_replication_role = DEFAULT;");
       console.log("✅ All rows synced to VPS database!");

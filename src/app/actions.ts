@@ -22,7 +22,21 @@ import { ROLES, type AttachmentType, type Profile, type Replacement, type Role }
  */
 function messageFrom(error: unknown): string {
   if (isRedirectError(error)) throw error;
-  return error instanceof Error ? error.message : "Something went wrong. Your change was not saved.";
+  console.error("[Action Error]", error);
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null) {
+    if ("message" in error && typeof (error as { message: unknown }).message === "string") {
+      return (error as { message: string }).message;
+    }
+    if ("details" in error && typeof (error as { details: unknown }).details === "string") {
+      return (error as { details: string }).details;
+    }
+    if ("error_description" in error && typeof (error as { error_description: unknown }).error_description === "string") {
+      return (error as { error_description: string }).error_description;
+    }
+  }
+  if (typeof error === "string") return error;
+  return "Something went wrong. Your change was not saved.";
 }
 
 /**
@@ -73,7 +87,7 @@ async function uploadFiles(
     });
     if (error) {
       if (uploaded.length) await supabase.storage.from("replacement-files").remove(uploaded);
-      throw new Error(`Could not upload ${file.name}. Try again.`);
+      throw new Error(`Could not upload ${file.name}: ${error.message || "Storage error"}`);
     }
     uploaded.push(path);
     rows.push({
@@ -208,7 +222,7 @@ export async function createReplacementAction(formData: FormData) {
       p_tracking_url: parsed.data.tracking_url,
       p_attachments: photoUpload.rows,
     });
-    if (error || !data) throw error ?? new Error("Could not create replacement.");
+    if (error || !data) throw new Error(error?.message ?? "Could not create replacement.");
     replacement = data as Replacement;
   } catch (error) {
     await cleanupUncommittedUploads(supabase, uploaded);
@@ -328,7 +342,7 @@ export async function createOrderBatchAction(formData: FormData) {
       p_attachments: attachmentRows,
       p_items: parsedItems.data,
     });
-    if (error || !data) throw error ?? new Error("Could not create order.");
+    if (error || !data) throw new Error(error?.message ?? "Could not create order.");
     created = [data as Replacement];
   } catch (error) {
     await cleanupUncommittedUploads(supabase, uploaded);
@@ -487,7 +501,7 @@ export async function submitLogisticsAction(formData: FormData) {
       p_courier_partner: courierPartner || null,
       p_tracking_id: trackingId || null,
     });
-    if (error) throw error;
+    if (error) throw new Error(error.message ?? "Could not submit logistics label.");
     replacement = data as Replacement;
   } catch (error) {
     await cleanupUncommittedUploads(supabase, uploaded);
@@ -538,7 +552,7 @@ export async function submitPackingQcAction(formData: FormData) {
       p_submission_id: submissionId,
       p_attachments: photoUpload.rows,
     });
-    if (error) throw error;
+    if (error) throw new Error(error.message ?? "Could not submit packing QC photos.");
     replacement = data as Replacement;
   } catch (error) {
     await cleanupUncommittedUploads(supabase, uploaded);
