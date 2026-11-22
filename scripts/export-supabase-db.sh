@@ -15,6 +15,16 @@ set -euo pipefail
 DB_URL="${1:-}"
 OUTPUT_FILE="${2:-supabase_data_backup.sql}"
 
+# Locate pg_dump if not in standard PATH
+if ! command -v pg_dump >/dev/null 2>&1; then
+  for candidate in /home/me/.local/share/mise/installs/postgres/*/bin /usr/lib/postgresql/*/bin; do
+    if [ -x "$candidate/pg_dump" ]; then
+      export PATH="$candidate:$PATH"
+      break
+    fi
+  done
+fi
+
 if [ -z "$DB_URL" ]; then
   echo ""
   echo "❌ Error: Missing Database Connection URL."

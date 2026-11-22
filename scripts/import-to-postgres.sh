@@ -14,6 +14,16 @@ set -euo pipefail
 DATABASE_URL="${1:-${DATABASE_URL:-}}"
 BACKUP_FILE="${2:-data_backup.sql}"
 
+# Locate psql if not in standard PATH
+if ! command -v psql >/dev/null 2>&1; then
+  for candidate in /home/me/.local/share/mise/installs/postgres/*/bin /usr/lib/postgresql/*/bin; do
+    if [ -x "$candidate/psql" ]; then
+      export PATH="$candidate:$PATH"
+      break
+    fi
+  done
+fi
+
 if [ -z "$DATABASE_URL" ]; then
   echo ""
   echo "❌ Error: Missing DATABASE_URL."

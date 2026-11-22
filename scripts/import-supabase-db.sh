@@ -14,6 +14,16 @@ set -euo pipefail
 TARGET_DB_URL="${1:-}"
 BACKUP_FILE="${2:-supabase_data_backup.sql}"
 
+# Locate psql if not in standard PATH
+if ! command -v psql >/dev/null 2>&1; then
+  for candidate in /home/me/.local/share/mise/installs/postgres/*/bin /usr/lib/postgresql/*/bin; do
+    if [ -x "$candidate/psql" ]; then
+      export PATH="$candidate:$PATH"
+      break
+    fi
+  done
+fi
+
 if [ -z "$TARGET_DB_URL" ]; then
   echo ""
   echo "❌ Error: Missing Target Database URL."
