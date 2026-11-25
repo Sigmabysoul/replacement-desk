@@ -3623,7 +3623,7 @@ CREATE POLICY "authorized users can upload offline order files" ON storage.objec
 -- Name: objects authorized users can upload replacement files; Type: POLICY; Schema: storage; Owner: -
 --
 
-CREATE POLICY "authorized users can upload replacement files" ON storage.objects FOR INSERT TO authenticated WITH CHECK (((bucket_id = 'replacement-files'::text) AND (name ~~ 'replacements/%'::text) AND (public.current_active_role() = ANY (ARRAY['CUSTOMER_SUPPORT'::public.app_role, 'LOGISTICS'::public.app_role, 'PACKING'::public.app_role, 'ADMIN'::public.app_role])) AND (COALESCE(((metadata ->> 'size'::text))::bigint, (0)::bigint) <= 26214400)));
+CREATE POLICY "authorized users can upload replacement files" ON storage.objects FOR INSERT TO authenticated WITH CHECK (((bucket_id = 'replacement-files'::text) AND (name ~~ 'replacements/%'::text) AND (public.has_any_role('CUSTOMER_SUPPORT'::public.app_role, 'LOGISTICS'::public.app_role, 'PACKING'::public.app_role, 'ADMIN'::public.app_role)) AND (COALESCE(((metadata ->> 'size'::text))::bigint, (0)::bigint) <= 26214400)));
 
 
 --
