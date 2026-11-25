@@ -690,8 +690,14 @@ export async function updateUserAction(formData: FormData) {
     .update({ full_name: fullName, role: primaryRole, roles, active })
     .eq("id", id);
   if (error) redirect(`/admin/users?error=${encodeURIComponent(error.message)}`);
+  const currentMeta =
+    typeof authRecord?.user?.user_metadata === "object" &&
+    authRecord.user.user_metadata !== null &&
+    !Array.isArray(authRecord.user.user_metadata)
+      ? authRecord.user.user_metadata
+      : {};
   const { error: authError } = await admin.auth.admin.updateUserById(id, {
-    user_metadata: { ...authRecord.user.user_metadata, full_name: fullName },
+    user_metadata: { ...currentMeta, full_name: fullName },
   });
   if (authError) redirect(`/admin/users?error=${encodeURIComponent(`Profile name was saved, but Auth metadata could not be updated: ${authError.message}`)}`);
 

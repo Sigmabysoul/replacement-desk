@@ -144,7 +144,7 @@ export default async function ReplacementDetailPage({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={replacement.status} className="text-sm" />
-                  {["CUSTOMER_SUPPORT", "ADMIN"].includes(profile.role) &&
+                  {hasAnyRole(profile, ["CUSTOMER_SUPPORT", "ADMIN"]) &&
                     !["SHIPPED", "CANCELLED"].includes(replacement.status) && (
                       <Link
                         href={`/replacements/${replacement.id}/edit`}

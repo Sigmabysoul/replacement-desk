@@ -109,6 +109,19 @@ export async function GET() {
 
     // --- PACKING ---
     if (hasRole("PACKING")) {
+      const awaitingQc = (repMap["LABEL_PRINTED"] || 0) + (repMap["QC_REJECTED"] || 0);
+      if (awaitingQc > 0) {
+        tasks.push({
+          id: "packing-qc",
+          role: "PACKING",
+          title: "Take & Submit QC Photos",
+          description: `${awaitingQc} order${awaitingQc > 1 ? "s" : ""} awaiting packing verification and QC photos`,
+          count: awaitingQc,
+          href: "/replacements?scope=all&status=LABEL_PRINTED",
+          urgency: "high",
+        });
+      }
+
       const readyToPack = repMap["QC_APPROVED"] || 0;
       if (readyToPack > 0) {
         tasks.push({

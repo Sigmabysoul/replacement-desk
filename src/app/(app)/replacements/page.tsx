@@ -4,7 +4,7 @@ import { archiveCompletedReplacementsAction } from "@/app/actions";
 import { ReplacementCard } from "@/components/replacements/replacement-card";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
-import { hasAnyRole, hasRole, requireProfile } from "@/lib/auth/session";
+import { getProfileRoles, hasAnyRole, hasRole, requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedOperationalData, setCachedOperationalData } from "@/lib/cache/dashboard-cache";
 import { STATUSES, type Replacement, type ReplacementStatus } from "@/lib/types";
@@ -168,7 +168,12 @@ export default async function ReplacementsPage({ searchParams }: { searchParams:
       {replacements.length ? (
         <div className="grid gap-3 md:grid-cols-2 w-full max-w-full min-w-0">
           {replacements.map((replacement) => (
-            <ReplacementCard key={replacement.id} replacement={replacement} role={profile.role} />
+            <ReplacementCard
+              key={replacement.id}
+              replacement={replacement}
+              role={profile.role}
+              roles={getProfileRoles(profile)}
+            />
           ))}
         </div>
       ) : (

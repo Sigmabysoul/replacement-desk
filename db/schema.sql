@@ -1866,7 +1866,7 @@ begin
   if not found then raise exception 'Replacement not found'; end if;
 
   select public.current_active_role() into actor_role;
-  if actor_role is null or actor_role not in ('PACKING', 'ADMIN') then
+  if actor_role is null or not (actor_role in ('PACKING', 'ADMIN') or public.has_any_role('PACKING', 'ADMIN')) then
     raise exception 'Only Packing can submit QC photos';
   end if;
   if current_row.status not in ('LABEL_PRINTED', 'QC_REJECTED') then

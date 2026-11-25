@@ -14,14 +14,15 @@ import { formatDate } from "@/lib/utils";
  * @param role Active user's department role.
  * @returns Short human-readable status cue.
  */
-function actionHint(status: Replacement["status"], role: Role) {
-  if (status === "NEW") return role === "LOGISTICS" || role === "ADMIN" ? "Upload shipping label" : "Waiting for logistics";
-  if (status === "LABEL_UPLOADED") return role === "PRINTING" || role === "ADMIN" ? "Print the label" : "Waiting for printing";
-  if (status === "LABEL_PRINTED") return role === "PACKING" || role === "ADMIN" ? "Request CUSTOMER_SUPPORT QC" : "Waiting for packing QC";
-  if (status === "QC_REJECTED") return role === "PACKING" || role === "ADMIN" ? "Resubmit QC pictures" : "Waiting for packing QC";
-  if (status === "QC_PENDING") return role === "CUSTOMER_SUPPORT" || role === "ADMIN" ? "Review QC" : "Waiting for review";
-  if (status === "QC_APPROVED") return role === "PACKING" || role === "ADMIN" ? "Pack replacement" : "Ready to pack";
-  if (status === "PACKED") return role === "PACKING" || role === "ADMIN" ? "Complete dispatch" : "Ready for dispatch";
+function actionHint(status: Replacement["status"], roles: Role[]) {
+  const has = (r: Role) => roles.includes("ADMIN") || roles.includes(r);
+  if (status === "NEW") return has("LOGISTICS") ? "Upload shipping label" : "Waiting for logistics";
+  if (status === "LABEL_UPLOADED") return has("PRINTING") ? "Print the label" : "Waiting for printing";
+  if (status === "LABEL_PRINTED") return has("PACKING") ? "Request CUSTOMER_SUPPORT QC" : "Waiting for packing QC";
+  if (status === "QC_REJECTED") return has("PACKING") ? "Resubmit QC pictures" : "Waiting for packing QC";
+  if (status === "QC_PENDING") return has("CUSTOMER_SUPPORT") ? "Review QC" : "Waiting for review";
+  if (status === "QC_APPROVED") return has("PACKING") ? "Pack replacement" : "Ready to pack";
+  if (status === "PACKED") return has("PACKING") ? "Complete dispatch" : "Ready for dispatch";
   if (status === "NEEDS_TOKEN") return "Follow up on token";
   return "View history";
 }
@@ -33,9 +34,19 @@ function actionHint(status: Replacement["status"], role: Role) {
  * creation date, and direct navigation link.
  *
  * @param props.replacement Order record.
- * @param props.role Viewer's department role.
+ * @param props.role Viewer's primary department role.
+ * @param props.roles Viewer's full assigned roles list.
  */
-export function ReplacementCard({ replacement, role }: { replacement: Replacement; role: Role }) {
+export function ReplacementCard({
+  replacement,
+  role,
+  roles,
+}: {
+  replacement: Replacement;
+  role: Role;
+  roles?: Role[];
+}) {
+  const userRoles = Array.isArray(roles) && roles.length ? roles : [role];
   return (
     <Link
       href={`/replacements/${replacement.id}`}
@@ -56,7 +67,7 @@ export function ReplacementCard({ replacement, role }: { replacement: Replacemen
         </div>
         <div className="mt-4 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 min-w-0">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs sm:text-sm font-bold text-indigo-700">{actionHint(replacement.status, role)}</p>
+            <p className="truncate text-xs sm:text-sm font-bold text-indigo-700">{actionHint(replacement.status, userRoles)}</p>
             <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 truncate"><CalendarDays className="size-3.5 shrink-0" />{formatDate(replacement.created_at)}</p>
           </div>
           <span aria-hidden="true" className="grid size-9 sm:size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 transition group-hover:bg-indigo-600 group-hover:text-white">

@@ -322,12 +322,25 @@ export async function adminGetUserById(id: string): Promise<{ data: { user: Auth
       return { data: null, error: { message: "User not found" } };
     }
     const u = users[0];
+    let meta: Record<string, unknown> = {};
+    if (typeof u.raw_user_meta_data === "object" && u.raw_user_meta_data !== null && !Array.isArray(u.raw_user_meta_data)) {
+      meta = u.raw_user_meta_data as Record<string, unknown>;
+    } else if (typeof u.raw_user_meta_data === "string") {
+      try {
+        const parsed = JSON.parse(u.raw_user_meta_data);
+        if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+          meta = parsed;
+        }
+      } catch {
+        meta = {};
+      }
+    }
     return {
       data: {
         user: {
           id: u.id,
           email: u.email,
-          user_metadata: (u.raw_user_meta_data as Record<string, unknown>) ?? {},
+          user_metadata: meta,
         },
       },
       error: null,

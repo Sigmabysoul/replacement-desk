@@ -133,6 +133,96 @@ export async function ensureDatabaseReady(): Promise<void> {
         VALUES ('replacement-files', 'replacement-files', false),
                ('offline-order-files', 'offline-order-files', false)
         ON CONFLICT (id) DO NOTHING;
+
+        -- Ensure submit_packing_qc supports multi-role users (e.g. PRINTING + PACKING)
+        CREATE OR REPLACE FUNCTION public.submit_packing_qc(p_replacement_id uuid, p_submission_id uuid, p_attachments jsonb) RETURNS public.replacements
+            LANGUAGE plpgsql SECURITY DEFINER
+            SET search_path TO ''
+            AS $qc$
+        declare
+          current_row public.replacements;
+          actor_role public.app_role;
+          next_submission integer;
+          attachment_count integer := 0;
+        begin
+          select * into current_row from public.replacements where id = p_replacement_id for update;
+          if not found then raise exception 'Replacement not found'; end if;
+
+          select public.current_active_role() into actor_role;
+          if actor_role is null or not (actor_role in ('PACKING', 'ADMIN') or public.has_any_role('PACKING', 'ADMIN')) then
+            raise exception 'Only Packing can submit QC photos';
+          end if;
+          if current_row.status not in ('LABEL_PRINTED', 'QC_REJECTED') then
+            raise exception 'QC can only be submitted after label printing or a rejection';
+          end if;
+          if jsonb_typeof(p_attachments) is distinct from 'array'
+            or jsonb_array_length(p_attachments) not between 1 and 12 then
+            raise exception 'Between one and twelve QC photos are required';
+          end if;
+          if not exists (
+            select 1
+            from public.attachments attachment
+            join storage.objects stored
+              on stored.bucket_id = 'replacement-files'
+              and stored.name = attachment.storage_path
+            where attachment.replacement_id = p_replacement_id
+              and attachment.attachment_type = 'LABEL'
+          ) then
+            raise exception 'A stored shipping label is required before QC';
+          end if;
+          if (
+            select count(*)
+            from jsonb_to_recordset(p_attachments) as item(storage_path text)
+            join storage.objects as stored
+              on stored.bucket_id = 'replacement-files'
+              and stored.name = item.storage_path
+              and stored.owner_id = auth.uid()::text
+          ) <> jsonb_array_length(p_attachments) then
+            raise exception 'QC photo storage objects were not uploaded by the current user';
+          end if;
+
+          select coalesce(max(submission_number), 0) + 1
+          into next_submission
+          from public.qc_submissions
+          where replacement_id = p_replacement_id;
+
+          insert into public.qc_submissions(id, replacement_id, submission_number, submitted_by)
+          values (p_submission_id, p_replacement_id, next_submission, auth.uid());
+
+          insert into public.attachments(
+            replacement_id, qc_submission_id, attachment_type, storage_path, file_name, mime_type, uploaded_by
+          )
+          select
+            p_replacement_id, p_submission_id, 'QC_PHOTO', item.storage_path, item.file_name, item.mime_type, auth.uid()
+          from jsonb_to_recordset(p_attachments) as item(storage_path text, file_name text, mime_type text)
+          where item.mime_type in ('image/jpeg', 'image/png', 'image/webp')
+            and item.storage_path like (
+              'replacements/' || p_replacement_id || '/packing/' || p_submission_id || '/photos/%'
+            );
+          get diagnostics attachment_count = row_count;
+          if attachment_count <> jsonb_array_length(p_attachments) then raise exception 'Invalid QC photo metadata'; end if;
+
+          update public.replacements set
+            status = 'QC_PENDING',
+            qc_submitted_at = now()
+          where id = p_replacement_id
+          returning * into current_row;
+
+          insert into public.activity_logs(replacement_id, actor_id, action, metadata)
+          values (
+            p_replacement_id,
+            auth.uid(),
+            'QC_SUBMITTED',
+            jsonb_build_object('submission_id', p_submission_id, 'photo_count', attachment_count)
+          );
+
+          return current_row;
+        end;
+        $qc$;
+
+        -- Update storage policy to ensure multi-role workers can upload
+        DROP POLICY IF EXISTS "authorized users can upload replacement files" ON storage.objects;
+        CREATE POLICY "authorized users can upload replacement files" ON storage.objects FOR INSERT TO authenticated WITH CHECK (((bucket_id = 'replacement-files'::text) AND (name ~~ 'replacements/%'::text) AND (public.has_any_role('CUSTOMER_SUPPORT'::public.app_role, 'LOGISTICS'::public.app_role, 'PACKING'::public.app_role, 'ADMIN'::public.app_role)) AND (COALESCE(((metadata ->> 'size'::text))::bigint, (0)::bigint) <= 26214400)));
       `).catch((e: Error) => console.warn("[DB] Storage schema ensure notice:", e.message));
 
       // Auto-heal missing storage.objects rows for existing attachments

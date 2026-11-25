@@ -483,6 +483,7 @@ export default async function DashboardPage() {
                   key={replacement.id}
                   replacement={replacement}
                   role={profile.role}
+                  roles={userRoles}
                 />
               ))}
             </div>
